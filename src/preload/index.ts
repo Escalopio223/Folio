@@ -1,13 +1,47 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { FolioApi, DbStatus, Item, CreateItemDTO, WindowAction } from '@shared/types'
+import type {
+  FolioApi,
+  Project,
+  CreateProjectInput,
+  UpdateProjectInput,
+  Folio,
+  CreateFolioInput,
+  UpdateFolioInput,
+  LoreItem,
+  CreateLoreInput,
+  UpdateLoreInput,
+  WindowAction
+} from '@shared/types'
 
 const api: FolioApi = {
-  getDbStatus: (): Promise<DbStatus> => ipcRenderer.invoke('db:status'),
-  getItems: (): Promise<Item[]> => ipcRenderer.invoke('db:items:get'),
-  createItem: (data: CreateItemDTO): Promise<Item> => ipcRenderer.invoke('db:items:create', data),
-  deleteItem: (id: number): Promise<boolean> => ipcRenderer.invoke('db:items:delete', id),
-  windowAction: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)
+  project: {
+    getAll: (): Promise<Project[]> => ipcRenderer.invoke('project:getAll'),
+    getById: (id: string): Promise<Project | null> => ipcRenderer.invoke('project:getById', id),
+    create: (input: CreateProjectInput): Promise<Project> => ipcRenderer.invoke('project:create', input),
+    update: (input: UpdateProjectInput): Promise<Project> => ipcRenderer.invoke('project:update', input),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('project:delete', id)
+  },
+  folio: {
+    getAll: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getAll', projectId),
+    getTrash: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getTrash', projectId),
+    getById: (id: string): Promise<Folio | null> => ipcRenderer.invoke('folio:getById', id),
+    create: (input: CreateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:create', input),
+    update: (input: UpdateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:update', input),
+    deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('folio:deletePermanent', id)
+  },
+  lore: {
+    getAll: (projectId?: string, category?: string): Promise<LoreItem[]> =>
+      ipcRenderer.invoke('lore:getAll', projectId, category),
+    getTrash: (projectId?: string): Promise<LoreItem[]> => ipcRenderer.invoke('lore:getTrash', projectId),
+    getById: (id: string): Promise<LoreItem | null> => ipcRenderer.invoke('lore:getById', id),
+    create: (input: CreateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:create', input),
+    update: (input: UpdateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:update', input),
+    deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('lore:deletePermanent', id)
+  },
+  window: {
+    action: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)
+  }
 }
 
 if (process.contextIsolated) {
