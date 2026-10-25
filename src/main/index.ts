@@ -14,7 +14,7 @@ function createWindow(): BrowserWindow {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: '#120E0B',
+    backgroundColor: '#EFEAE1',
     autoHideMenuBar: true,
     icon: icon,
     webPreferences: {

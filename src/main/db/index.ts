@@ -411,6 +411,8 @@ export function updateProject(input: UpdateProjectInput): Project {
 
 export function deleteProject(id: string): boolean {
   const db = getDb()
+  db.delete(schema.folios).where(eq(schema.folios.projectId, id)).run()
+  db.delete(schema.loreItems).where(eq(schema.loreItems.projectId, id)).run()
   const res = db.delete(schema.projects).where(eq(schema.projects.id, id)).run()
   return res.changes > 0
 }

@@ -7,17 +7,26 @@ import {
   ChevronsUpDown,
   Check,
   Plus,
-  Sparkles
+  Sparkles,
+  Trash2,
+  AlertTriangle
 } from 'lucide-vue-next'
+import type { Project } from '@shared/types'
 
 const emit = defineEmits<{
   (e: 'openCreateModal'): void
   (e: 'projectChanged', projectId: string): void
+  (e: 'projectDeleted', projectId: string): void
 }>()
 
 const projectStore = useProjectStore()
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+
+// Modal de confirmación para eliminar libro
+const projectToDelete = ref<Project | null>(null)
+const isConfirmModalOpen = ref(false)
+const isDeleting = ref(false)
 
 // Cerrar automáticamente al hacer clic fuera del desplegable
 onClickOutside(dropdownRef, () => {
@@ -39,6 +48,26 @@ function handleCreateNew(): void {
   isOpen.value = false
   emit('openCreateModal')
 }
+
+function promptDelete(p: Project): void {
+  projectToDelete.value = p
+  isConfirmModalOpen.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!projectToDelete.value) return
+  const id = projectToDelete.value.id
+  try {
+    isDeleting.value = true
+    await projectStore.deleteProject(id)
+    isConfirmModalOpen.value = false
+    projectToDelete.value = null
+    isOpen.value = false
+    emit('projectDeleted', id)
+  } finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -56,7 +85,7 @@ function handleCreateNew(): void {
 
         <button
           type="button"
-          class="neu-btn px-2 py-0.5 text-[10px] text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center gap-1"
+          class="neu-btn px-2 py-0.5 text-[10px] text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center gap-1 cursor-pointer"
           title="Crear nuevo proyecto de novela"
           @click="emit('openCreateModal')"
         >
@@ -68,7 +97,7 @@ function handleCreateNew(): void {
       <!-- Gatillo táctil personalizado para abrir el menú -->
       <button
         type="button"
-        class="neu-btn w-full p-2.5 text-left flex items-center justify-between gap-2.5 transition-all group"
+        class="neu-btn w-full p-2.5 text-left flex items-center justify-between gap-2.5 transition-all group cursor-pointer"
         :class="isOpen ? 'is-active ring-1 ring-[var(--accent)]/40' : ''"
         :aria-expanded="isOpen"
         aria-haspopup="listbox"
@@ -137,7 +166,7 @@ function handleCreateNew(): void {
         </div>
 
         <!-- Lista de Proyectos con desplazamiento suave -->
-        <div class="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+        <div class="max-h-56 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
           <div
             v-for="p in projectStore.projects"
             :key="p.id"
@@ -152,7 +181,7 @@ function handleCreateNew(): void {
             "
             @click="selectProject(p.id)"
           >
-            <div class="flex items-center gap-2.5 min-w-0">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
               <div
                 class="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
                 :class="
@@ -164,7 +193,7 @@ function handleCreateNew(): void {
                 <BookOpen :size="13" />
               </div>
 
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <span class="font-editorial text-xs font-bold truncate block leading-tight text-[var(--text-primary)]">
                   {{ p.title }}
                 </span>
@@ -185,9 +214,21 @@ function handleCreateNew(): void {
               </div>
             </div>
 
-            <!-- Indicador activo de check -->
-            <div v-if="p.id === projectStore.activeProjectId" class="shrink-0 text-[var(--accent)] pr-1">
-              <Check :size="14" />
+            <!-- Acciones a la derecha: Check activo y Botón de borrar -->
+            <div class="flex items-center gap-1.5 shrink-0" @click.stop>
+              <div v-if="p.id === projectStore.activeProjectId" class="text-[var(--accent)]">
+                <Check :size="14" />
+              </div>
+
+              <!-- Botón Borrar Libro con confirmación modal -->
+              <button
+                type="button"
+                class="p-1 rounded text-[var(--text-muted)] hover:!text-rose-500 hover:neu-well-sm transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                title="Eliminar este libro de forma definitiva"
+                @click.stop="promptDelete(p)"
+              >
+                <Trash2 :size="12" />
+              </button>
             </div>
           </div>
 
@@ -205,7 +246,7 @@ function handleCreateNew(): void {
         <!-- Botón para crear libro dentro del dropdown -->
         <button
           type="button"
-          class="neu-btn w-full py-2 px-3 text-xs text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center justify-center gap-2 rounded-xl transition-all"
+          class="neu-btn w-full py-2 px-3 text-xs text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center justify-center gap-2 rounded-xl transition-all cursor-pointer"
           @click="handleCreateNew"
         >
           <Sparkles :size="13" />
@@ -213,5 +254,53 @@ function handleCreateNew(): void {
         </button>
       </div>
     </Transition>
+
+    <!-- Modal de confirmación para eliminar libro -->
+    <Teleport to="body">
+      <div
+        v-if="isConfirmModalOpen && projectToDelete"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none"
+      >
+        <div class="neu-surface p-6 max-w-sm w-full space-y-4 shadow-2xl border border-[var(--groove-dark)]/60">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl neu-well-sm flex items-center justify-center text-rose-500 shrink-0">
+              <AlertTriangle :size="20" />
+            </div>
+            <div class="min-w-0">
+              <h3 class="font-editorial text-base font-bold text-[var(--text-primary)]">
+                ¿Eliminar este libro?
+              </h3>
+              <p class="text-xs text-[var(--accent)] font-medium truncate">
+                «{{ projectToDelete.title }}»
+              </p>
+            </div>
+          </div>
+
+          <p class="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Se eliminarán de forma permanente todos los capítulos, escenas y entradas de la wiki pertenecientes a esta obra. Esta acción no se puede deshacer.
+          </p>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              class="neu-btn px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              :disabled="isDeleting"
+              @click="isConfirmModalOpen = false"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="px-4 py-1.5 text-xs font-semibold rounded-lg text-white bg-rose-600 hover:bg-rose-700 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              :disabled="isDeleting"
+              @click="confirmDelete"
+            >
+              <Trash2 :size="13" />
+              <span>{{ isDeleting ? 'Eliminando...' : 'Eliminar Libro' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

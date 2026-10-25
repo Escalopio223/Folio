@@ -7,18 +7,18 @@ import type { WindowAction } from '@shared/types'
 
 const uiStore = useUiStore()
 const isMaximized = ref(false)
-const isDark = ref(true)
+const isDark = ref(false)
 
 function initTheme(): void {
   const saved = localStorage.getItem('folio:theme')
-  if (saved === 'light') {
-    isDark.value = false
-    document.documentElement.classList.remove('dark')
-  } else {
+  if (saved === 'dark') {
     isDark.value = true
     document.documentElement.classList.add('dark')
+  } else {
+    isDark.value = false
+    document.documentElement.classList.remove('dark')
     if (!saved) {
-      localStorage.setItem('folio:theme', 'dark')
+      localStorage.setItem('folio:theme', 'light')
     }
   }
 }

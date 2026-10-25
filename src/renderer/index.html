@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" class="dark">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <title>Folio</title>
@@ -19,12 +19,12 @@
     />
 
     <script>
-      // Initialize theme preference before render
+      // Initialize theme preference before render (Light Mode default)
       const savedTheme = localStorage.getItem('folio:theme');
-      if (savedTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else {
+      if (savedTheme === 'dark') {
         document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
       }
     </script>
   </head>

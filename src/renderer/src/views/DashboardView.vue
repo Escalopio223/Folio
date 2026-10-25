@@ -453,6 +453,18 @@ async function handleProjectChange(projectId: string): Promise<void> {
   ])
 }
 
+// Project Delete
+async function handleProjectDeleted(_deletedProjectId: string): Promise<void> {
+  if (projectStore.activeProjectId) {
+    await handleProjectChange(projectStore.activeProjectId)
+  } else {
+    folioStore.folios = []
+    folioStore.trashedFolios = []
+    folioStore.selectFolio('')
+    loreStore.items = []
+  }
+}
+
 // Initial boot & listeners
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
@@ -503,6 +515,7 @@ onBeforeUnmount(async () => {
       <BookSelector
         @open-create-modal="isProjectModalOpen = true"
         @project-changed="handleProjectChange"
+        @project-deleted="handleProjectDeleted"
       />
 
       <!-- Conmutador Principal de Modo: Manuscrito vs Librería de Datos -->
