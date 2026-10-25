@@ -4,11 +4,11 @@ import { useProjectStore } from '../stores/projectStore'
 import { useFolioStore } from '../stores/folioStore'
 import { useLoreStore } from '../stores/loreStore'
 import { useUiStore } from '../stores/uiStore'
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn, onClickOutside } from '@vueuse/core'
 import ProjectModal from '../components/ProjectModal.vue'
 import FolioLogo from '../components/FolioLogo.vue'
+import BookSelector from '../components/BookSelector.vue'
 import {
-  BookOpen,
   ChevronDown,
   ChevronRight,
   Plus,
@@ -43,6 +43,28 @@ const editFolioTitle = ref('')
 const editFolioContent = ref('')
 const editFolioSynopsis = ref('')
 const editFolioStatus = ref('draft')
+const isStatusDropdownOpen = ref(false)
+const statusDropdownRef = ref<HTMLElement | null>(null)
+
+onClickOutside(statusDropdownRef, () => {
+  isStatusDropdownOpen.value = false
+})
+
+const statusOptions = [
+  { value: 'draft', label: 'Borrador', color: 'bg-amber-500' },
+  { value: 'in_progress', label: 'En curso', color: 'bg-sky-500' },
+  { value: 'completed', label: 'Finalizado', color: 'bg-emerald-500' }
+]
+
+const currentStatusObj = computed(() => {
+  return statusOptions.find(o => o.value === editFolioStatus.value) || statusOptions[0]
+})
+
+function setFolioStatus(status: string): void {
+  editFolioStatus.value = status
+  isStatusDropdownOpen.value = false
+  onEditorInput()
+}
 
 // Lore Editable States
 const editLoreName = ref('')
@@ -279,49 +301,11 @@ onMounted(async () => {
       class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
       :class="uiStore.isSidebarOpen ? 'w-80 p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
     >
-      <!-- Cabecera de Proyecto / Selector de Libro -->
-      <div class="neu-well p-3 flex flex-col gap-2 shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 min-w-0">
-            <BookOpen :size="15" class="text-[var(--accent)] shrink-0" />
-            <span class="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
-              Libro Activo
-            </span>
-          </div>
-
-          <button
-            type="button"
-            class="neu-btn px-2 py-0.5 text-[10px] text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center gap-1"
-            title="Crear nuevo proyecto de novela"
-            @click="isProjectModalOpen = true"
-          >
-            <Plus :size="11" />
-            <span>Nuevo Libro</span>
-          </button>
-        </div>
-
-        <!-- Selector desplegable de proyectos -->
-        <select
-          v-if="projectStore.projects.length > 0"
-          :value="projectStore.activeProjectId"
-          class="w-full bg-transparent border-none font-editorial text-sm font-bold text-[var(--text-primary)] focus:outline-none cursor-pointer"
-          @change="handleProjectChange(($event.target as HTMLSelectElement).value)"
-        >
-          <option
-            v-for="p in projectStore.projects"
-            :key="p.id"
-            :value="p.id"
-            class="bg-[var(--bg-surface)] text-[var(--text-primary)]"
-          >
-            {{ p.title }}
-          </option>
-        </select>
-        <span v-else class="text-xs text-[var(--text-muted)] italic">Sin proyectos creados</span>
-
-        <p v-if="projectStore.activeProject?.genre" class="text-[10px] text-[var(--text-muted)] font-mono truncate">
-          {{ projectStore.activeProject.genre }}
-        </p>
-      </div>
+      <!-- Selector Personalizado de Libros -->
+      <BookSelector
+        @open-create-modal="isProjectModalOpen = true"
+        @project-changed="handleProjectChange"
+      />
 
       <!-- Conmutador Principal de Modo: Manuscrito vs Librería de Datos -->
       <div class="neu-well-sm p-1 grid grid-cols-2 gap-1 shrink-0 text-xs font-medium">
@@ -643,16 +627,51 @@ onMounted(async () => {
 
           <!-- Controles de Escena -->
           <div class="flex items-center gap-2 shrink-0">
-            <!-- Estado selector -->
-            <select
-              v-model="editFolioStatus"
-              class="neu-well-sm px-2.5 py-1 text-xs text-[var(--text-secondary)] bg-transparent border-none focus:outline-none cursor-pointer"
-              @change="onEditorInput"
-            >
-              <option value="draft" class="bg-[var(--bg-surface)] text-[var(--text-primary)]">Borrador</option>
-              <option value="in_progress" class="bg-[var(--bg-surface)] text-[var(--text-primary)]">En curso</option>
-              <option value="completed" class="bg-[var(--bg-surface)] text-[var(--text-primary)]">Finalizado</option>
-            </select>
+            <!-- Selector de estado personalizado táctil -->
+            <div ref="statusDropdownRef" class="relative">
+              <button
+                type="button"
+                class="neu-well-sm px-2.5 py-1 text-xs text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
+                @click="isStatusDropdownOpen = !isStatusDropdownOpen"
+              >
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="currentStatusObj.color"></span>
+                <span class="font-medium text-[11px]">{{ currentStatusObj.label }}</span>
+                <ChevronDown
+                  :size="11"
+                  class="text-[var(--text-muted)] transition-transform duration-150 shrink-0"
+                  :class="{ 'rotate-180': isStatusDropdownOpen }"
+                />
+              </button>
+
+              <Transition
+                enter-active-class="transition duration-100 ease-out"
+                enter-from-class="opacity-0 scale-95"
+                enter-to-class="opacity-100 scale-100"
+                leave-active-class="transition duration-75 ease-in"
+                leave-from-class="opacity-100 scale-100"
+                leave-to-class="opacity-0 scale-95"
+              >
+                <div
+                  v-if="isStatusDropdownOpen"
+                  class="absolute right-0 top-full mt-1.5 z-50 neu-surface p-1 min-w-[125px] shadow-xl border border-[var(--groove-dark)]/50 backdrop-blur-md"
+                >
+                  <button
+                    v-for="opt in statusOptions"
+                    :key="opt.value"
+                    type="button"
+                    class="w-full px-2 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
+                    :class="opt.value === editFolioStatus ? 'text-[var(--accent)] font-semibold neu-well-sm' : 'text-[var(--text-primary)]'"
+                    @click="setFolioStatus(opt.value)"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="opt.color"></span>
+                      <span>{{ opt.label }}</span>
+                    </div>
+                    <Check v-if="opt.value === editFolioStatus" :size="12" class="text-[var(--accent)] shrink-0" />
+                  </button>
+                </div>
+              </Transition>
+            </div>
 
             <button
               type="button"
