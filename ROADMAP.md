@@ -37,10 +37,18 @@ Folio es una aplicación de escritorio **Local-First para novelistas y escritore
 ---
 
 ### ⏳ Fase 2: Motor de Escritura por Bloques y TipTap (`feat/rich-editor-autosave`)
+- [x] **Autoguardado Inteligente (Debounce 500ms):**
+  - Actualización instantánea en memoria en Pinia (cero retraso / Zero-Lag en el sidebar y headers).
+  - Persistencia debounced a 500ms en SQLite vía IPC.
+  - Indicador visual táctil en la barra de herramientas superior (*Guardando...*, *Guardado local*, *Sin guardar...* con timestamp y punto reactivo).
+  - Salvaguarda forzada (*flush*) al cambiar de folio, entrada de wiki o proyecto para evitar pérdida de datos.
+- [x] **Lienzo Editorial Distraction-Free:**
+  - Tipografía narrativa centrada en columna dorada (`max-w-3xl mx-auto`, `font-editorial text-lg leading-loose`).
+  - Scrollbar delgado y elegante con variables neumórficas (`.editorial-scrollbar`).
+  - Atajos de productividad: `Ctrl+S` (guardado forzado inmediato), `Ctrl+N` (nueva escena/folio rápido), `Tab` (indentación de 2 espacios sin pérdida de foco).
+  - Estimación de tiempo de lectura (`~X min de lectura`) y estadísticas de palabras/caracteres en tiempo real.
 - [ ] Integración de TipTap (`@tiptap/vue-3`, `@tiptap/starter-kit`, extensiones).
-- [ ] Atajos al vuelo de Markdown (`# `, `- `, `[] `, citas, separadores de escena).
 - [ ] Menú flotante (*Bubble Menu*) táctil con relieve neumórfico.
-- [ ] Autoguardado reactivo con `useDebounceFn` (400ms) e indicador discreto *"Guardado en local"*.
 
 ---
 
