@@ -7,8 +7,8 @@ import FolioLogo from './FolioLogo.vue'
     class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg-base)] select-none transition-opacity duration-300"
   >
     <!-- Neumorphic Center Card -->
-    <div class="neu-surface p-8 flex flex-col items-center justify-center space-y-4 max-w-xs w-full text-center">
-      <div class="w-16 h-16 flex items-center justify-center shrink-0 drop-shadow-md animate-pulse">
+    <div class="neu-surface p-9 flex flex-col items-center justify-center space-y-5 max-w-sm w-full text-center">
+      <div class="w-24 h-24 flex items-center justify-center shrink-0 drop-shadow-xl animate-pulse">
         <FolioLogo />
       </div>
 

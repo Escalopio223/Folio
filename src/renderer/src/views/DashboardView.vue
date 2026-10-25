@@ -1166,7 +1166,7 @@ onBeforeUnmount(async () => {
         v-else
         class="flex-1 flex flex-col items-center justify-center neu-well p-8 text-center"
       >
-        <div class="w-20 h-20 mb-4 flex items-center justify-center shrink-0 drop-shadow-md">
+        <div class="w-28 h-28 mb-5 flex items-center justify-center shrink-0 drop-shadow-xl">
           <FolioLogo />
         </div>
         <h3 class="font-editorial text-2xl font-bold text-[var(--text-primary)] mb-1">

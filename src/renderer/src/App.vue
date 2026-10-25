@@ -25,21 +25,8 @@ const uiStore = useUiStore()
     <div class="neu-groove-h"></div>
 
     <!-- Bottom Warm Status Bar -->
-    <footer class="h-7 w-full px-4 flex items-center justify-between text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0">
-      <div class="flex items-center gap-3">
-        <span class="flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#C85A32]"></span>
-          <span class="text-[var(--text-secondary)]">SQLite Local-First · Modo WAL</span>
-        </span>
-        <span class="text-[var(--text-muted)] opacity-40">|</span>
-        <span>Zero-Friction Engine</span>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <span>Folio v0.1.0</span>
-        <span class="text-[var(--text-muted)] opacity-40">|</span>
-        <span>Escritura Editorial & Wiki de Mundo</span>
-      </div>
+    <footer class="h-6 w-full px-4 flex items-center justify-end text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none">
+      <span>Folio v0.1.0</span>
     </footer>
   </div>
 </template>

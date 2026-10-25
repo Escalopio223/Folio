@@ -66,7 +66,7 @@ onUnmounted(() => {
 
 <template>
   <div class="w-full flex flex-col shrink-0 select-none bg-[var(--bg-base)]">
-    <header class="drag-region h-10 w-full flex items-center justify-between px-3.5 text-xs">
+    <header class="drag-region h-11 w-full flex items-center justify-between px-3.5 text-xs">
       <!-- Left: Brand / Title / Logo / Sidebar Toggle -->
       <div class="flex items-center gap-2.5">
         <!-- Sidebar Toggle Button -->
@@ -80,13 +80,13 @@ onUnmounted(() => {
           <PanelLeft v-else :size="13" />
         </button>
 
-        <div class="neu-groove-v h-3.5 my-auto"></div>
+        <div class="neu-groove-v h-4 my-auto"></div>
 
-        <div class="w-5 h-5 shrink-0 flex items-center justify-center">
+        <div class="w-7 h-7 shrink-0 flex items-center justify-center drop-shadow-sm">
           <FolioLogo />
         </div>
 
-        <span class="font-editorial text-base font-bold tracking-tight text-[var(--text-primary)]">
+        <span class="font-editorial text-lg font-bold tracking-tight text-[var(--text-primary)]">
           Folio
         </span>
 
