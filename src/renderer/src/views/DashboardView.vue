@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useProjectStore } from '../stores/projectStore'
 import { useFolioStore } from '../stores/folioStore'
 import { useLoreStore } from '../stores/loreStore'
@@ -16,7 +16,6 @@ import {
   Bookmark,
   Trash2,
   Check,
-  Save,
   Compass,
   Tag,
   SlidersHorizontal,
@@ -75,12 +74,17 @@ const editLoreAttributes = ref<Array<{ key: string; value: string }>>([])
 const newAttrKey = ref('')
 const newAttrValue = ref('')
 
-// Save states
-const isSaving = ref(false)
+// Save states & indicators
+type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+const saveStatus = ref<SaveStatus>('saved')
 const lastSavedTime = ref<string>('')
+const hasPendingChanges = ref(false)
 let isSyncing = false
 
-// Word and character count for manuscript
+// Input DOM references for focus control
+const titleInputRef = ref<HTMLInputElement | null>(null)
+
+// Word, character count and estimated reading time
 const wordCount = computed(() => {
   const text = editFolioContent.value.trim()
   if (!text) return 0
@@ -88,6 +92,12 @@ const wordCount = computed(() => {
 })
 
 const charCount = computed(() => editFolioContent.value.length)
+
+const readingTime = computed(() => {
+  const words = wordCount.value
+  if (words === 0) return 0
+  return Math.max(1, Math.ceil(words / 200))
+})
 
 // Sync active folio when changed
 watch(
@@ -100,14 +110,19 @@ watch(
       editFolioContent.value = folio.content
       editFolioSynopsis.value = folio.synopsis || ''
       editFolioStatus.value = folio.status || 'draft'
+      saveStatus.value = 'saved'
+      hasPendingChanges.value = false
       lastSavedTime.value = new Date(folio.updatedAt).toLocaleTimeString('es-ES', {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
       })
     } else {
       editFolioTitle.value = ''
       editFolioContent.value = ''
       editFolioSynopsis.value = ''
+      saveStatus.value = 'saved'
+      hasPendingChanges.value = false
     }
     setTimeout(() => {
       isSyncing = false
@@ -131,9 +146,12 @@ watch(
         key,
         value
       }))
+      saveStatus.value = 'saved'
+      hasPendingChanges.value = false
       lastSavedTime.value = new Date(item.updatedAt).toLocaleTimeString('es-ES', {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
       })
     } else {
       editLoreName.value = ''
@@ -141,6 +159,8 @@ watch(
       editLoreSummary.value = ''
       editLoreContent.value = ''
       editLoreAttributes.value = []
+      saveStatus.value = 'saved'
+      hasPendingChanges.value = false
     }
     setTimeout(() => {
       isSyncing = false
@@ -149,44 +169,184 @@ watch(
   { immediate: true }
 )
 
-// Debounced auto-save (400ms)
+// Flush & Save inmediato en SQLite
+async function flushSave(): Promise<void> {
+  if (!hasPendingChanges.value) return
+
+  saveStatus.value = 'saving'
+  hasPendingChanges.value = false
+
+  try {
+    if (activeTargetType.value === 'folio' && folioStore.activeFolioId) {
+      const targetId = folioStore.activeFolioId
+      const titleToSave = editFolioTitle.value.trim() || 'Sin título'
+      const contentToSave = editFolioContent.value
+      const synopsisToSave = editFolioSynopsis.value
+      const statusToSave = editFolioStatus.value
+
+      // Actualizar réplica reactiva en el store para zero-lag en el sidebar
+      const item = folioStore.folios.find((f) => f.id === targetId)
+      if (item) {
+        item.title = titleToSave
+        item.content = contentToSave
+        item.synopsis = synopsisToSave
+        item.status = statusToSave
+      }
+
+      await folioStore.updateFolio({
+        id: targetId,
+        title: titleToSave,
+        content: contentToSave,
+        synopsis: synopsisToSave,
+        status: statusToSave
+      })
+    } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
+      const targetId = loreStore.activeLoreId
+      const nameToSave = editLoreName.value.trim() || 'Sin nombre'
+      const categoryToSave = editLoreCategory.value.trim() || 'personaje'
+      const summaryToSave = editLoreSummary.value
+      const contentToSave = editLoreContent.value
+      const attrsObj: Record<string, string> = {}
+      for (const attr of editLoreAttributes.value) {
+        if (attr.key.trim()) attrsObj[attr.key.trim()] = attr.value.trim()
+      }
+
+      const item = loreStore.items.find((l) => l.id === targetId)
+      if (item) {
+        item.name = nameToSave
+        item.category = categoryToSave
+        item.summary = summaryToSave
+        item.content = contentToSave
+        item.attributes = attrsObj
+      }
+
+      await loreStore.updateLore({
+        id: targetId,
+        name: nameToSave,
+        category: categoryToSave,
+        summary: summaryToSave,
+        content: contentToSave,
+        attributes: attrsObj
+      })
+    }
+
+    saveStatus.value = 'saved'
+    lastSavedTime.value = new Date().toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch (err) {
+    console.error('[DashboardView] Error al guardar en SQLite:', err)
+    saveStatus.value = 'error'
+  }
+}
+
+// Debounced auto-save inteligente a 500ms
 const debouncedSave = useDebounceFn(async () => {
   if (isSyncing) return
-  isSaving.value = true
-
-  if (activeTargetType.value === 'folio' && folioStore.activeFolioId) {
-    await folioStore.updateFolio({
-      id: folioStore.activeFolioId,
-      title: editFolioTitle.value.trim() || 'Sin título',
-      content: editFolioContent.value,
-      synopsis: editFolioSynopsis.value,
-      status: editFolioStatus.value
-    })
-  } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
-    const attrsObj: Record<string, string> = {}
-    for (const attr of editLoreAttributes.value) {
-      if (attr.key.trim()) attrsObj[attr.key.trim()] = attr.value.trim()
-    }
-    await loreStore.updateLore({
-      id: loreStore.activeLoreId,
-      name: editLoreName.value.trim() || 'Sin nombre',
-      category: editLoreCategory.value.trim() || 'personaje',
-      summary: editLoreSummary.value,
-      content: editLoreContent.value,
-      attributes: attrsObj
-    })
-  }
-
-  isSaving.value = false
-  lastSavedTime.value = new Date().toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}, 400)
+  await flushSave()
+}, 500)
 
 function onEditorInput(): void {
-  if (!isSyncing) {
-    debouncedSave()
+  if (isSyncing) return
+
+  hasPendingChanges.value = true
+  saveStatus.value = 'pending'
+
+  // Actualización instantánea en memoria (Zero-Lag)
+  if (activeTargetType.value === 'folio' && folioStore.activeFolioId) {
+    const target = folioStore.folios.find((f) => f.id === folioStore.activeFolioId)
+    if (target) {
+      target.title = editFolioTitle.value.trim() || 'Sin título'
+      target.synopsis = editFolioSynopsis.value
+      target.status = editFolioStatus.value
+      target.content = editFolioContent.value
+    }
+  } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
+    const target = loreStore.items.find((l) => l.id === loreStore.activeLoreId)
+    if (target) {
+      target.name = editLoreName.value.trim() || 'Sin nombre'
+      target.summary = editLoreSummary.value
+      target.content = editLoreContent.value
+      target.category = editLoreCategory.value
+    }
+  }
+
+  debouncedSave()
+}
+
+// Manejador de tecla Tab en el área de escritura de prosa (2 espacios)
+function handleTextareaKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    const textarea = e.target as HTMLTextAreaElement
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const value = textarea.value
+    const indent = '  '
+
+    textarea.value = value.substring(0, start) + indent + value.substring(end)
+    editFolioContent.value = textarea.value
+    textarea.selectionStart = textarea.selectionEnd = start + indent.length
+    onEditorInput()
+  }
+}
+
+// Forzar guardado manual (Ctrl+S / Cmd+S)
+async function handleManualSave(): Promise<void> {
+  await flushSave()
+}
+
+// Crear nuevo folio rápido con el teclado (Ctrl+N / Cmd+N)
+async function handleQuickNewFolio(): Promise<void> {
+  if (!projectStore.activeProjectId) return
+
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
+
+  let targetChapterId: string | null = null
+  if (folioStore.activeFolio) {
+    if (folioStore.activeFolio.type === 'chapter') {
+      targetChapterId = folioStore.activeFolio.id
+    } else if (folioStore.activeFolio.parentId) {
+      targetChapterId = folioStore.activeFolio.parentId
+    }
+  }
+
+  if (!targetChapterId && folioStore.chapters.length > 0) {
+    targetChapterId = folioStore.chapters[0].id
+  }
+
+  if (targetChapterId) {
+    await handleCreateScene(targetChapterId)
+  } else {
+    await handleCreateChapter()
+  }
+
+  nextTick(() => {
+    titleInputRef.value?.focus()
+    titleInputRef.value?.select()
+  })
+}
+
+// Listener de atajos de teclado globales de productividad
+function handleGlobalKeydown(e: KeyboardEvent): void {
+  const isCtrlOrCmd = e.ctrlKey || e.metaKey
+
+  // Ctrl+S / Cmd+S: Guardado forzado instantáneo
+  if (isCtrlOrCmd && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    handleManualSave()
+    return
+  }
+
+  // Ctrl+N / Cmd+N: Nuevo folio sin usar el ratón
+  if (isCtrlOrCmd && e.key.toLowerCase() === 'n') {
+    e.preventDefault()
+    handleQuickNewFolio()
+    return
   }
 }
 
@@ -199,13 +359,25 @@ function isChapterExpanded(chapterId: string): boolean {
   return expandedChapters.value[chapterId] !== false // default expanded
 }
 
-// Selection Handlers
-function selectSceneOrChapter(folio: Folio): void {
+// Selection Handlers con flush forzado previo para garantizar CERO pérdida de datos
+async function selectSceneOrChapter(folio: Folio): Promise<void> {
+  if (folioStore.activeFolioId === folio.id && activeTargetType.value === 'folio') return
+
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
+
   activeTargetType.value = 'folio'
   folioStore.selectFolio(folio.id)
 }
 
-function selectLoreEntry(item: LoreItem): void {
+async function selectLoreEntry(item: LoreItem): Promise<void> {
+  if (loreStore.activeLoreId === item.id && activeTargetType.value === 'lore') return
+
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
+
   activeTargetType.value = 'lore'
   loreStore.selectLore(item.id)
 }
@@ -213,24 +385,33 @@ function selectLoreEntry(item: LoreItem): void {
 // Creation Handlers
 async function handleCreateChapter(): Promise<void> {
   if (!projectStore.activeProjectId) return
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
   const chapter = await folioStore.createChapter(projectStore.activeProjectId)
   if (chapter) {
     expandedChapters.value[chapter.id] = true
-    selectSceneOrChapter(chapter)
+    await selectSceneOrChapter(chapter)
   }
 }
 
 async function handleCreateScene(chapterId: string): Promise<void> {
   if (!projectStore.activeProjectId) return
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
   const scene = await folioStore.createScene(projectStore.activeProjectId, chapterId)
   if (scene) {
     expandedChapters.value[chapterId] = true
-    selectSceneOrChapter(scene)
+    await selectSceneOrChapter(scene)
   }
 }
 
 async function handleCreateLoreItem(categoryPreset?: string): Promise<void> {
   if (!projectStore.activeProjectId) return
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
   const created = await loreStore.createLore({
     projectId: projectStore.activeProjectId,
     category: categoryPreset || loreStore.selectedCategory === 'todos' ? 'personaje' : loreStore.selectedCategory,
@@ -252,16 +433,19 @@ function addAttribute(): void {
   })
   newAttrKey.value = ''
   newAttrValue.value = ''
-  debouncedSave()
+  onEditorInput()
 }
 
 function removeAttribute(index: number): void {
   editLoreAttributes.value.splice(index, 1)
-  debouncedSave()
+  onEditorInput()
 }
 
-// Project Change
+// Project Change con salvaguarda de datos pendientes
 async function handleProjectChange(projectId: string): Promise<void> {
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
   projectStore.selectProject(projectId)
   await Promise.all([
     folioStore.fetchFolios(projectId),
@@ -269,8 +453,15 @@ async function handleProjectChange(projectId: string): Promise<void> {
   ])
 }
 
-// Initial boot
+// Initial boot & listeners
 onMounted(async () => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('beforeunload', () => {
+    if (hasPendingChanges.value) {
+      flushSave()
+    }
+  })
+
   await projectStore.fetchProjects()
   if (projectStore.activeProjectId) {
     await Promise.all([
@@ -282,6 +473,13 @@ onMounted(async () => {
   setTimeout(() => {
     uiStore.setSplashLoading(false)
   }, 650)
+})
+
+onBeforeUnmount(async () => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  if (hasPendingChanges.value) {
+    await flushSave()
+  }
 })
 </script>
 
@@ -682,55 +880,102 @@ onMounted(async () => {
               <Trash2 :size="13" />
             </button>
 
-            <!-- Guardar -->
+            <!-- Indicador sutil de Autoguardado & Guardado Manual -->
             <button
               type="button"
-              class="neu-btn-terracotta px-4 py-1.5 text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
-              @click="debouncedSave"
+              class="neu-btn px-3 py-1.5 text-xs flex items-center gap-2 transition-all cursor-pointer group"
+              :class="{
+                'neu-well border-amber-500/40 text-amber-500': saveStatus === 'pending',
+                'neu-well border-[var(--accent)]/40 text-[var(--accent)]': saveStatus === 'saving',
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': saveStatus === 'saved'
+              }"
+              title="Forzar guardado manual inmediato (Ctrl+S)"
+              @click="handleManualSave"
             >
-              <Check v-if="!isSaving && lastSavedTime" :size="13" />
-              <Save v-else :size="13" />
-              <span>{{ isSaving ? 'Guardando...' : `Guardado ${lastSavedTime}` }}</span>
+              <!-- Punto indicador reactivo -->
+              <span class="relative flex h-2 w-2">
+                <span
+                  v-if="saveStatus === 'saving'"
+                  class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"
+                ></span>
+                <span
+                  class="relative inline-flex rounded-full h-2 w-2 transition-colors duration-200"
+                  :class="{
+                    'bg-amber-400': saveStatus === 'pending',
+                    'bg-[var(--accent)]': saveStatus === 'saving',
+                    'bg-emerald-500': saveStatus === 'saved',
+                    'bg-rose-500': saveStatus === 'error'
+                  }"
+                ></span>
+              </span>
+
+              <span class="text-[11px] font-mono select-none">
+                <template v-if="saveStatus === 'saving'">Guardando...</template>
+                <template v-else-if="saveStatus === 'pending'">Sin guardar...</template>
+                <template v-else-if="saveStatus === 'error'">Error en SQLite</template>
+                <template v-else>Guardado local {{ lastSavedTime ? `· ${lastSavedTime}` : '' }}</template>
+              </span>
+
+              <span class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75">
+                Ctrl+S
+              </span>
             </button>
           </div>
         </header>
 
         <div class="neu-groove-h"></div>
 
-        <!-- Papel / Lienzo Hundido -->
-        <div class="flex-1 flex flex-col neu-well p-8 overflow-y-auto">
-          <!-- Título -->
-          <input
-            v-model="editFolioTitle"
-            type="text"
-            placeholder="Título del capítulo o escena..."
-            class="font-editorial text-3xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-3 placeholder:text-[var(--text-muted)] w-full"
-            @input="onEditorInput"
-          />
+        <!-- Papel / Lienzo Hundido con scrollbar editorial delgado -->
+        <div class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar">
+          <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col">
+            <!-- Título de la escena / capítulo -->
+            <input
+              ref="titleInputRef"
+              v-model="editFolioTitle"
+              type="text"
+              placeholder="Título del capítulo o escena..."
+              class="font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-2 placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
+              @input="onEditorInput"
+            />
 
-          <!-- Sinopsis de la escena (opcional) -->
-          <input
-            v-model="editFolioSynopsis"
-            type="text"
-            placeholder="Sinopsis o nota de la escena..."
-            class="text-xs text-[var(--text-muted)] bg-transparent border-none focus:outline-none mb-4 placeholder:text-[var(--text-muted)] w-full italic"
-            @input="onEditorInput"
-          />
+            <!-- Sinopsis o nota de la escena (opcional) -->
+            <input
+              v-model="editFolioSynopsis"
+              type="text"
+              placeholder="Sinopsis o nota de la escena..."
+              class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none mb-4 placeholder:text-[var(--text-muted)]/50 w-full italic"
+              @input="onEditorInput"
+            />
 
-          <div class="neu-groove-h mb-6 opacity-60"></div>
+            <div class="neu-groove-h mb-6 opacity-60"></div>
 
-          <!-- Área de Escritura Prosa -->
-          <textarea
-            v-model="editFolioContent"
-            placeholder="Escribe la prosa de tu libro aquí..."
-            class="flex-1 w-full bg-transparent border-none resize-none focus:outline-none text-base leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] select-text caret-[#C85A32]"
-            @input="onEditorInput"
-          ></textarea>
+            <!-- Área de Escritura Prosa -->
+            <textarea
+              ref="contentInputRef"
+              v-model="editFolioContent"
+              placeholder="Escribe la prosa de tu libro aquí..."
+              class="flex-1 w-full bg-transparent border-none resize-none focus:outline-none font-editorial text-lg md:text-[18px] leading-relaxed md:leading-loose text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/40 select-text caret-[var(--accent)] editorial-scrollbar"
+              @input="onEditorInput"
+              @keydown="handleTextareaKeydown"
+            ></textarea>
 
-          <!-- Contador de Palabras y Caracteres -->
-          <div class="pt-4 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-[var(--text-muted)]">
-            <span>{{ wordCount }} palabras · {{ charCount }} caracteres</span>
-            <span>Tipo: {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}</span>
+            <!-- Barra de Estado Inferior: Palabras, Caracteres, Tiempo de Lectura y Atajos -->
+            <div class="pt-4 mt-4 border-t border-[var(--groove-dark)]/40 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none">
+              <div class="flex items-center gap-3">
+                <span>{{ wordCount }} palabras</span>
+                <span>·</span>
+                <span>{{ charCount }} caracteres</span>
+                <span>·</span>
+                <span class="text-[var(--accent)] opacity-85">~{{ readingTime }} min de lectura</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)]">
+                  {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
+                </span>
+                <span class="text-[9px] opacity-60">Ctrl+N: Nueva escena · Tab: Indentar</span>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -761,23 +1006,52 @@ onMounted(async () => {
               <Trash2 :size="13" />
             </button>
 
-            <!-- Guardar -->
+            <!-- Indicador sutil de Autoguardado & Guardado Manual Wiki -->
             <button
               type="button"
-              class="neu-btn-terracotta px-4 py-1.5 text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
-              @click="debouncedSave"
+              class="neu-btn px-3 py-1.5 text-xs flex items-center gap-2 transition-all cursor-pointer group"
+              :class="{
+                'neu-well border-amber-500/40 text-amber-500': saveStatus === 'pending',
+                'neu-well border-[var(--accent)]/40 text-[var(--accent)]': saveStatus === 'saving',
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': saveStatus === 'saved'
+              }"
+              title="Forzar guardado manual inmediato (Ctrl+S)"
+              @click="handleManualSave"
             >
-              <Check v-if="!isSaving && lastSavedTime" :size="13" />
-              <Save v-else :size="13" />
-              <span>{{ isSaving ? 'Guardando...' : `Guardado ${lastSavedTime}` }}</span>
+              <span class="relative flex h-2 w-2">
+                <span
+                  v-if="saveStatus === 'saving'"
+                  class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"
+                ></span>
+                <span
+                  class="relative inline-flex rounded-full h-2 w-2 transition-colors duration-200"
+                  :class="{
+                    'bg-amber-400': saveStatus === 'pending',
+                    'bg-[var(--accent)]': saveStatus === 'saving',
+                    'bg-emerald-500': saveStatus === 'saved',
+                    'bg-rose-500': saveStatus === 'error'
+                  }"
+                ></span>
+              </span>
+
+              <span class="text-[11px] font-mono select-none">
+                <template v-if="saveStatus === 'saving'">Guardando...</template>
+                <template v-else-if="saveStatus === 'pending'">Sin guardar...</template>
+                <template v-else-if="saveStatus === 'error'">Error en SQLite</template>
+                <template v-else>Guardado local {{ lastSavedTime ? `· ${lastSavedTime}` : '' }}</template>
+              </span>
+
+              <span class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75">
+                Ctrl+S
+              </span>
             </button>
           </div>
         </header>
 
         <div class="neu-groove-h"></div>
 
-        <!-- Ficha de Registro de la Wiki -->
-        <div class="flex-1 flex flex-col neu-well p-8 overflow-y-auto space-y-5">
+        <!-- Ficha de Registro de la Wiki con scrollbar delgado -->
+        <div class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar space-y-5">
           <!-- Nombre y Categoría -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <input

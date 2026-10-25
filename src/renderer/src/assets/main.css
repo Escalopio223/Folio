@@ -146,7 +146,7 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Scrollbars */
+/* Scrollbars Generales */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -164,3 +164,30 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+
+/* Scrollbar Editorial Delgado y Táctil */
+.editorial-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--groove-dark) transparent;
+}
+
+.editorial-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.editorial-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.editorial-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--groove-dark);
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.editorial-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
