@@ -17,7 +17,9 @@ import type {
   CreateLoreInput,
   UpdateLoreInput,
   ScratchpadNote,
-  SaveScratchpadNoteInput
+  SaveScratchpadNoteInput,
+  WorldRule,
+  SaveWorldRuleInput
 } from '@shared/types'
 
 let sqliteInstance: Database.Database | null = null
@@ -25,6 +27,22 @@ let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null
 let activeDbPath = ''
 
 // Mappers
+function mapWorldRule(row: schema.WorldRuleSelect): WorldRule {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    category: row.category,
+    title: row.title,
+    axiom: row.axiom,
+    details: row.details,
+    limitations: row.limitations,
+    orderIndex: row.orderIndex,
+    isPinned: Boolean(row.isPinned),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  }
+}
+
 function mapScratchpadNote(row: schema.ScratchpadNoteSelect): ScratchpadNote {
   return {
     id: row.id,
@@ -180,6 +198,25 @@ export function initDatabase(): {
     );
     CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
     CREATE INDEX IF NOT EXISTS idx_scratchpad_is_pinned ON scratchpad_notes(is_pinned);
+
+    CREATE TABLE IF NOT EXISTS world_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      axiom TEXT NOT NULL,
+      details TEXT,
+      limitations TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_rules_project_id ON world_rules(project_id);
+    CREATE INDEX IF NOT EXISTS idx_rules_category ON world_rules(category);
+    CREATE INDEX IF NOT EXISTS idx_rules_is_pinned ON world_rules(is_pinned);
+    CREATE INDEX IF NOT EXISTS idx_rules_order ON world_rules(order_index);
   `)
 
   // Asegurar que la columna title existe en bases de datos ya inicializadas
@@ -383,6 +420,13 @@ export function getDb(): BetterSQLite3Database<typeof schema> {
     initDatabase()
   }
   return drizzleInstance!
+}
+
+export function getSqlite(): Database.Database {
+  if (!sqliteInstance) {
+    initDatabase()
+  }
+  return sqliteInstance!
 }
 
 // -------------------------------------------------------------------------
@@ -787,4 +831,108 @@ export function deleteScratchpadNote(id: number): boolean {
   const res = db.delete(schema.scratchpadNotes).where(eq(schema.scratchpadNotes.id, id)).run()
   return res.changes > 0
 }
+
+// -------------------------------------------------------------------------
+// REGLAS DEL MUNDO (LEYES, CÓDIGOS, AXIOMAS Y SISTEMAS)
+// -------------------------------------------------------------------------
+
+export function getWorldRules(projectId: string): WorldRule[] {
+  const db = getDb()
+  const rows = db.select()
+    .from(schema.worldRules)
+    .where(eq(schema.worldRules.projectId, projectId))
+    .orderBy(
+      desc(schema.worldRules.isPinned),
+      asc(schema.worldRules.category),
+      asc(schema.worldRules.orderIndex),
+      desc(schema.worldRules.updatedAt)
+    )
+    .all()
+
+  return rows.map(mapWorldRule)
+}
+
+export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
+  const db = getDb()
+  const now = new Date()
+
+  if (input.id) {
+    const existing = db.select()
+      .from(schema.worldRules)
+      .where(eq(schema.worldRules.id, input.id))
+      .get()
+
+    if (existing) {
+      const values: Partial<typeof schema.worldRules.$inferInsert> = {
+        updatedAt: now
+      }
+      if (input.category !== undefined) values.category = input.category
+      if (input.title !== undefined) values.title = input.title
+      if (input.axiom !== undefined) values.axiom = input.axiom
+      if (input.details !== undefined) values.details = input.details
+      if (input.limitations !== undefined) values.limitations = input.limitations
+      if (input.orderIndex !== undefined) values.orderIndex = input.orderIndex
+      if (input.isPinned !== undefined) values.isPinned = input.isPinned
+
+      const updated = db.update(schema.worldRules)
+        .set(values)
+        .where(eq(schema.worldRules.id, input.id))
+        .returning()
+        .get()
+
+      if (!updated) throw new Error(`Regla ${input.id} no encontrada`)
+      return mapWorldRule(updated)
+    }
+  }
+
+  // Si no se especifica orderIndex, calculamos el siguiente
+  let nextOrderIndex = input.orderIndex ?? 0
+  if (input.orderIndex === undefined) {
+    const highest = db.select({ maxOrder: schema.worldRules.orderIndex })
+      .from(schema.worldRules)
+      .where(eq(schema.worldRules.projectId, input.projectId))
+      .orderBy(desc(schema.worldRules.orderIndex))
+      .limit(1)
+      .get()
+    nextOrderIndex = highest?.maxOrder !== undefined ? highest.maxOrder + 1 : 0
+  }
+
+  // Insertar nueva regla del mundo
+  const inserted = db.insert(schema.worldRules).values({
+    projectId: input.projectId,
+    category: input.category,
+    title: input.title,
+    axiom: input.axiom,
+    details: input.details ?? null,
+    limitations: input.limitations ?? null,
+    orderIndex: nextOrderIndex,
+    isPinned: input.isPinned ?? false,
+    createdAt: now,
+    updatedAt: now
+  }).returning().get()
+
+  return mapWorldRule(inserted)
+}
+
+export function deleteWorldRule(id: number): boolean {
+  const db = getDb()
+  const res = db.delete(schema.worldRules).where(eq(schema.worldRules.id, id)).run()
+  return res.changes > 0
+}
+
+export function reorderWorldRules(ids: number[]): boolean {
+  const sqlite = getSqlite()
+  const updateStmt = sqlite.prepare('UPDATE world_rules SET order_index = ?, updated_at = ? WHERE id = ?')
+
+  const now = Date.now()
+  const transaction = sqlite.transaction((ruleIds: number[]) => {
+    for (let i = 0; i < ruleIds.length; i++) {
+      updateStmt.run(i, now, ruleIds[i])
+    }
+  })
+
+  transaction(ids)
+  return true
+}
+
 

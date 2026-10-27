@@ -87,3 +87,30 @@ export const scratchpadNotes = sqliteTable(
 
 export type ScratchpadNoteSelect = typeof scratchpadNotes.$inferSelect
 export type ScratchpadNoteInsert = typeof scratchpadNotes.$inferInsert
+
+export const worldRules = sqliteTable(
+  'world_rules',
+  {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(), // Texto libre dinámico (ej. 'Leyes Penales', 'Sistemas de Magia', etc.)
+    title: text('title').notNull(),
+    axiom: text('axiom').notNull(), // Verdad fundamental / declaración en 1-2 frases
+    details: text('details'), // Explicación profunda, precedentes, excepciones en texto/Markdown
+    limitations: text('limitations'), // Costes, tabúes, penalizaciones o qué ocurre al transgredir la regla
+    orderIndex: integer('order_index').notNull().default(0),
+    isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('idx_rules_project_id').on(table.projectId),
+    index('idx_rules_category').on(table.category),
+    index('idx_rules_is_pinned').on(table.isPinned),
+    index('idx_rules_order').on(table.orderIndex)
+  ]
+)
+
+export type WorldRuleSelect = typeof worldRules.$inferSelect
+export type WorldRuleInsert = typeof worldRules.$inferInsert
+

@@ -10,7 +10,8 @@ import {
   Eye,
   Save,
   Trash2,
-  Feather
+  Feather,
+  Scale
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -18,6 +19,7 @@ import type { useLoreStore } from '../../stores/loreStore'
 import type { useProjectStore } from '../../stores/projectStore'
 import { useTrashStore } from '../../stores/trashStore'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
+import { useRulesStore } from '../../stores/rulesStore'
 
 export interface CommandAction {
   id: string
@@ -38,6 +40,7 @@ export interface StoreContext {
   projectStore: ReturnType<typeof useProjectStore>
   trashStore?: ReturnType<typeof useTrashStore>
   scratchpadStore?: ReturnType<typeof useScratchpadStore>
+  rulesStore?: ReturnType<typeof useRulesStore>
 }
 
 /**
@@ -48,6 +51,7 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
   const { uiStore, folioStore, loreStore, projectStore } = ctx
   const trashStore = ctx.trashStore || useTrashStore()
   const scratchpadStore = ctx.scratchpadStore || useScratchpadStore()
+  const rulesStore = ctx.rulesStore || useRulesStore()
 
   return [
     {
@@ -257,6 +261,31 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       execute: async () => {
         await scratchpadStore.openScratchpad()
         await scratchpadStore.createQuickNote()
+      }
+    },
+    {
+      id: 'new-world-rule',
+      title: 'Nueva Regla del Mundo',
+      description: 'Crear una ley dura, axioma, código o limitación en el universo narrativo',
+      category: 'action',
+      badge: 'Reglas',
+      icon: Scale,
+      keywords: ['regla', 'ley', 'mundo', 'axioma', 'codigo', 'limite', 'sistema', 'magia', 'tecnologia', 'nueva', 'norma'],
+      execute: () => {
+        uiStore.openWikiRules()
+        rulesStore.openCreateModal()
+      }
+    },
+    {
+      id: 'view-world-rules',
+      title: 'Ver Reglas del Mundo',
+      description: 'Consultar las leyes, códigos y sistemas del universo narrativo en el panel lateral',
+      category: 'action',
+      badge: 'Vista',
+      icon: Scale,
+      keywords: ['reglas', 'leyes', 'mundo', 'axiomas', 'codigos', 'sistemas', 'normas', 'ver', 'consultar'],
+      execute: () => {
+        uiStore.openWikiRules()
       }
     }
   ]

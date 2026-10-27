@@ -3,6 +3,7 @@ import { registerFolioHandlers } from './folioHandler'
 import { registerLoreHandlers } from './loreHandler'
 import { registerWindowHandlers } from './windowHandler'
 import { registerScratchpadHandlers } from './scratchpadHandler'
+import { registerRulesHandlers } from './rulesHandler'
 
 export function registerAllIpcHandlers(): void {
   registerProjectHandlers()
@@ -10,4 +11,5 @@ export function registerAllIpcHandlers(): void {
   registerLoreHandlers()
   registerWindowHandlers()
   registerScratchpadHandlers()
+  registerRulesHandlers()
 }

@@ -122,6 +122,32 @@ export interface SaveScratchpadNoteInput {
   colorTag?: string | null
 }
 
+export interface WorldRule {
+  id: number
+  projectId: string
+  category: string
+  title: string
+  axiom: string
+  details?: string | null
+  limitations?: string | null
+  orderIndex: number
+  isPinned: boolean
+  createdAt: string | Date
+  updatedAt: string | Date
+}
+
+export interface SaveWorldRuleInput {
+  id?: number
+  projectId: string
+  category: string
+  title: string
+  axiom: string
+  details?: string | null
+  limitations?: string | null
+  orderIndex?: number
+  isPinned?: boolean
+}
+
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized'
 
 export interface FolioApi {
@@ -155,6 +181,12 @@ export interface FolioApi {
     list: (projectId: string) => Promise<ScratchpadNote[]>
     save: (note: SaveScratchpadNoteInput) => Promise<ScratchpadNote>
     delete: (id: number) => Promise<boolean>
+  }
+  rules: {
+    list: (projectId: string) => Promise<WorldRule[]>
+    save: (rule: SaveWorldRuleInput) => Promise<WorldRule>
+    delete: (id: number) => Promise<boolean>
+    reorder: (ids: number[]) => Promise<boolean>
   }
   window: {
     action: (action: WindowAction) => Promise<boolean | void>

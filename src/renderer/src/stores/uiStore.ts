@@ -95,11 +95,29 @@ export const useUiStore = defineStore('ui', () => {
     isFocusMode.value = !isFocusMode.value
   }
 
+  // Pestaña activa en el Inspector Derecho: 'lore' (Entidades) | 'rules' (Reglas del Mundo)
+  const activeWikiTab = ref<'lore' | 'rules'>('lore')
+
+  function setActiveWikiTab(tab: 'lore' | 'rules'): void {
+    activeWikiTab.value = tab
+  }
+
+  function openWikiRules(): void {
+    activeWikiTab.value = 'rules'
+    setRightSidebar(true)
+  }
+
+  function openWikiLore(): void {
+    activeWikiTab.value = 'lore'
+    setRightSidebar(true)
+  }
+
   return {
     isLeftSidebarOpen,
     isRightSidebarOpen,
     isSidebarOpen,
     isWikiOpen,
+    activeWikiTab,
     isSplashLoading,
     isTypewriterMode,
     isFocusMode,
@@ -112,6 +130,9 @@ export const useUiStore = defineStore('ui', () => {
     toggleRightSidebar,
     setRightSidebar,
     toggleWiki,
+    setActiveWikiTab,
+    openWikiRules,
+    openWikiLore,
     setSplashLoading,
     toggleTypewriterMode,
     toggleFocusMode

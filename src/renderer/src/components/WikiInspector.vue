@@ -2,9 +2,12 @@
 import { ref, computed, reactive, watch, nextTick, type Component } from 'vue'
 import { useLoreStore } from '../stores/loreStore'
 import { useProjectStore } from '../stores/projectStore'
+import { useUiStore } from '../stores/uiStore'
+import { useRulesStore } from '../stores/rulesStore'
 import { useDebounceFn } from '@vueuse/core'
 import {
   Compass,
+  Scale,
   Plus,
   Search,
   X,
@@ -20,9 +23,12 @@ import {
   Sparkles
 } from 'lucide-vue-next'
 import type { LoreItem } from '@shared/types'
+import WorldRulesList from './rules/WorldRulesList.vue'
 
 const loreStore = useLoreStore()
 const projectStore = useProjectStore()
+const uiStore = useUiStore()
+const rulesStore = useRulesStore()
 
 // Búsqueda y Filtros
 const searchQuery = ref('')
@@ -224,39 +230,73 @@ watch(
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-3 min-w-0 select-none">
-    <!-- Header del Inspector de Lore -->
-    <div class="flex items-center justify-between gap-2 shrink-0">
-      <div class="flex items-center gap-2 min-w-0">
-        <div class="p-1 rounded-md neu-well-sm text-[var(--accent)] shrink-0">
-          <Compass :size="15" />
-        </div>
-        <div class="flex flex-col min-w-0">
-          <div class="flex items-center gap-1.5">
-            <h3 class="font-editorial text-sm font-bold text-[var(--text-primary)] truncate">
-              Wiki & Lore
-            </h3>
-            <span class="text-[10px] font-mono px-1.5 py-0.2 rounded neu-well-sm text-[var(--text-muted)] shrink-0">
-              {{ loreStore.items.length }}
-            </span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] font-mono leading-none">
-            Inspector de Mundo
-          </span>
-        </div>
-      </div>
-
-      <!-- Botón Nueva Entrada -->
+  <div class="h-full flex flex-col gap-2.5 min-w-0 select-none">
+    <!-- Conmutador Segmentado: Entidades de Lore vs Reglas del Mundo -->
+    <div class="neu-well p-1 flex items-center gap-1 rounded-xl shrink-0">
       <button
         type="button"
-        class="neu-btn-terracotta px-2.5 py-1.5 text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
-        title="Crear nueva ficha de personaje, lugar u objeto"
-        @click="handleCreateLore"
+        class="flex-1 py-1 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+        :class="uiStore.activeWikiTab === 'lore' ? 'neu-btn font-bold !text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
+        @click="uiStore.setActiveWikiTab('lore')"
       >
-        <Plus :size="13" />
-        <span class="font-medium text-[11px]">Nueva Ficha</span>
+        <Compass :size="13" />
+        <span class="text-[11px]">Entidades</span>
+        <span class="text-[9px] font-mono opacity-70">({{ loreStore.items.length }})</span>
+      </button>
+
+      <button
+        type="button"
+        class="flex-1 py-1 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+        :class="uiStore.activeWikiTab === 'rules' ? 'neu-btn font-bold !text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
+        @click="uiStore.setActiveWikiTab('rules')"
+      >
+        <Scale :size="13" />
+        <span class="text-[11px]">Reglas</span>
+        <span class="text-[9px] font-mono opacity-70">({{ rulesStore.totalCount }})</span>
       </button>
     </div>
+
+    <!-- VISTA 1: REGLAS DEL MUNDO (LEYES, AXIOMAS, CÓDIGOS) -->
+    <template v-if="uiStore.activeWikiTab === 'rules'">
+      <div class="flex-1 min-h-0 flex flex-col">
+        <WorldRulesList />
+      </div>
+    </template>
+
+    <!-- VISTA 2: ENTIDADES DE LORE (PERSONAJES, LUGARES, OBJETOS) -->
+    <template v-else>
+      <!-- Header del Inspector de Lore -->
+      <div class="flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="p-1 rounded-md neu-well-sm text-[var(--accent)] shrink-0">
+            <Compass :size="15" />
+          </div>
+          <div class="flex flex-col min-w-0">
+            <div class="flex items-center gap-1.5">
+              <h3 class="font-editorial text-sm font-bold text-[var(--text-primary)] truncate">
+                Wiki & Lore
+              </h3>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded neu-well-sm text-[var(--text-muted)] shrink-0">
+                {{ loreStore.items.length }}
+              </span>
+            </div>
+            <span class="text-[10px] text-[var(--text-muted)] font-mono leading-none">
+              Inspector de Mundo
+            </span>
+          </div>
+        </div>
+
+        <!-- Botón Nueva Entrada -->
+        <button
+          type="button"
+          class="neu-btn-terracotta px-2.5 py-1.5 text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
+          title="Crear nueva ficha de personaje, lugar u objeto"
+          @click="handleCreateLore"
+        >
+          <Plus :size="13" />
+          <span class="font-medium text-[11px]">Nueva Ficha</span>
+        </button>
+      </div>
 
     <!-- Barra de Búsqueda Rápida en Vivo -->
     <div class="relative shrink-0">
@@ -560,11 +600,13 @@ watch(
         </button>
       </div>
     </div>
+    </template>
 
     <!-- Pie del Inspector con atajo de teclado visible -->
     <div class="neu-groove-h"></div>
     <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0">
-      <span>{{ displayItems.length }} fichas</span>
+      <span v-if="uiStore.activeWikiTab === 'lore'">{{ displayItems.length }} fichas</span>
+      <span v-else>{{ rulesStore.filteredRules.length }} reglas</span>
       <span class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--accent)] font-semibold">Ctrl+N: Ocultar Wiki</span>
     </div>
   </div>

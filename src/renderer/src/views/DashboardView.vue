@@ -28,6 +28,7 @@ import type { Editor } from '@tiptap/vue-3'
 import type { Folio } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
+import { useRulesStore } from '../stores/rulesStore'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
@@ -35,6 +36,7 @@ const loreStore = useLoreStore()
 const uiStore = useUiStore()
 const trashStore = useTrashStore()
 const scratchpadStore = useScratchpadStore()
+const rulesStore = useRulesStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
@@ -365,7 +367,8 @@ async function handleProjectChange(projectId: string): Promise<void> {
     folioStore.fetchFolios(projectId),
     loreStore.fetchLore(projectId),
     trashStore.fetchTrash(projectId),
-    scratchpadStore.fetchNotes(projectId)
+    scratchpadStore.fetchNotes(projectId),
+    rulesStore.fetchRules(projectId)
   ])
 }
 
@@ -382,6 +385,8 @@ async function handleProjectDeleted(): Promise<void> {
     trashStore.trashLore = []
     scratchpadStore.notes = []
     scratchpadStore.activeNoteId = null
+    rulesStore.rules = []
+    rulesStore.selectedRuleId = null
   }
 }
 
@@ -400,7 +405,8 @@ onMounted(async () => {
       folioStore.fetchFolios(projectStore.activeProjectId),
       loreStore.fetchLore(projectStore.activeProjectId),
       trashStore.fetchTrash(projectStore.activeProjectId),
-      scratchpadStore.fetchNotes(projectStore.activeProjectId)
+      scratchpadStore.fetchNotes(projectStore.activeProjectId),
+      rulesStore.fetchRules(projectStore.activeProjectId)
     ])
   }
   // Smoothly hide splash screen after initial load

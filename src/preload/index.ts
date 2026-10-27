@@ -13,6 +13,8 @@ import type {
   UpdateLoreInput,
   ScratchpadNote,
   SaveScratchpadNoteInput,
+  WorldRule,
+  SaveWorldRuleInput,
   WindowAction
 } from '@shared/types'
 
@@ -49,6 +51,12 @@ const api: FolioApi = {
     list: (projectId: string): Promise<ScratchpadNote[]> => ipcRenderer.invoke('scratchpad:list', projectId),
     save: (note: SaveScratchpadNoteInput): Promise<ScratchpadNote> => ipcRenderer.invoke('scratchpad:save', note),
     delete: (id: number): Promise<boolean> => ipcRenderer.invoke('scratchpad:delete', id)
+  },
+  rules: {
+    list: (projectId: string): Promise<WorldRule[]> => ipcRenderer.invoke('rules:list', projectId),
+    save: (rule: SaveWorldRuleInput): Promise<WorldRule> => ipcRenderer.invoke('rules:save', rule),
+    delete: (id: number): Promise<boolean> => ipcRenderer.invoke('rules:delete', id),
+    reorder: (ids: number[]): Promise<boolean> => ipcRenderer.invoke('rules:reorder', ids)
   },
   window: {
     action: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)

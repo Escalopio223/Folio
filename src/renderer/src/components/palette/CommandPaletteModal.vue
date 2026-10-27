@@ -11,7 +11,8 @@ import {
   Sparkles,
   Command,
   CornerDownLeft,
-  ArrowUpDown
+  ArrowUpDown,
+  Scale
 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
 import { usePaletteStore } from '../../stores/paletteStore'
@@ -21,6 +22,7 @@ import { useLoreStore } from '../../stores/loreStore'
 import { useProjectStore } from '../../stores/projectStore'
 import { useTrashStore } from '../../stores/trashStore'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
+import { useRulesStore } from '../../stores/rulesStore'
 import { getSystemCommands, type CommandAction } from './commandsRegistry'
 
 const paletteStore = usePaletteStore()
@@ -30,6 +32,7 @@ const loreStore = useLoreStore()
 const projectStore = useProjectStore()
 const trashStore = useTrashStore()
 const scratchpadStore = useScratchpadStore()
+const rulesStore = useRulesStore()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const modalRef = ref<HTMLElement | null>(null)
@@ -91,7 +94,7 @@ export interface PaletteItem {
   title: string
   description?: string
   snippet?: string
-  section: 'action' | 'manuscript' | 'lore'
+  section: 'action' | 'manuscript' | 'lore' | 'rule'
   badge: string
   icon: Component
   shortcut?: string
@@ -106,7 +109,8 @@ const systemCommands = computed<CommandAction[]>(() => {
     loreStore,
     projectStore,
     trashStore,
-    scratchpadStore
+    scratchpadStore,
+    rulesStore
   })
 })
 
@@ -244,11 +248,62 @@ const filteredLore = computed<PaletteItem[]>(() => {
   return results
 })
 
+// 4. Reglas del Mundo (Leyes, Axiomas y Códigos)
+const filteredWorldRules = computed<PaletteItem[]>(() => {
+  const q = normalize(paletteStore.query)
+  const rules = rulesStore.rules
+
+  if (!q) {
+    return rules.slice(0, 4).map((r) => ({
+      id: `rule-${r.id}`,
+      title: r.title,
+      description: `${r.category} · «${r.axiom}»`,
+      snippet: r.limitations ? `Límites: ${r.limitations}` : undefined,
+      section: 'rule',
+      badge: r.isPinned ? 'Regla 📌' : 'Regla',
+      icon: Scale,
+      execute: () => {
+        uiStore.openWikiRules()
+        rulesStore.selectRule(r.id)
+      }
+    }))
+  }
+
+  const results: PaletteItem[] = []
+  for (const r of rules) {
+    const matchTitle = normalize(r.title).includes(q)
+    const matchAxiom = normalize(r.axiom).includes(q)
+    const matchCat = normalize(r.category).includes(q)
+    const matchLim = normalize(r.limitations || '').includes(q)
+    const matchDet = normalize(r.details || '').includes(q)
+
+    if (matchTitle || matchAxiom || matchCat || matchLim || matchDet) {
+      const snippet = extractSnippet(matchAxiom ? r.axiom : (r.limitations || r.details || r.axiom), paletteStore.query)
+      results.push({
+        id: `rule-${r.id}`,
+        title: r.title,
+        description: `${r.category} · «${r.axiom}»`,
+        snippet,
+        section: 'rule',
+        badge: r.isPinned ? 'Regla 📌' : 'Regla',
+        icon: Scale,
+        execute: () => {
+          uiStore.openWikiRules()
+          rulesStore.selectRule(r.id)
+        }
+      })
+    }
+  }
+
+  return results
+})
+
 // Lista aplanada para navegación secuencial con flechas (ArrowDown / ArrowUp)
 const allResults = computed<PaletteItem[]>(() => {
   return [
     ...filteredActions.value,
     ...filteredManuscript.value,
+    ...filteredWorldRules.value,
     ...filteredLore.value
   ]
 })
@@ -502,7 +557,52 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- 3. SECCIÓN: LORE & WIKI -->
+            <!-- 3. SECCIÓN: REGLAS DEL MUNDO -->
+            <div v-if="filteredWorldRules.length > 0" class="space-y-1">
+              <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2">
+                <span>Reglas del Mundo & Leyes</span>
+                <span>{{ filteredWorldRules.length }}</span>
+              </div>
+
+              <div
+                v-for="item in filteredWorldRules"
+                :key="item.id"
+                class="px-2.5 py-2 rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer transition-all"
+                :class="{
+                  'neu-well border-l-4 !border-l-[var(--accent)] font-semibold text-[var(--text-primary)] shadow-sm palette-item-active':
+                    allResults[paletteStore.selectedIndex]?.id === item.id,
+                  'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
+                    allResults[paletteStore.selectedIndex]?.id !== item.id
+                }"
+                @mouseenter="paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))"
+                @click="executeItem(item)"
+              >
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div
+                    class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                    :class="allResults[paletteStore.selectedIndex]?.id === item.id ? 'text-[var(--accent)] neu-well-sm' : 'text-[var(--text-muted)] neu-surface'"
+                  >
+                    <component :is="item.icon" :size="13" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]">
+                      {{ item.title }}
+                    </div>
+                    <div v-if="item.snippet" class="text-[10px] text-[var(--text-muted)] truncate italic">
+                      {{ item.snippet }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold">
+                    {{ item.badge }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. SECCIÓN: LORE & WIKI -->
             <div v-if="filteredLore.length > 0" class="space-y-1">
               <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2">
                 <span>Wiki & Lore</span>
