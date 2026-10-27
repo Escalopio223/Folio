@@ -135,7 +135,6 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_folios_parent_id ON folios(parent_id);
     CREATE INDEX IF NOT EXISTS idx_folios_type ON folios(type);
     CREATE INDEX IF NOT EXISTS idx_folios_is_archived ON folios(is_archived);
-    CREATE INDEX IF NOT EXISTS idx_folios_is_graveyard ON folios(is_graveyard);
 
     CREATE TABLE IF NOT EXISTS lore_items (
       id TEXT PRIMARY KEY NOT NULL,
@@ -159,14 +158,14 @@ export function initDatabase(): {
 
   // Ensure is_graveyard column exists on legacy databases
   try {
-    sqliteInstance.exec('ALTER TABLE folios ADD COLUMN is_graveyard INTEGER NOT NULL DEFAULT 0;')
-  } catch {
-    // Column already exists or fresh table
-  }
-  try {
+    const tableColumns = sqliteInstance.prepare("PRAGMA table_info(folios)").all() as Array<{ name: string }>
+    const hasIsGraveyard = tableColumns.some((col) => col.name === 'is_graveyard')
+    if (!hasIsGraveyard) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN is_graveyard INTEGER NOT NULL DEFAULT 0;')
+    }
     sqliteInstance.exec('CREATE INDEX IF NOT EXISTS idx_folios_is_graveyard ON folios(is_graveyard);')
-  } catch {
-    // Index already exists
+  } catch (err) {
+    console.warn('[Folio DB] is_graveyard migration check:', err)
   }
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
