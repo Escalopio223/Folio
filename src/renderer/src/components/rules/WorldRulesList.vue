@@ -5,8 +5,7 @@ import {
   Search,
   X,
   Scale,
-  Pin,
-  Lightbulb
+  Pin
 } from 'lucide-vue-next'
 import { useRulesStore } from '../../stores/rulesStore'
 import { useProjectStore } from '../../stores/projectStore'
@@ -17,7 +16,7 @@ import RuleEditModal from './RuleEditModal.vue'
 const rulesStore = useRulesStore()
 const projectStore = useProjectStore()
 
-// Presets recomendados según el género del proyecto
+// Presets recomendados según el género del proyecto (solo para el Empty State)
 const genrePresets = computed(() => {
   return getPresetsForGenre(projectStore.activeProject?.genre)
 })
@@ -31,30 +30,25 @@ function getCategoryCount(cat: string): number {
 function handleCreateRule(prefillCategory?: string): void {
   rulesStore.openCreateModal(prefillCategory)
 }
-
-function handleApplyPresetCategory(cat: string): void {
-  rulesStore.openCreateModal(cat)
-}
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-2.5 min-w-0 select-none">
-    <!-- Barra de Búsqueda Rápida de Reglas y Botón Nueva Regla -->
-    <div class="flex items-center gap-2 shrink-0">
-      <div class="relative flex-1">
-        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[var(--text-muted)]">
-          <Search :size="12" />
-        </div>
+  <div class="h-full flex flex-col gap-2 min-w-0 select-none">
+    <!-- BARRA SUPERIOR COMPACTA: Búsqueda + Selector de Categoría + Botón Nueva Regla -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <!-- Input de Búsqueda -->
+      <div class="relative flex-1 min-w-0">
+        <Search :size="12" class="absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
         <input
           v-model="rulesStore.searchQuery"
           type="text"
-          placeholder="Buscar axioma, ley o límite..."
-          class="w-full pl-8 pr-7 py-1.5 text-xs neu-well-sm bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none cursor-text select-text"
+          placeholder="Buscar ley, axioma..."
+          class="w-full pl-7 pr-6 py-1 text-xs neu-well-sm bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none cursor-text select-text"
         />
         <button
           v-if="rulesStore.searchQuery"
           type="button"
-          class="w-4 h-4 neu-btn rounded-md flex items-center justify-center absolute right-2 inset-y-auto top-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer active:scale-95"
+          class="absolute right-1.5 top-1.5 p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
           title="Limpiar búsqueda"
           @click="rulesStore.searchQuery = ''"
         >
@@ -62,82 +56,61 @@ function handleApplyPresetCategory(cat: string): void {
         </button>
       </div>
 
-      <!-- Botón Nueva Regla -->
+      <!-- Selector Desplegable de Categoría (Sin scroll horizontal) -->
+      <div v-if="rulesStore.categories.length > 0" class="shrink-0">
+        <select
+          :value="rulesStore.activeCategoryFilter || ''"
+          class="neu-btn text-[10px] font-mono py-1 px-1.5 rounded-lg bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--groove-dark)]/40 focus:outline-none cursor-pointer max-w-[110px] truncate"
+          title="Filtrar por categoría"
+          @change="(e) => rulesStore.setCategoryFilter((e.target as HTMLSelectElement).value || null)"
+        >
+          <option value="">Todas ({{ rulesStore.totalCount }})</option>
+          <option v-for="cat in rulesStore.categories" :key="cat" :value="cat">
+            {{ cat }} ({{ getCategoryCount(cat) }})
+          </option>
+        </select>
+      </div>
+
+      <!-- Botón + Nueva Regla (Abre el editor inline) -->
       <button
         type="button"
-        class="neu-btn-terracotta px-2.5 py-1.5 text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
-        title="Crear una nueva regla, axioma o código inmutable"
+        class="neu-btn-terracotta px-2 py-1 text-xs flex items-center gap-1 shrink-0 active:scale-95 cursor-pointer transition-transform"
+        title="Crear una nueva regla en el panel inline"
         @click="handleCreateRule()"
       >
-        <Plus :size="13" />
-        <span class="font-medium text-[11px] hidden sm:inline">Nueva Regla</span>
+        <Plus :size="12" />
+        <span class="text-[11px] font-medium hidden sm:inline">Nueva</span>
       </button>
     </div>
 
-    <!-- Barra de Filtros Dinámicos por Categoría (Totalmente Reactiva) -->
-    <div class="flex items-center gap-1.5 overflow-x-auto editorial-scrollbar pb-1 text-[10px] shrink-0">
-      <!-- Píldora "Todas" -->
+    <!-- Indicador de Filtro Activo con botón para limpiar (si hay categoría seleccionada) -->
+    <div
+      v-if="rulesStore.activeCategoryFilter"
+      class="flex items-center justify-between text-[10px] px-2 py-0.5 neu-well-sm rounded-lg text-[var(--accent)] shrink-0"
+    >
+      <span class="font-mono truncate">
+        Filtrando por: <strong>{{ rulesStore.activeCategoryFilter }}</strong>
+      </span>
       <button
         type="button"
-        class="neu-btn px-2.5 py-1 rounded-lg shrink-0 transition-all font-mono whitespace-nowrap active:scale-95"
-        :class="
-          rulesStore.activeCategoryFilter === null
-            ? 'is-active neu-well !text-[var(--accent)] font-bold'
-            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-        "
+        class="p-0.5 text-[var(--text-muted)] hover:text-rose-500 cursor-pointer"
+        title="Quitar filtro"
         @click="rulesStore.setCategoryFilter(null)"
       >
-        Todas ({{ rulesStore.totalCount }})
-      </button>
-
-      <!-- Píldoras de Categorías Dinámicas existentes -->
-      <button
-        v-for="cat in rulesStore.categories"
-        :key="cat"
-        type="button"
-        class="neu-btn px-2.5 py-1 rounded-lg shrink-0 transition-all font-medium whitespace-nowrap active:scale-95"
-        :class="
-          rulesStore.activeCategoryFilter?.toLowerCase() === cat.toLowerCase()
-            ? 'is-active neu-well !text-[var(--accent)] font-bold'
-            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-        "
-        @click="rulesStore.setCategoryFilter(cat)"
-      >
-        <span>{{ cat }}</span>
-        <span class="ml-1 opacity-70 font-mono text-[9px]">({{ getCategoryCount(cat) }})</span>
+        <X :size="10" />
       </button>
     </div>
 
-    <!-- Sugerencias de Género si hay pocas categorías creadas -->
-    <div
-      v-if="rulesStore.categories.length < 3 && genrePresets.categories.length > 0"
-      class="px-2.5 py-1.5 rounded-xl neu-well-sm border border-[var(--groove-dark)]/40 flex items-center justify-between gap-1.5 shrink-0 text-[10px]"
-    >
-      <div class="flex items-center gap-1 text-[var(--accent)] shrink-0 font-medium">
-        <Lightbulb :size="11" />
-        <span>Sugerencias para {{ projectStore.activeProject?.genre || 'tu novela' }}:</span>
-      </div>
-      <div class="flex items-center gap-1 overflow-x-auto editorial-scrollbar">
-        <button
-          v-for="presetCat in genrePresets.categories.slice(0, 3)"
-          :key="presetCat"
-          type="button"
-          class="neu-btn px-1.5 py-0.5 rounded text-[9px] text-[var(--text-secondary)] hover:text-[var(--accent)] whitespace-nowrap active:scale-95 transition-all"
-          :title="`Crear regla en categoría '${presetCat}'`"
-          @click="handleApplyPresetCategory(presetCat)"
-        >
-          + {{ presetCat }}
-        </button>
-      </div>
-    </div>
+    <!-- ÁREA PRINCIPAL CON SCROLL VERTICAL: Editor Inline + Lista de Fichas -->
+    <div class="flex-1 overflow-y-auto space-y-2 editorial-scrollbar pr-0.5 min-h-0">
+      <!-- Formulario de Creación / Edición Inline (cuando rulesStore.isModalOpen = true) -->
+      <RuleEditModal />
 
-    <!-- Lista Desplazable de Reglas del Mundo -->
-    <div class="flex-1 overflow-y-auto space-y-2.5 editorial-scrollbar pr-0.5 min-h-0">
-      <!-- 1. Sección de Reglas Ancladas / Prioritarias (si no se está filtrando una categoría específica) -->
+      <!-- 1. Sección de Reglas Ancladas / Prioritarias (si no se está filtrando categoría específica) -->
       <template v-if="rulesStore.activeCategoryFilter === null && rulesStore.pinnedRules.length > 0 && !rulesStore.searchQuery">
-        <div class="flex items-center gap-1 text-[10px] font-mono text-amber-500 font-bold px-1 pt-1">
+        <div class="flex items-center gap-1 text-[10px] font-mono text-amber-500 font-bold px-1 pt-0.5">
           <Pin :size="10" class="fill-current rotate-45" />
-          <span class="uppercase tracking-wider">Reglas Prioritarias / Ancladas ({{ rulesStore.pinnedRules.length }})</span>
+          <span class="uppercase tracking-wider">Reglas Prioritarias ({{ rulesStore.pinnedRules.length }})</span>
         </div>
 
         <RuleCard
@@ -146,21 +119,21 @@ function handleApplyPresetCategory(cat: string): void {
           :rule="rule"
         />
 
-        <div class="neu-groove-h my-2 opacity-50"></div>
+        <div class="neu-groove-h my-1.5 opacity-40"></div>
 
         <div class="flex items-center gap-1 text-[10px] font-mono text-[var(--text-muted)] font-semibold px-1">
           <Scale :size="10" />
-          <span class="uppercase tracking-wider">Todas las Leyes & Códigos</span>
+          <span class="uppercase tracking-wider">Todas las Reglas</span>
         </div>
 
         <RuleCard
-          v-for="rule in rulesStore.filteredRules.filter(r => !r.isPinned)"
+          v-for="rule in rulesStore.filteredRules.filter((r) => !r.isPinned)"
           :key="rule.id"
           :rule="rule"
         />
       </template>
 
-      <!-- 2. Lista estándar si hay filtro de categoría o búsqueda activa -->
+      <!-- 2. Lista filtrada estándar -->
       <template v-else-if="rulesStore.filteredRules.length > 0">
         <RuleCard
           v-for="rule in rulesStore.filteredRules"
@@ -169,57 +142,68 @@ function handleApplyPresetCategory(cat: string): void {
         />
       </template>
 
-      <!-- 3. Empty State cuando no hay ninguna regla en el proyecto -->
+      <!-- 3. EMPTY STATE: Cuando el proyecto no tiene ninguna regla -->
       <div
-        v-else-if="rulesStore.totalCount === 0"
-        class="h-full flex flex-col items-center justify-center neu-well rounded-2xl p-6 text-center space-y-3"
+        v-else-if="rulesStore.totalCount === 0 && !rulesStore.isModalOpen"
+        class="h-full flex flex-col items-center justify-center neu-well rounded-2xl p-5 text-center space-y-3"
       >
-        <div class="w-12 h-12 rounded-2xl neu-surface flex items-center justify-center text-[var(--accent)] shrink-0">
-          <Scale :size="24" class="stroke-[1.8]" />
+        <div class="w-10 h-10 rounded-xl neu-surface flex items-center justify-center text-[var(--accent)] shrink-0">
+          <Scale :size="20" class="stroke-[1.8]" />
         </div>
+
         <div class="space-y-1">
           <p class="font-editorial text-sm font-bold text-[var(--text-primary)]">
-            Sin Reglas de Mundo Codificadas
+            Sin Reglas Codificadas
           </p>
           <p class="text-[11px] text-[var(--text-muted)] max-w-xs leading-relaxed">
-            Establece los límites mágicos, códigos legales, protocolos forenses o normas que rigen tu universo narrativo.
+            Registra los axiomas, límites o normas inquebrantables de tu ambientación.
           </p>
         </div>
 
-        <div class="flex flex-col gap-2 pt-1 w-full max-w-[220px]">
-          <button
-            type="button"
-            class="neu-btn-terracotta py-2 px-3 text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-            @click="handleCreateRule()"
-          >
-            <Plus :size="13" />
-            <span>Crear primera regla</span>
-          </button>
+        <!-- Presets por Género (Solo mostrados aquí para sembrar el proyecto con 1 clic) -->
+        <div v-if="genrePresets.categories.length > 0" class="w-full pt-1 space-y-1.5">
+          <span class="text-[10px] font-mono text-[var(--text-muted)] block">
+            Sugerencias para {{ projectStore.activeProject?.genre || 'tu novela' }}:
+          </span>
+          <div class="flex flex-wrap gap-1 justify-center">
+            <button
+              v-for="presetCat in genrePresets.categories.slice(0, 4)"
+              :key="presetCat"
+              type="button"
+              class="neu-btn px-2 py-0.5 rounded text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer active:scale-95 transition-all"
+              @click="handleCreateRule(presetCat)"
+            >
+              + {{ presetCat }}
+            </button>
+          </div>
         </div>
+
+        <button
+          type="button"
+          class="neu-btn-terracotta py-1.5 px-3 text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 mt-1"
+          @click="handleCreateRule()"
+        >
+          <Plus :size="12" />
+          <span>Crear primera regla</span>
+        </button>
       </div>
 
-      <!-- 4. Empty State cuando no hay coincidencias con la búsqueda o filtro -->
+      <!-- 4. EMPTY STATE: Sin coincidencias con búsqueda/filtro -->
       <div
-        v-else
-        class="py-8 text-center neu-well rounded-2xl p-4 text-[var(--text-muted)] space-y-2"
+        v-else-if="!rulesStore.isModalOpen"
+        class="py-6 text-center neu-well rounded-xl p-4 text-[var(--text-muted)] space-y-2"
       >
         <p class="text-xs font-editorial font-medium text-[var(--text-secondary)]">
-          No se encontraron reglas para este filtro
-        </p>
-        <p class="text-[10px] text-[var(--text-muted)]">
-          Prueba con otros términos de búsqueda o selecciona otra categoría.
+          No hay reglas que coincidan con la búsqueda
         </p>
         <button
           type="button"
-          class="neu-btn px-2.5 py-1 text-[11px] text-[var(--accent)] cursor-pointer mt-1"
+          class="neu-btn px-2 py-1 text-[10px] text-[var(--accent)] cursor-pointer"
           @click="rulesStore.setCategoryFilter(null); rulesStore.searchQuery = ''"
         >
-          Ver todas las reglas
+          Restablecer filtros
         </button>
       </div>
     </div>
-
-    <!-- Modal de Creación / Edición de Reglas -->
-    <RuleEditModal />
   </div>
 </template>

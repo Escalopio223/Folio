@@ -54,6 +54,7 @@ function getCardCategoryIcon(cat: string): Component {
   if (c.includes('lugar')) return MapPin
   if (c.includes('objeto')) return Box
   if (c.includes('idea') || c.includes('pensamiento')) return Lightbulb
+  if (c.includes('regla') || c.includes('ley') || c.includes('sistema') || c.includes('codigo')) return Scale
   return Sparkles
 }
 
@@ -230,28 +231,28 @@ watch(
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-2.5 min-w-0 select-none">
-    <!-- Conmutador Segmentado: Entidades de Lore vs Reglas del Mundo -->
-    <div class="neu-well p-1 flex items-center gap-1 rounded-xl shrink-0">
+  <div class="h-full flex flex-col gap-2 min-w-0 select-none">
+    <!-- Conmutador Segmentado: Wiki de Lore vs Reglas del Mundo (Ultra-delgado 32px) -->
+    <div class="neu-well p-0.5 flex items-center gap-1 rounded-xl shrink-0 h-8">
       <button
         type="button"
-        class="flex-1 py-1 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+        class="flex-1 h-full rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
         :class="uiStore.activeWikiTab === 'lore' ? 'neu-btn font-bold !text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
         @click="uiStore.setActiveWikiTab('lore')"
       >
-        <Compass :size="13" />
-        <span class="text-[11px]">Entidades</span>
+        <Compass :size="12" />
+        <span class="text-[11px] font-medium">Wiki</span>
         <span class="text-[9px] font-mono opacity-70">({{ loreStore.items.length }})</span>
       </button>
 
       <button
         type="button"
-        class="flex-1 py-1 px-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+        class="flex-1 h-full rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
         :class="uiStore.activeWikiTab === 'rules' ? 'neu-btn font-bold !text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
         @click="uiStore.setActiveWikiTab('rules')"
       >
-        <Scale :size="13" />
-        <span class="text-[11px]">Reglas</span>
+        <Scale :size="12" />
+        <span class="text-[11px] font-medium">Reglas</span>
         <span class="text-[9px] font-mono opacity-70">({{ rulesStore.totalCount }})</span>
       </button>
     </div>

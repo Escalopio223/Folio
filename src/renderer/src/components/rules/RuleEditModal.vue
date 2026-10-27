@@ -3,12 +3,9 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import {
   X,
   Pin,
-  Sparkles,
-  AlertTriangle,
-  BookOpen,
-  Tag,
-  Check,
-  Scale
+  ChevronDown,
+  ChevronUp,
+  Tag
 } from 'lucide-vue-next'
 import { useRulesStore } from '../../stores/rulesStore'
 import { useProjectStore } from '../../stores/projectStore'
@@ -19,7 +16,7 @@ const projectStore = useProjectStore()
 
 const titleInputRef = ref<HTMLInputElement | null>(null)
 
-// Campos reactivos del formulario
+// Campos reactivos del formulario inline
 const formTitle = ref('')
 const formCategory = ref('')
 const formAxiom = ref('')
@@ -27,6 +24,7 @@ const formLimitations = ref('')
 const formDetails = ref('')
 const formIsPinned = ref(false)
 
+const showExtraNotes = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -45,10 +43,10 @@ const categorySuggestions = computed<string[]>(() => {
     set.add(cat)
   }
 
-  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+  return Array.from(set).slice(0, 5)
 })
 
-// Sincronizar formulario al abrir modal (creación o edición)
+// Sincronizar formulario al abrir (creación o edición)
 watch(
   () => rulesStore.isModalOpen,
   (open) => {
@@ -62,6 +60,10 @@ watch(
         formLimitations.value = rulesStore.editingRule.limitations || ''
         formDetails.value = rulesStore.editingRule.details || ''
         formIsPinned.value = rulesStore.editingRule.isPinned
+        // Si ya tenía notas o limitaciones, desplegar automáticamente
+        showExtraNotes.value = Boolean(
+          rulesStore.editingRule.details?.trim() || rulesStore.editingRule.limitations?.trim()
+        )
       } else {
         // Modo Creación
         formTitle.value = ''
@@ -70,6 +72,7 @@ watch(
         formLimitations.value = ''
         formDetails.value = ''
         formIsPinned.value = false
+        showExtraNotes.value = false
       }
 
       nextTick(() => {
@@ -94,11 +97,11 @@ async function handleSave(): Promise<void> {
     return
   }
   if (!category) {
-    errorMessage.value = 'Debes especificar una categoría para clasificar la regla.'
+    errorMessage.value = 'Debes especificar una categoría o dominio.'
     return
   }
   if (!axiom) {
-    errorMessage.value = 'El axioma o verdad fundamental no puede estar vacío.'
+    errorMessage.value = 'La ley o axioma fundamental no puede estar vacío.'
     return
   }
 
@@ -124,7 +127,7 @@ async function handleSave(): Promise<void> {
 
     rulesStore.closeModal()
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Error al guardar la regla en la base de datos.'
+    errorMessage.value = err instanceof Error ? err.message : 'Error al guardar la regla.'
   } finally {
     isSaving.value = false
   }
@@ -148,207 +151,177 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div
-        v-if="rulesStore.isModalOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
-        @click.self="rulesStore.closeModal"
-      >
-        <div
-          class="neu-surface max-w-lg w-full max-h-[90vh] flex flex-col rounded-2xl overflow-hidden border border-[var(--groove-dark)]/60 shadow-2xl bg-[var(--bg-surface)] text-[var(--text-primary)]"
-          role="dialog"
-          aria-modal="true"
+  <div
+    v-if="rulesStore.isModalOpen"
+    class="neu-surface p-3 rounded-2xl border border-[var(--accent)]/50 shadow-md flex flex-col gap-2.5 animate-fadeIn shrink-0 select-none"
+  >
+    <!-- Cabecera del Editor Inline: Título de acción, Pin y Cerrar -->
+    <div class="flex items-center justify-between gap-2 border-b border-[var(--groove-dark)]/30 pb-2">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-editorial font-bold text-[var(--accent)]">
+          {{ rulesStore.editingRule ? 'Editar Regla' : 'Nueva Regla del Mundo' }}
+        </span>
+
+        <!-- Botón Pin rápido -->
+        <button
+          type="button"
+          class="neu-btn px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+          :class="formIsPinned ? 'neu-well text-amber-500 font-bold' : 'text-[var(--text-muted)] hover:text-amber-500'"
+          title="Fijar regla como prioritaria al inicio"
+          @click="formIsPinned = !formIsPinned"
         >
-          <!-- Cabecera del Modal -->
-          <header class="p-3.5 border-b border-[var(--groove-dark)]/40 flex items-center justify-between shrink-0 bg-[var(--bg-surface)]">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-8 h-8 rounded-xl neu-well flex items-center justify-center text-[var(--accent)] shrink-0">
-                <Scale :size="16" class="stroke-[2.2]" />
-              </div>
-              <div class="min-w-0">
-                <h3 class="font-editorial text-sm font-bold text-[var(--text-primary)] truncate">
-                  {{ rulesStore.editingRule ? 'Editar Regla del Mundo' : 'Nueva Regla del Mundo' }}
-                </h3>
-                <p class="text-[10px] text-[var(--text-muted)] truncate">
-                  Codifica leyes duras, axiomas y límites inmutables
-                </p>
-              </div>
-            </div>
+          <Pin :size="10" :class="{ 'fill-current rotate-45': formIsPinned }" />
+          <span>{{ formIsPinned ? 'Fijada' : 'Fijar' }}</span>
+        </button>
+      </div>
 
-            <button
-              type="button"
-              class="w-7 h-7 neu-btn rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer active:scale-95"
-              title="Cerrar modal (Escape)"
-              @click="rulesStore.closeModal"
-            >
-              <X :size="14" />
-            </button>
-          </header>
+      <button
+        type="button"
+        class="w-5 h-5 neu-btn rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer active:scale-95 transition-all"
+        title="Cancelar y cerrar (Esc)"
+        @click="rulesStore.closeModal()"
+      >
+        <X :size="11" />
+      </button>
+    </div>
 
-          <!-- Cuerpo desplazable del Formulario -->
-          <div class="p-4 overflow-y-auto space-y-3.5 editorial-scrollbar text-xs">
-            <!-- Mensaje de Error si aplica -->
-            <div
-              v-if="errorMessage"
-              class="p-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-mono"
-            >
-              {{ errorMessage }}
-            </div>
+    <!-- 1. TÍTULO Y CATEGORÍA (Compactos en una sola fila) -->
+    <div class="flex items-center gap-2">
+      <!-- Input de Título -->
+      <input
+        ref="titleInputRef"
+        v-model="formTitle"
+        type="text"
+        placeholder="Título de la regla o ley..."
+        class="flex-1 text-xs font-editorial font-semibold neu-well-sm px-2.5 py-1.5 bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none cursor-text select-text"
+      />
 
-            <!-- 1. Título de la regla -->
-            <div class="space-y-1">
-              <label class="block text-[11px] font-mono text-[var(--text-secondary)] font-semibold">
-                Título o Denominación de la Ley <span class="text-[var(--accent)]">*</span>
-              </label>
-              <div class="neu-well-sm rounded-xl px-3 py-1.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)]">
-                <input
-                  ref="titleInputRef"
-                  v-model="formTitle"
-                  type="text"
-                  placeholder="Ej: Tercera Ley del Éter, Protocolo de Custodia, Juramento de Sangre..."
-                  class="w-full bg-transparent border-none outline-none font-editorial font-bold text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]/60 cursor-text select-text"
-                />
-              </div>
-            </div>
+      <!-- Input de Categoría -->
+      <div class="flex items-center gap-1 neu-well-sm px-2 py-1.5 w-32 shrink-0">
+        <Tag :size="10" class="text-[var(--accent)] shrink-0" />
+        <input
+          v-model="formCategory"
+          type="text"
+          placeholder="Categoría"
+          class="w-full text-[10px] font-mono text-[var(--accent)] bg-transparent border-none focus:outline-none cursor-text select-text"
+        />
+      </div>
+    </div>
 
-            <!-- 2. Categoría Dinámica -->
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <label class="block text-[11px] font-mono text-[var(--text-secondary)] font-semibold">
-                  Categoría o Dominio del Sistema <span class="text-[var(--accent)]">*</span>
-                </label>
-                <span class="text-[10px] text-[var(--text-muted)] font-mono">Texto libre o sugerencias</span>
-              </div>
+    <!-- Chips rápidos de sugerencia de categoría (si escribe o quiere cambiarla con 1 clic) -->
+    <div
+      v-if="categorySuggestions.length > 0"
+      class="flex items-center gap-1 flex-wrap text-[9px] -mt-1"
+    >
+      <span class="text-[var(--text-muted)] font-mono text-[8px] opacity-70">Sugerencias:</span>
+      <button
+        v-for="cat in categorySuggestions"
+        :key="cat"
+        type="button"
+        class="neu-btn px-1.5 py-0.2 rounded text-[9px] transition-all cursor-pointer"
+        :class="formCategory.toLowerCase() === cat.toLowerCase() ? 'neu-well text-[var(--accent)] font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
+        @click="setCategory(cat)"
+      >
+        {{ cat }}
+      </button>
+    </div>
 
-              <!-- Input libre de categoría -->
-              <div class="neu-well-sm rounded-xl px-3 py-1.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)] flex items-center gap-2">
-                <Tag :size="12" class="text-[var(--accent)] shrink-0" />
-                <input
-                  v-model="formCategory"
-                  type="text"
-                  placeholder="Ej: Sistemas de Magia, Leyes Penales, Etiqueta, Tecnología..."
-                  class="w-full bg-transparent border-none outline-none font-sans text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)]/60 cursor-text select-text"
-                />
-              </div>
+    <!-- 2. LA REGLA / LEY FUNDAMENTAL (Único textarea principal de 2-3 líneas) -->
+    <div class="space-y-1">
+      <textarea
+        v-model="formAxiom"
+        rows="3"
+        placeholder="Define la ley inquebrantable o su coste al transgredirla..."
+        class="w-full text-xs font-editorial italic neu-well-sm p-2.5 bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none resize-none cursor-text select-text leading-relaxed"
+      ></textarea>
+    </div>
 
-              <!-- Chips sugeridos rápidos -->
-              <div class="flex items-center gap-1.5 overflow-x-auto editorial-scrollbar pb-1 pt-0.5 text-[10px]">
-                <span class="text-[9px] font-mono text-[var(--text-muted)] shrink-0">Sugerencias:</span>
-                <button
-                  v-for="cat in categorySuggestions"
-                  :key="cat"
-                  type="button"
-                  class="neu-btn px-2 py-0.5 rounded-lg whitespace-nowrap cursor-pointer transition-all shrink-0 active:scale-95"
-                  :class="formCategory.trim().toLowerCase() === cat.toLowerCase() ? 'neu-well font-bold text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
-                  @click="setCategory(cat)"
-                >
-                  {{ cat }}
-                </button>
-              </div>
-            </div>
+    <!-- 3. EXCEPCIONES Y NOTAS (Opcional y Colapsable) -->
+    <div class="space-y-1.5">
+      <button
+        type="button"
+        class="text-[10px] font-mono text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer select-none"
+        @click="showExtraNotes = !showExtraNotes"
+      >
+        <component :is="showExtraNotes ? ChevronUp : ChevronDown" :size="11" />
+        <span>{{ showExtraNotes ? 'Ocultar matices y costes' : '+ Añadir matices, costes o excepciones' }}</span>
+      </button>
 
-            <!-- 3. Axioma / Verdad Fundamental (1-2 frases) -->
-            <div class="space-y-1">
-              <div class="flex items-center justify-between">
-                <label class="flex items-center gap-1 text-[11px] font-mono text-[var(--text-secondary)] font-semibold">
-                  <Sparkles :size="11" class="text-[var(--accent)]" />
-                  <span>Axioma Central (Verdad Fundamental) <span class="text-[var(--accent)]">*</span></span>
-                </label>
-                <span class="text-[10px] text-[var(--text-muted)] font-mono">1 o 2 frases contundentes</span>
-              </div>
-              <div class="neu-well rounded-xl p-2.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)]">
-                <textarea
-                  v-model="formAxiom"
-                  rows="2"
-                  placeholder="Ej: «Para obtener algo de valor alquímico, debe sacrificarse una sustancia de idéntica masa y carga espiritual.»"
-                  class="w-full bg-transparent resize-none border-none outline-none font-editorial italic text-xs leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-muted)]/60 cursor-text select-text"
-                />
-              </div>
-            </div>
+      <div v-if="showExtraNotes" class="space-y-2 pt-1 border-t border-[var(--groove-dark)]/20 animate-fadeIn">
+        <!-- Campo opcional de detalles / matices / excepciones -->
+        <div>
+          <label class="text-[9px] font-mono text-[var(--text-muted)] block mb-0.5">
+            Matices, excepciones o notas adicionales:
+          </label>
+          <textarea
+            v-model="formDetails"
+            rows="2"
+            placeholder="Precedentes históricos, excepciones conocidas o notas..."
+            class="w-full text-xs neu-well-sm p-2 bg-transparent border-none text-[var(--text-secondary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none resize-none cursor-text select-text font-sans leading-relaxed"
+          ></textarea>
+        </div>
 
-            <!-- 4. Limitaciones / Costes / Consecuencias -->
-            <div class="space-y-1">
-              <div class="flex items-center justify-between">
-                <label class="flex items-center gap-1 text-[11px] font-mono text-[var(--accent)] font-semibold">
-                  <AlertTriangle :size="11" />
-                  <span>Costes, Tabúes & Consecuencias</span>
-                </label>
-                <span class="text-[10px] text-[var(--text-muted)] font-mono">Qué ocurre al transgredirla</span>
-              </div>
-              <div class="neu-well-sm rounded-xl p-2.5 border-l-3 border-[var(--accent)] border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)]">
-                <textarea
-                  v-model="formLimitations"
-                  rows="2"
-                  placeholder="Ej: Transmutar materia viva destruye el sistema nervioso del mago. Negarse al duelo anula los títulos feudales..."
-                  class="w-full bg-transparent resize-none border-none outline-none font-sans text-xs leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-muted)]/60 cursor-text select-text"
-                />
-              </div>
-            </div>
-
-            <!-- 5. Detalles profundos, precedentes y excepciones (Markdown) -->
-            <div class="space-y-1">
-              <label class="flex items-center gap-1 text-[11px] font-mono text-[var(--text-secondary)] font-semibold">
-                <BookOpen :size="11" />
-                <span>Excepciones Documentadas & Precedentes (Opcional)</span>
-              </label>
-              <div class="neu-well-sm rounded-xl p-2.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)]">
-                <textarea
-                  v-model="formDetails"
-                  rows="3"
-                  placeholder="Añade precedentes históricos, tratados firmados, casos únicos o matices que enriquecen la narrativa..."
-                  class="w-full bg-transparent resize-y min-h-[60px] border-none outline-none font-sans text-xs leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-muted)]/60 cursor-text select-text"
-                />
-              </div>
-            </div>
-
-            <!-- 6. Opción de Anclar regla como prioritaria -->
-            <div class="pt-1 flex items-center justify-between">
-              <button
-                type="button"
-                class="neu-btn px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                :class="formIsPinned ? 'neu-well text-amber-500 font-bold' : 'text-[var(--text-secondary)]'"
-                @click="formIsPinned = !formIsPinned"
-              >
-                <Pin :size="12" :class="{ 'fill-current rotate-45': formIsPinned }" />
-                <span>{{ formIsPinned ? 'Regla anclada al inicio' : 'Anclar como regla prioritaria' }}</span>
-              </button>
-
-              <span class="text-[10px] font-mono text-[var(--text-muted)]">
-                <kbd class="neu-well-sm px-1 py-0.5">Ctrl+Enter</kbd> para guardar
-              </span>
-            </div>
-          </div>
-
-          <!-- Pie del Modal con Acciones -->
-          <footer class="p-3 border-t border-[var(--groove-dark)]/40 bg-[var(--bg-surface)] shrink-0 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              class="neu-btn px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer active:scale-95"
-              @click="rulesStore.closeModal"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              class="neu-btn neu-btn-terracotta px-4 py-1.5 text-xs flex items-center gap-1.5 text-white font-semibold transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              :disabled="isSaving"
-              @click="handleSave"
-            >
-              <Check :size="13" />
-              <span>{{ isSaving ? 'Guardando...' : (rulesStore.editingRule ? 'Guardar Cambios' : 'Crear Regla') }}</span>
-            </button>
-          </footer>
+        <!-- Campo opcional de limitaciones / costes (retrocompatibilidad) -->
+        <div>
+          <label class="text-[9px] font-mono text-[#C85A32] block mb-0.5">
+            Costes punitivos o consecuencias al transgredir la ley:
+          </label>
+          <input
+            v-model="formLimitations"
+            type="text"
+            placeholder="Tabúes, coste biológico, castigo penal..."
+            class="w-full text-xs neu-well-sm px-2.5 py-1.5 bg-transparent border-none text-[var(--text-secondary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none cursor-text select-text font-sans"
+          />
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+
+    <!-- Mensaje de Error si hay campos incompletos -->
+    <p v-if="errorMessage" class="text-[10px] text-rose-500 font-mono">
+      {{ errorMessage }}
+    </p>
+
+    <!-- FOOTER: Atajos y Botones de Guardar / Cancelar -->
+    <div class="flex items-center justify-between gap-2 pt-1 border-t border-[var(--groove-dark)]/20">
+      <span class="text-[9px] font-mono text-[var(--text-muted)] hidden sm:inline">
+        Ctrl+Enter para guardar · Esc para cancelar
+      </span>
+
+      <div class="flex items-center gap-1.5 ml-auto">
+        <button
+          type="button"
+          class="neu-btn px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer active:scale-95"
+          @click="rulesStore.closeModal()"
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="button"
+          class="neu-btn-terracotta px-3.5 py-1 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-95"
+          :disabled="isSaving"
+          @click="handleSave"
+        >
+          <span>{{ isSaving ? 'Guardando...' : (rulesStore.editingRule ? 'Actualizar' : 'Guardar') }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+</style>

@@ -4,9 +4,7 @@ import {
   Pin,
   ChevronDown,
   Edit3,
-  Trash2,
-  AlertTriangle,
-  BookOpen
+  Trash2
 } from 'lucide-vue-next'
 import type { WorldRule } from '@shared/types'
 import { useRulesStore } from '../../stores/rulesStore'
@@ -40,123 +38,125 @@ async function handleTogglePin(): Promise<void> {
 
 <template>
   <div
-    class="neu-btn w-full p-3 flex flex-col gap-2 rounded-2xl transition-all select-none border border-[var(--groove-dark)]/40 relative group"
+    class="neu-btn w-full p-2.5 flex flex-col rounded-xl transition-all select-none border border-[var(--groove-dark)]/40 relative group cursor-pointer"
     :class="{
       'neu-well border-[var(--accent)]/50 !shadow-inner': rulesStore.selectedRuleId === rule.id,
-      'border-l-4 !border-l-[var(--accent)]': rule.isPinned
+      'border-l-3 !border-l-[var(--accent)]': rule.isPinned
     }"
-    @click="rulesStore.selectRule(rule.id)"
+    @click="toggleExpand"
   >
-    <!-- Cabecera de la Tarjeta: Categoría, Pin y Acciones -->
-    <div class="flex items-start justify-between gap-2">
-      <div class="flex items-center gap-1.5 flex-wrap min-w-0">
-        <!-- Chip de Categoría Dinámica -->
+    <!-- LÍNEA 1: Pin (si está fijada) + Título + Píldora de Categoría + Acciones en Hover -->
+    <div class="flex items-center justify-between gap-1.5 min-w-0">
+      <div class="flex items-center gap-1.5 min-w-0 flex-1">
+        <!-- Icono Pin discreto si está anclada -->
+        <Pin
+          v-if="rule.isPinned"
+          :size="10"
+          class="text-amber-500 fill-current rotate-45 shrink-0"
+          title="Regla prioritaria fijada"
+        />
+
+        <!-- Título de la Regla en negrita editorial -->
+        <h4
+          class="font-editorial text-sm font-semibold text-[var(--text-primary)] truncate leading-tight"
+          :title="rule.title"
+        >
+          {{ rule.title }}
+        </h4>
+
+        <!-- Píldora discreta de Categoría -->
         <span
-          class="neu-well-sm px-2 py-0.5 text-[9px] font-mono text-[var(--accent)] font-semibold rounded-md uppercase tracking-wider truncate max-w-[170px]"
+          class="text-[9px] font-mono text-[var(--accent)]/90 bg-[var(--accent)]/10 px-1.5 py-0.2 rounded shrink-0 uppercase tracking-wider truncate max-w-[120px]"
           :title="rule.category"
         >
           {{ rule.category }}
         </span>
-
-        <!-- Insignia de Anclada -->
-        <span
-          v-if="rule.isPinned"
-          class="inline-flex items-center gap-1 text-[9px] font-mono text-amber-500 font-bold px-1.5 py-0.2 neu-well-sm rounded-md"
-          title="Regla prioritaria fijada al inicio"
-        >
-          <Pin :size="9" class="fill-current rotate-45" />
-          <span>Fijada</span>
-        </span>
       </div>
 
-      <!-- Botones Rápidos de Cabecera -->
-      <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" @click.stop>
+      <!-- Acciones de Cabecera (Solo visibles en hover para eliminar ruido visual) -->
+      <div
+        class="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        @click.stop
+      >
         <!-- Conmutar Pin -->
         <button
           type="button"
-          class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center transition-all cursor-pointer active:scale-95"
-          :class="rule.isPinned ? 'neu-well text-amber-500 font-bold' : 'text-[var(--text-muted)] hover:text-amber-500'"
+          class="w-5 h-5 rounded neu-btn flex items-center justify-center transition-all cursor-pointer active:scale-95"
+          :class="rule.isPinned ? 'text-amber-500 font-bold' : 'text-[var(--text-muted)] hover:text-amber-500'"
           :title="rule.isPinned ? 'Desfijar regla' : 'Fijar regla como prioritaria'"
           @click="handleTogglePin"
         >
-          <Pin :size="11" :class="{ 'fill-current rotate-45': rule.isPinned }" />
+          <Pin :size="10" :class="{ 'fill-current rotate-45': rule.isPinned }" />
         </button>
 
         <!-- Editar -->
         <button
           type="button"
-          class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer active:scale-95"
-          title="Editar regla"
+          class="w-5 h-5 rounded neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer active:scale-95"
+          title="Editar regla inline"
           @click="handleEdit"
         >
-          <Edit3 :size="11" />
+          <Edit3 :size="10" />
         </button>
 
         <!-- Eliminar -->
         <button
           type="button"
-          class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
+          class="w-5 h-5 rounded neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
           title="Eliminar regla"
           @click="handleDelete"
         >
-          <Trash2 :size="11" />
+          <Trash2 :size="10" />
         </button>
       </div>
+
+      <!-- Chevron indicador de expansión -->
+      <ChevronDown
+        :size="12"
+        class="text-[var(--text-muted)] transition-transform duration-200 shrink-0"
+        :class="{ 'rotate-180 text-[var(--accent)]': isExpanded }"
+      />
     </div>
 
-    <!-- Título de la Regla / Ley -->
-    <h4
-      class="font-editorial text-sm font-bold text-[var(--text-primary)] leading-snug cursor-pointer flex items-center justify-between gap-2"
-      @click="toggleExpand"
+    <!-- LÍNEA 2: Vista previa del Axioma truncada en 1 sola línea (Estado Colapsado) -->
+    <p
+      v-if="!isExpanded"
+      class="line-clamp-1 text-xs font-editorial italic text-[var(--text-secondary)] opacity-80 mt-1 leading-snug"
     >
-      <span class="truncate">{{ rule.title }}</span>
-      <button
-        type="button"
-        class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-transform duration-200 shrink-0 p-0.5"
-        :class="{ 'rotate-180 text-[var(--accent)]': isExpanded }"
-        :title="isExpanded ? 'Plegar detalles' : 'Desplegar detalles'"
-        @click.stop="toggleExpand"
-      >
-        <ChevronDown :size="13" />
-      </button>
-    </h4>
+      «{{ rule.axiom }}»
+    </p>
 
-    <!-- Bloque 1: Axioma Destacado / Verdad Fundamental (Neu-well con Serif Italic) -->
-    <div class="neu-well rounded-xl p-2.5 border border-[var(--groove-dark)]/40 relative">
-      <div class="flex items-center gap-1.5 text-[9px] font-mono text-[var(--text-muted)] mb-1">
-        <Sparkles :size="10" class="text-[var(--accent)]" />
-        <span class="uppercase tracking-wider font-semibold">Axioma Fundamental</span>
-      </div>
-      <p class="font-editorial italic text-xs text-[var(--text-primary)] leading-relaxed">
+    <!-- ESTADO EXPANDIDO: Despliegue suave y limpio sin cajas pesadas -->
+    <div
+      v-else
+      class="mt-2 pt-2 border-t border-[var(--groove-dark)]/30 space-y-2 animate-fadeIn"
+      @click.stop
+    >
+      <!-- Texto Completo del Axioma / Ley Fundamental -->
+      <p class="font-editorial text-sm leading-relaxed text-[var(--text-primary)] italic">
         «{{ rule.axiom }}»
       </p>
-    </div>
 
-    <!-- Bloque 2: Limitaciones / Costes / Consecuencias (Acento Terracota #C85A32) -->
-    <div
-      v-if="rule.limitations && rule.limitations.trim()"
-      class="neu-well-sm rounded-xl p-2.5 border-l-3 border-[var(--accent)] bg-[var(--bg-base)]/50 flex flex-col gap-1"
-    >
-      <div class="flex items-center gap-1 text-[9px] font-mono text-[var(--accent)] font-bold">
-        <AlertTriangle :size="10" />
-        <span class="uppercase tracking-wider">Límites, Costes & Consecuencias</span>
+      <!-- Limitaciones / Costes / Consecuencias (Línea lateral terracota fina, sin cajas de alerta pesadas) -->
+      <div
+        v-if="rule.limitations && rule.limitations.trim()"
+        class="border-l-2 border-[#C85A32] pl-2.5 text-xs text-[var(--text-secondary)] leading-relaxed space-y-0.5"
+      >
+        <span class="text-[9px] font-mono font-bold text-[#C85A32] uppercase tracking-wider block">
+          Costes & Consecuencias
+        </span>
+        <p>{{ rule.limitations }}</p>
       </div>
-      <p class="text-[11px] text-[var(--text-secondary)] font-sans leading-relaxed">
-        {{ rule.limitations }}
-      </p>
-    </div>
 
-    <!-- Bloque 3: Detalles Profundos / Excepciones Documentadas (Acordeón desplegable) -->
-    <div
-      v-if="isExpanded && rule.details && rule.details.trim()"
-      class="pt-1.5 border-t border-[var(--groove-dark)]/30 flex flex-col gap-1.5 animate-fadeIn"
-    >
-      <div class="flex items-center gap-1 text-[9px] font-mono text-[var(--text-muted)] font-semibold">
-        <BookOpen :size="10" />
-        <span class="uppercase tracking-wider">Detalles, Precedentes & Matices</span>
-      </div>
-      <div class="text-[11px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap font-sans neu-well-sm p-2 rounded-lg">
-        {{ rule.details }}
+      <!-- Notas Profundas, Matices o Precedentes (Línea lateral neutral fina) -->
+      <div
+        v-if="rule.details && rule.details.trim()"
+        class="border-l-2 border-[var(--groove-dark)]/60 pl-2.5 text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap space-y-0.5"
+      >
+        <span class="text-[9px] font-mono font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
+          Notas & Excepciones
+        </span>
+        <p>{{ rule.details }}</p>
       </div>
     </div>
   </div>
@@ -166,7 +166,7 @@ async function handleTogglePin(): Promise<void> {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-3px);
+    transform: translateY(-2px);
   }
   to {
     opacity: 1;
@@ -175,6 +175,6 @@ async function handleTogglePin(): Promise<void> {
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 </style>
