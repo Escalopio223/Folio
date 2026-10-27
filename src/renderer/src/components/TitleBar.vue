@@ -57,8 +57,17 @@ async function handleAction(action: WindowAction): Promise<void> {
 function handleKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
 
-  // Ctrl+B / Cmd+B: Alternar Árbol de Manuscrito
+  // Ctrl+B / Cmd+B: Alternar Árbol de Manuscrito (excepto si estamos escribiendo en el editor o input)
   if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'b') {
+    const target = document.activeElement as HTMLElement | null
+    const isEditing =
+      target?.closest('.ProseMirror') ||
+      target?.tagName === 'INPUT' ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.isContentEditable
+    if (isEditing) {
+      return
+    }
     e.preventDefault()
     uiStore.toggleLeftSidebar()
     return

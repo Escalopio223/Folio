@@ -35,10 +35,11 @@ export const useFolioStore = defineStore('folio', () => {
   const folioDeltas = new Map<string, number>()
 
   function countWords(text: string): number {
-    const trimmed = (text || '').trim()
-    if (!trimmed) return 0
-    return trimmed.split(/\s+/).length
+    const cleanText = (text || '').replace(/<[^>]*>/g, ' ').trim()
+    if (!cleanText) return 0
+    return cleanText.split(/\s+/).length
   }
+
 
   function recordBaseline(folioId: string, content: string): void {
     if (!baselineWordCounts.has(folioId)) {
@@ -216,6 +217,16 @@ export const useFolioStore = defineStore('folio', () => {
     }
   }
 
+  async function saveCurrentFolio(
+    fields?: Partial<Pick<UpdateFolioInput, 'content' | 'title' | 'synopsis' | 'status'>>
+  ): Promise<Folio | null> {
+    if (!activeFolioId.value) return null
+    return updateFolio({
+      id: activeFolioId.value,
+      ...fields
+    })
+  }
+
   return {
     folios,
     trashedFolios,
@@ -224,6 +235,7 @@ export const useFolioStore = defineStore('folio', () => {
     chapters,
     isLoading,
     sessionWordsAdded,
+    countWords,
     recordBaseline,
     updateSessionWords,
     getScenesForChapter,
@@ -233,6 +245,7 @@ export const useFolioStore = defineStore('folio', () => {
     createScene,
     createFolio,
     updateFolio,
+    saveCurrentFolio,
     moveToTrash,
     restoreFromTrash,
     deletePermanently

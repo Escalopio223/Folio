@@ -54,7 +54,7 @@ function mapFolio(row: schema.FolioSelect): Folio {
 }
 
 function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
-  let parsedAttrs: Record<string, string> = {}
+  let parsedAttrs: Record<string, string>
   try {
     parsedAttrs = JSON.parse(row.attributes || '{}')
   } catch {
@@ -423,7 +423,7 @@ export function deleteProject(id: string): boolean {
 
 export function getAllFolios(projectId?: string): Folio[] {
   const db = getDb()
-  let query = db.select().from(schema.folios)
+  const query = db.select().from(schema.folios)
   
   if (projectId) {
     const rows = query.where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, false)))

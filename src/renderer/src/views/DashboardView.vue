@@ -21,7 +21,7 @@ import {
   Eye,
   Flame
 } from 'lucide-vue-next'
-import { getCaretCoordinates } from '../utils/caret'
+import TiptapEditor from '../components/editor/TiptapEditor.vue'
 import type { Folio } from '@shared/types'
 
 const projectStore = useProjectStore()
@@ -69,157 +69,35 @@ let isSyncing = false
 
 // Input DOM references for focus and scroll control
 const titleInputRef = ref<HTMLInputElement | null>(null)
-const contentInputRef = ref<HTMLTextAreaElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
-const cursorPosition = ref(0)
+const tiptapEditorRef = ref<InstanceType<typeof TiptapEditor> | null>(null)
 
-// =========================================================================
-// MODO MÁQUINA DE ESCRIBIR: CENTRADO BLOQUEADO DEL CURSOR EN EL MEDIO
-// =========================================================================
-function syncTypewriterCenter(instant = false): void {
-  if (!uiStore.isTypewriterMode || !contentInputRef.value || !scrollContainerRef.value) return
+// Word, character count and estimated reading time (Zero-Lag reactive from TipTap)
+const wordCount = ref(0)
+const charCount = ref(0)
+const readingTime = ref(0)
 
-  const container = scrollContainerRef.value
-  const textarea = contentInputRef.value
-  const pos = textarea.selectionStart ?? 0
-
-  const coords = getCaretCoordinates(textarea, pos)
-  const containerRect = container.getBoundingClientRect()
-  const textareaRect = textarea.getBoundingClientRect()
-
-  // Coordenada Y absoluta del cursor en el viewport
-  const caretViewportY = textareaRect.top + coords.top + coords.height / 2
-  // Coordenada Y del centro exacto del viewport del contenedor
-  const containerCenterY = containerRect.top + container.clientHeight / 2
-
-  // Desfase entre el cursor y el centro vertical exacto
-  const deltaY = caretViewportY - containerCenterY
-
-  // Si el cursor se ha desplazado del centro por más de 1.5px, corregir inmediatamente el scroll
-  if (Math.abs(deltaY) > 1.5) {
-    const targetScrollTop = Math.max(0, container.scrollTop + deltaY)
-    if (instant) {
-      container.scrollTop = targetScrollTop
-    } else {
-      container.scrollTo({
-        top: targetScrollTop,
-        behavior: 'smooth'
-      })
-    }
+function handleEditorStats(stats: {
+  wordCount: number
+  charCount: number
+  readingTime: number
+  plainText: string
+}): void {
+  wordCount.value = stats.wordCount
+  charCount.value = stats.charCount
+  readingTime.value = stats.readingTime
+  if (folioStore.activeFolioId) {
+    folioStore.updateSessionWords(folioStore.activeFolioId, stats.plainText)
   }
 }
 
-// =========================================================================
-// MODO ENFOQUE: SPOTLIGHT LUMINOSO SOBRE EL PÁRRAFO ACTIVO
-// =========================================================================
-function getParagraphBounds(content: string, pos: number): { start: number; end: number } {
-  if (!content) return { start: 0, end: 0 }
-  const clampedPos = Math.max(0, Math.min(pos, content.length))
-
-  const lastNewline = content.lastIndexOf('\n', clampedPos > 0 ? clampedPos - 1 : 0)
-  const start = lastNewline === -1 ? 0 : lastNewline + 1
-
-  const nextNewline = content.indexOf('\n', clampedPos)
-  const end = nextNewline === -1 ? content.length : nextNewline
-
-  return { start, end }
-}
-
-const focusSpotlightTop = ref(0)
-const focusSpotlightBottom = ref(40)
-
-function updateSpotlightPosition(): void {
-  if (!contentInputRef.value) return
-  const textarea = contentInputRef.value
-  const content = editFolioContent.value || ''
-  const pos = textarea.selectionStart ?? 0
-
-  const { start, end } = getParagraphBounds(content, pos)
-  const startCoords = getCaretCoordinates(textarea, start)
-  const endCoords = getCaretCoordinates(textarea, Math.max(start, end === 0 ? 0 : end - 1))
-
-  focusSpotlightTop.value = Math.max(0, startCoords.top - 6)
-  focusSpotlightBottom.value = endCoords.top + endCoords.height + 6
-}
-
-// Estilo del velo de enfoque: atenuación elegante del resto del documento al 18% de contraste
-const focusSpotlightStyle = computed(() => {
-  if (!uiStore.isFocusMode) {
-    return { display: 'none' }
-  }
-  const top = focusSpotlightTop.value
-  const bottom = focusSpotlightBottom.value
-
-  return {
-    background: `linear-gradient(to bottom,
-      var(--bg-base) 0px,
-      var(--bg-base) ${Math.max(0, top - 10)}px,
-      transparent ${top}px,
-      transparent ${bottom}px,
-      var(--bg-base) ${bottom + 10}px,
-      var(--bg-base) 100%)`,
-    opacity: 0.82
-  }
-})
-
-// Controlador central de eventos de cursor
-function onCaretMove(instant = false): void {
-  if (!contentInputRef.value) return
-  cursorPosition.value = contentInputRef.value.selectionStart ?? 0
-  updateSpotlightPosition()
-  if (uiStore.isTypewriterMode) {
-    syncTypewriterCenter(instant)
-  }
-}
-
-function adjustTextareaHeight(): void {
-  if (!contentInputRef.value) return
-  const el = contentInputRef.value
-  el.style.height = 'auto'
-  el.style.height = `${Math.max(350, el.scrollHeight)}px`
-}
-
-watch(
-  () => uiStore.isTypewriterMode,
-  (active) => {
-    if (active) {
-      nextTick(() => {
-        onCaretMove(false)
-      })
-    }
-  }
-)
-
-watch(
-  () => uiStore.isFocusMode,
-  (active) => {
-    if (active) {
-      nextTick(() => {
-        updateSpotlightPosition()
-      })
-    }
-  }
-)
-
-// Word, character count and estimated reading time
-const wordCount = computed(() => {
-  const text = editFolioContent.value.trim()
-  if (!text) return 0
-  return text.split(/\s+/).length
-})
-
-const charCount = computed(() => editFolioContent.value.length)
-
-const readingTime = computed(() => {
-  const words = wordCount.value
-  if (words === 0) return 0
-  return Math.max(1, Math.ceil(words / 200))
-})
-
-// Sync active folio when changed
+// Sync active folio when changed with flush save safeguard
 watch(
   () => folioStore.activeFolio,
-  (folio) => {
+  async (folio, oldFolio) => {
+    if (oldFolio && oldFolio.id !== folio?.id && hasPendingChanges.value) {
+      await flushSave()
+    }
     isSyncing = true
     if (folio) {
       editFolioTitle.value = folio.title
@@ -234,17 +112,20 @@ watch(
         second: '2-digit'
       })
       folioStore.recordBaseline(folio.id, folio.content || '')
-      cursorPosition.value = 0
-      nextTick(() => {
-        adjustTextareaHeight()
-        onCaretMove(true)
-      })
+      const initialText = (folio.content || '').replace(/<[^>]*>/g, ' ').trim()
+      const words = initialText ? initialText.split(/\s+/).length : 0
+      wordCount.value = words
+      charCount.value = (folio.content || '').length
+      readingTime.value = words === 0 ? 0 : Math.max(1, Math.ceil(words / 200))
     } else {
       editFolioTitle.value = ''
       editFolioContent.value = ''
       editFolioSynopsis.value = ''
       saveStatus.value = 'saved'
       hasPendingChanges.value = false
+      wordCount.value = 0
+      charCount.value = 0
+      readingTime.value = 0
     }
     setTimeout(() => {
       isSyncing = false
@@ -264,7 +145,7 @@ async function flushSave(): Promise<void> {
     if (folioStore.activeFolioId) {
       const targetId = folioStore.activeFolioId
       const titleToSave = editFolioTitle.value.trim() || 'Sin título'
-      const contentToSave = editFolioContent.value
+      const contentToSave = tiptapEditorRef.value?.getHTML() ?? editFolioContent.value
       const synopsisToSave = editFolioSynopsis.value
       const statusToSave = editFolioStatus.value
 
@@ -322,34 +203,7 @@ function onEditorInput(): void {
     folioStore.updateSessionWords(folioStore.activeFolioId, editFolioContent.value)
   }
 
-  adjustTextareaHeight()
-  onCaretMove(true)
   debouncedSave()
-}
-
-// Manejo reactivo de teclas en el área de escritura de prosa
-function handleTextareaKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Tab') {
-    e.preventDefault()
-    const textarea = e.target as HTMLTextAreaElement
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const value = textarea.value
-    const indent = '  '
-
-    textarea.value = value.substring(0, start) + indent + value.substring(end)
-    editFolioContent.value = textarea.value
-    textarea.selectionStart = textarea.selectionEnd = start + indent.length
-    onEditorInput()
-    return
-  }
-
-  // Teclas de navegación que desplazan el cursor (Enter, Flechas, Retroceso)
-  if (['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete'].includes(e.key)) {
-    nextTick(() => {
-      onCaretMove(false)
-    })
-  }
 }
 
 function onTitleFocus(): void {
@@ -895,29 +749,17 @@ onBeforeUnmount(async () => {
 
             <div class="neu-groove-h mb-6 opacity-60"></div>
 
-            <!-- Contenedor de Prosa con Modo Enfoque Spotlight sobre el Párrafo Activo -->
+            <!-- Contenedor de Prosa con Editor Enriquecido TipTap -->
             <div class="relative w-full flex-1 flex flex-col">
-              <!-- Velo de Enfoque que atenúa todos los párrafos excepto el activo -->
-              <div
-                v-if="uiStore.isFocusMode"
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 z-10 transition-all duration-300"
-                :style="focusSpotlightStyle"
-              ></div>
-
-              <!-- Área de Escritura Prosa -->
-              <textarea
-                ref="contentInputRef"
-                v-model="editFolioContent"
-                placeholder="Escribe la prosa de tu libro aquí..."
-                class="w-full p-0 m-0 bg-transparent border-none resize-none focus:outline-none font-editorial text-lg md:text-[18px] leading-relaxed md:leading-loose text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/40 select-text caret-[var(--accent)] relative z-0"
-                style="field-sizing: content; min-height: 350px; overflow-y: hidden;"
-                @input="onEditorInput"
-                @keydown="handleTextareaKeydown"
-                @keyup="onCaretMove(false)"
-                @click="onCaretMove(false)"
-                @select="onCaretMove(false)"
-              ></textarea>
+              <TiptapEditor
+                ref="tiptapEditorRef"
+                v-model:content="editFolioContent"
+                :scroll-container="scrollContainerRef"
+                placeholder="Empieza a escribir tu escena..."
+                @stats="handleEditorStats"
+                @change="onEditorInput"
+                @save="handleManualSave"
+              />
             </div>
           </div>
         </div>

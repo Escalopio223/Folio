@@ -23,6 +23,11 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@tiptap/extension-bubble-menu": "^3.32.0",
+    "@tiptap/extension-placeholder": "^3.32.0",
+    "@tiptap/extension-underline": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
+    "@tiptap/vue-3": "^3.32.0",
     "@vueuse/core": "^15.0.0",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.4",
