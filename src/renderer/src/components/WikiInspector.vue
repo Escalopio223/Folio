@@ -543,11 +543,11 @@ watch(
       </div>
     </div>
 
-    <!-- Pie del Inspector -->
+    <!-- Pie del Inspector con atajo de teclado visible -->
     <div class="neu-groove-h"></div>
     <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0">
-      <span>{{ displayItems.length }} visibles</span>
-      <span>Consulta rápida al escribir</span>
+      <span>{{ displayItems.length }} fichas</span>
+      <span class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--accent)] font-semibold">Ctrl+N: Ocultar Wiki</span>
     </div>
   </div>
 </template>

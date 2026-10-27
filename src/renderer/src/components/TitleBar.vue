@@ -64,8 +64,8 @@ function handleKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Ctrl+Shift+L / Cmd+Shift+L: Alternar Wiki / Lore Inspector
-  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'l') {
+  // Ctrl+N / Cmd+N: Alternar Wiki / Lore Inspector
+  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'n') {
     e.preventDefault()
     uiStore.toggleRightSidebar()
     return
@@ -126,7 +126,7 @@ onUnmounted(() => {
           type="button"
           class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all"
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isRightSidebarOpen }"
-          :title="uiStore.isRightSidebarOpen ? 'Ocultar Wiki / Lore (Ctrl+Shift+L)' : 'Mostrar Wiki / Lore (Ctrl+Shift+L)'"
+          :title="uiStore.isRightSidebarOpen ? 'Ocultar Wiki & Lore (Ctrl+N)' : 'Mostrar Wiki & Lore (Ctrl+N)'"
           @click="uiStore.toggleRightSidebar"
         >
           <PanelRightClose v-if="uiStore.isRightSidebarOpen" :size="13" />

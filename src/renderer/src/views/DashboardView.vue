@@ -426,8 +426,8 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Ctrl+N / Cmd+N: Nuevo folio sin usar el ratón (sin shift)
-  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'n') {
+  // Ctrl+Alt+N / Cmd+Alt+N: Nuevo folio sin usar el ratón
+  if (isCtrlOrCmd && e.altKey && e.key.toLowerCase() === 'n') {
     e.preventDefault()
     handleQuickNewFolio()
     return
@@ -686,11 +686,13 @@ onBeforeUnmount(async () => {
         </div>
       </div>
 
-      <!-- Pie del Sidebar Izquierdo -->
+      <!-- Pie del Sidebar Izquierdo con atajo de teclado visible -->
       <div class="neu-groove-h"></div>
       <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0">
         <span>{{ folioStore.chapters.length }} caps · {{ folioStore.folios.length }} docs</span>
-        <span>Manuscrito</span>
+        <span class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-1">
+          <strong class="text-[var(--accent)]">Ctrl+B</strong>: Ocultar árbol
+        </span>
       </div>
     </aside>
 
@@ -917,37 +919,44 @@ onBeforeUnmount(async () => {
                 @select="onCaretMove(false)"
               ></textarea>
             </div>
-
-            <!-- Barra de Estado Inferior: Palabras, Sesión, Caracteres, Tiempo de Lectura y Atajos -->
-            <div
-              class="pt-4 mt-4 border-t border-[var(--groove-dark)]/40 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none transition-opacity duration-300"
-              :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
-            >
-              <div class="flex items-center gap-3">
-                <span>{{ wordCount }} palabras</span>
-                <span>·</span>
-                <span
-                  class="inline-flex items-center gap-1 font-semibold text-[var(--accent)]"
-                  title="Palabras netas añadidas en la sesión activa"
-                >
-                  <Flame :size="12" class="text-[var(--accent)] shrink-0" />
-                  +{{ folioStore.sessionWordsAdded }} sesión
-                </span>
-                <span>·</span>
-                <span>{{ charCount }} caracteres</span>
-                <span>·</span>
-                <span class="text-[var(--accent)] opacity-85">~{{ readingTime }} min de lectura</span>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)]">
-                  {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
-                </span>
-                <span class="text-[9px] opacity-60">Ctrl+Shift+T: Máquina · Ctrl+Shift+F: Enfoque</span>
-              </div>
-            </div>
           </div>
         </div>
+
+        <!-- Barra de Estado Inferior ANCLADA AL BOTTOM DE LA CAJA CENTRAL -->
+        <div class="neu-groove-h"></div>
+        <footer
+          class="shrink-0 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none pt-0.5 transition-opacity duration-300"
+          :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
+        >
+          <div class="flex items-center gap-3">
+            <span>{{ wordCount }} palabras</span>
+            <span>·</span>
+            <span
+              class="inline-flex items-center gap-1 font-semibold text-[var(--accent)]"
+              title="Palabras netas añadidas en la sesión activa"
+            >
+              <Flame :size="12" class="text-[var(--accent)] shrink-0" />
+              +{{ folioStore.sessionWordsAdded }} sesión
+            </span>
+            <span>·</span>
+            <span>{{ charCount }} caracteres</span>
+            <span>·</span>
+            <span class="text-[var(--accent)] opacity-85">~{{ readingTime }} min de lectura</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] uppercase">
+              {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
+            </span>
+            <span class="neu-well-sm px-2 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-2">
+              <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
+              <span>·</span>
+              <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
+              <span>·</span>
+              <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Enfoque</span>
+            </span>
+          </div>
+        </footer>
       </template>
 
       <!-- Estado Vacío cuando no hay folio activo -->
