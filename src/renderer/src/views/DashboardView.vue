@@ -408,7 +408,7 @@ onBeforeUnmount(async () => {
     <!-- ================================================================= -->
     <aside
       class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-      :class="uiStore.isLeftSidebarOpen ? 'w-72 xl:w-80 p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+      :class="uiStore.isLeftSidebarOpen ? 'w-60 xl:w-64 p-3.5 gap-3' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
     >
       <!-- Selector Personalizado de Libros -->
       <BookSelector
@@ -845,7 +845,7 @@ onBeforeUnmount(async () => {
     <!-- ================================================================= -->
     <aside
       class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-      :class="uiStore.isRightSidebarOpen ? 'w-80 lg:w-96 xl:w-[390px] p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+      :class="uiStore.isRightSidebarOpen ? 'w-72 lg:w-76 xl:w-80 p-3.5 gap-3' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
     >
       <WikiInspector />
     </aside>
