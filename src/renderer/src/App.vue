@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import AppSplash from './components/AppSplash.vue'
+import CommandPaletteModal from './components/palette/CommandPaletteModal.vue'
 import { useUiStore } from './stores/uiStore'
 
 const uiStore = useUiStore()
+
+onMounted(() => {
+  uiStore.initTheme()
+})
 </script>
 
 <template>
@@ -28,6 +34,9 @@ const uiStore = useUiStore()
     <footer class="h-6 w-full px-4 flex items-center justify-end text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none">
       <span>Folio v0.1.0</span>
     </footer>
+
+    <!-- Omnibox / Paleta de Comandos Modal Global (Ctrl+K / Cmd+K) -->
+    <CommandPaletteModal />
   </div>
 </template>
 

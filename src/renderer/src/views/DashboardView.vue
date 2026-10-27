@@ -124,6 +124,9 @@ watch(
       wordCount.value = words
       charCount.value = (folio.content || '').length
       readingTime.value = words === 0 ? 0 : Math.max(1, Math.ceil(words / 200))
+      if (folio.parentId) {
+        expandedChapters.value[folio.parentId] = true
+      }
     } else {
       editFolioTitle.value = ''
       editFolioContent.value = ''

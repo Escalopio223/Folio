@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, watch, type Component } from 'vue'
+import { ref, computed, reactive, watch, nextTick, type Component } from 'vue'
 import { useLoreStore } from '../stores/loreStore'
 import { useProjectStore } from '../stores/projectStore'
 import { useDebounceFn } from '@vueuse/core'
@@ -101,6 +101,23 @@ function toggleExpand(item: LoreItem): void {
     loreStore.selectLore(item.id)
   }
 }
+
+// Sincronizar apertura cuando se selecciona un Lore desde la paleta de comandos
+watch(
+  () => loreStore.activeLoreId,
+  (newId) => {
+    if (!newId) return
+    const item = loreStore.items.find((i) => i.id === newId)
+    if (item) {
+      expandedItemIds[newId] = true
+      ensureDraft(item)
+      nextTick(() => {
+        const el = document.getElementById(`lore-card-${newId}`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    }
+  }
+)
 
 // Auto-guardado debounced por tarjeta
 const saveQueue: Record<string, () => void> = {}
@@ -300,6 +317,7 @@ watch(
       <div
         v-for="item in displayItems"
         :key="item.id"
+        :id="'lore-card-' + item.id"
         class="neu-surface overflow-hidden transition-all duration-200 border"
         :class="
           isExpanded(item.id)

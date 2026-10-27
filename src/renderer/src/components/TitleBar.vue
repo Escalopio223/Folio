@@ -10,40 +10,17 @@ import {
   PanelLeft,
   PanelLeftClose,
   PanelRight,
-  PanelRightClose
+  PanelRightClose,
+  Search
 } from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import { useUiStore } from '../stores/uiStore'
+import { usePaletteStore } from '../stores/paletteStore'
 import type { WindowAction } from '@shared/types'
 
 const uiStore = useUiStore()
+const paletteStore = usePaletteStore()
 const isMaximized = ref(false)
-const isDark = ref(false)
-
-function initTheme(): void {
-  const saved = localStorage.getItem('folio:theme')
-  if (saved === 'dark') {
-    isDark.value = true
-    document.documentElement.classList.add('dark')
-  } else {
-    isDark.value = false
-    document.documentElement.classList.remove('dark')
-    if (!saved) {
-      localStorage.setItem('folio:theme', 'light')
-    }
-  }
-}
-
-function toggleTheme(): void {
-  isDark.value = !isDark.value
-  if (isDark.value) {
-    document.documentElement.classList.add('dark')
-    localStorage.setItem('folio:theme', 'dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-    localStorage.setItem('folio:theme', 'light')
-  }
-}
 
 async function handleAction(action: WindowAction): Promise<void> {
   const result = await window.api.window.action(action)
@@ -82,7 +59,6 @@ function handleKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(async () => {
-  initTheme()
   window.addEventListener('keydown', handleKeydown)
   const max = await window.api.window.action('isMaximized')
   if (typeof max === 'boolean') {
@@ -128,8 +104,22 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Right: Controls & Lore Toggle -->
+      <!-- Right: Omnibox, Lore Toggle, Theme & Window Controls -->
       <div class="no-drag flex items-center gap-2">
+        <!-- Quick Command Palette / Omnibox Button (Ctrl+K) -->
+        <button
+          type="button"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          title="Paleta de Comandos y Búsqueda Global (Ctrl+K)"
+          @click="paletteStore.open"
+        >
+          <Search :size="13" class="opacity-80" />
+          <span class="text-[11px] font-medium hidden md:inline">Buscar...</span>
+          <kbd class="neu-well-sm text-[9px] font-mono px-1 py-0.2 text-[var(--text-muted)]">Ctrl+K</kbd>
+        </button>
+
+        <div class="neu-groove-v h-4 my-auto"></div>
+
         <!-- Wiki / Lore Inspector Toggle Button -->
         <button
           type="button"
@@ -149,12 +139,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"
-          :title="isDark ? 'Cambiar a Modo Papel Claro' : 'Cambiar a Modo Espresso Oscuro'"
-          @click="toggleTheme"
+          :title="uiStore.isDark ? 'Cambiar a Modo Papel Claro' : 'Cambiar a Modo Espresso Oscuro'"
+          @click="uiStore.toggleTheme"
         >
-          <Sun v-if="isDark" :size="13" class="text-[#C85A32]" />
+          <Sun v-if="uiStore.isDark" :size="13" class="text-[#C85A32]" />
           <Moon v-else :size="13" class="text-[var(--text-primary)]" />
-          <span class="text-[11px] font-medium">{{ isDark ? 'Claro' : 'Oscuro' }}</span>
+          <span class="text-[11px] font-medium">{{ uiStore.isDark ? 'Claro' : 'Oscuro' }}</span>
         </button>
 
         <div class="neu-groove-v h-4 my-auto"></div>

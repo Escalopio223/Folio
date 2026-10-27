@@ -10,6 +10,34 @@ export const useUiStore = defineStore('ui', () => {
   const savedRight = localStorage.getItem('folio:right_sidebar')
   const isRightSidebarOpen = ref(savedRight !== 'false')
 
+  // Modo Oscuro / Espresso
+  const isDark = ref(false)
+
+  function initTheme(): void {
+    const saved = localStorage.getItem('folio:theme')
+    if (saved === 'dark') {
+      isDark.value = true
+      document.documentElement.classList.add('dark')
+    } else {
+      isDark.value = false
+      document.documentElement.classList.remove('dark')
+      if (!saved) {
+        localStorage.setItem('folio:theme', 'light')
+      }
+    }
+  }
+
+  function toggleTheme(): void {
+    isDark.value = !isDark.value
+    if (isDark.value) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('folio:theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('folio:theme', 'light')
+    }
+  }
+
   // Compatibilidad hacia atrás con referencias existentes a isSidebarOpen
   const isSidebarOpen = computed({
     get: () => isLeftSidebarOpen.value,
@@ -75,6 +103,9 @@ export const useUiStore = defineStore('ui', () => {
     isSplashLoading,
     isTypewriterMode,
     isFocusMode,
+    isDark,
+    initTheme,
+    toggleTheme,
     toggleLeftSidebar,
     setLeftSidebar,
     toggleSidebar,
