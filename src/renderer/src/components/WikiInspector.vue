@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch, type Component } from 'vue'
 import { useLoreStore } from '../stores/loreStore'
 import { useProjectStore } from '../stores/projectStore'
+import { useUiStore } from '../stores/uiStore'
 import { useDebounceFn } from '@vueuse/core'
 import {
   Compass,
@@ -17,12 +18,14 @@ import {
   MapPin,
   Box,
   Lightbulb,
-  Sparkles
+  Sparkles,
+  PanelRightClose
 } from 'lucide-vue-next'
 import type { LoreItem } from '@shared/types'
 
 const loreStore = useLoreStore()
 const projectStore = useProjectStore()
+const uiStore = useUiStore()
 
 // Búsqueda y Filtros
 const searchQuery = ref('')
@@ -229,16 +232,28 @@ watch(
         </div>
       </div>
 
-      <!-- Botón Nueva Entrada -->
-      <button
-        type="button"
-        class="neu-btn-terracotta px-2.5 py-1.5 text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
-        title="Crear nueva ficha de personaje, lugar u objeto"
-        @click="handleCreateLore"
-      >
-        <Plus :size="13" />
-        <span class="font-medium text-[11px]">Nueva Ficha</span>
-      </button>
+      <!-- Acciones de Cabecera: Nueva Entrada y Ocultar Panel -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          class="neu-btn-terracotta px-2.5 py-1.5 text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
+          title="Crear nueva ficha de personaje, lugar u objeto"
+          @click="handleCreateLore"
+        >
+          <Plus :size="13" />
+          <span class="font-medium text-[11px]">Nueva Ficha</span>
+        </button>
+
+        <!-- Botón explícito para ocultar Wiki & Lore -->
+        <button
+          type="button"
+          class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          title="Ocultar Wiki & Lore (Ctrl+Shift+L)"
+          @click="uiStore.toggleRightSidebar"
+        >
+          <PanelRightClose :size="13" />
+        </button>
+      </div>
     </div>
 
     <!-- Barra de Búsqueda Rápida en Vivo -->

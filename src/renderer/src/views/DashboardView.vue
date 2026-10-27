@@ -19,7 +19,9 @@ import {
   Check,
   AlignVerticalSpaceAround,
   Eye,
-  Flame
+  Flame,
+  PanelRight,
+  PanelRightClose
 } from 'lucide-vue-next'
 import { getCaretCoordinates } from '../utils/caret'
 import type { Folio } from '@shared/types'
@@ -839,6 +841,24 @@ onBeforeUnmount(async () => {
               <span class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75">
                 Ctrl+S
               </span>
+            </button>
+
+            <div class="neu-groove-v h-4 my-auto"></div>
+
+            <!-- Conmutador Wiki & Lore -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': uiStore.isRightSidebarOpen,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !uiStore.isRightSidebarOpen
+              }"
+              :title="uiStore.isRightSidebarOpen ? 'Ocultar Wiki & Lore (Ctrl+Shift+L)' : 'Mostrar Wiki & Lore (Ctrl+Shift+L)'"
+              @click="uiStore.toggleRightSidebar"
+            >
+              <PanelRightClose v-if="uiStore.isRightSidebarOpen" :size="13" />
+              <PanelRight v-else :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Wiki</span>
             </button>
           </div>
         </header>
