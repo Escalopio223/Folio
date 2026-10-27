@@ -48,7 +48,6 @@ function mapFolio(row: schema.FolioSelect): Folio {
     status: row.status,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
-    isGraveyard: Boolean(row.isGraveyard),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
@@ -126,7 +125,6 @@ export function initDatabase(): {
       status TEXT NOT NULL DEFAULT 'draft',
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
-      is_graveyard INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -155,18 +153,6 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
     CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
   `)
-
-  // Ensure is_graveyard column exists on legacy databases
-  try {
-    const tableColumns = sqliteInstance.prepare("PRAGMA table_info(folios)").all() as Array<{ name: string }>
-    const hasIsGraveyard = tableColumns.some((col) => col.name === 'is_graveyard')
-    if (!hasIsGraveyard) {
-      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN is_graveyard INTEGER NOT NULL DEFAULT 0;')
-    }
-    sqliteInstance.exec('CREATE INDEX IF NOT EXISTS idx_folios_is_graveyard ON folios(is_graveyard);')
-  } catch (err) {
-    console.warn('[Folio DB] is_graveyard migration check:', err)
-  }
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
 
@@ -454,19 +440,7 @@ export function getAllFolios(projectId?: string): Folio[] {
 
 export function getTrashFolios(projectId?: string): Folio[] {
   const db = getDb()
-  const conditions = [eq(schema.folios.isArchived, true), eq(schema.folios.isGraveyard, false)]
-  if (projectId) conditions.push(eq(schema.folios.projectId, projectId))
-
-  const rows = db.select().from(schema.folios)
-    .where(and(...conditions))
-    .orderBy(desc(schema.folios.updatedAt))
-    .all()
-  return rows.map(mapFolio)
-}
-
-export function getGraveyardFolios(projectId?: string): Folio[] {
-  const db = getDb()
-  const conditions = [eq(schema.folios.isArchived, true), eq(schema.folios.isGraveyard, true)]
+  const conditions = [eq(schema.folios.isArchived, true)]
   if (projectId) conditions.push(eq(schema.folios.projectId, projectId))
 
   const rows = db.select().from(schema.folios)
@@ -500,7 +474,6 @@ export function createFolio(input: CreateFolioInput): Folio {
     status: input.status || 'draft',
     isFavorite: false,
     isArchived: false,
-    isGraveyard: input.isGraveyard ?? false,
     createdAt: now,
     updatedAt: now
   }).returning().get()
@@ -525,7 +498,6 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   if (input.icon !== undefined) values.icon = input.icon
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
-  if (input.isGraveyard !== undefined) values.isGraveyard = input.isGraveyard
 
   const updated = db.update(schema.folios)
     .set(values)
@@ -558,7 +530,6 @@ export function restoreFolio(id: string): Folio {
   const updated = db.update(schema.folios)
     .set({
       isArchived: false,
-      isGraveyard: false,
       parentId,
       type,
       updatedAt: now
@@ -567,7 +538,7 @@ export function restoreFolio(id: string): Folio {
     .returning()
     .get()
 
-  if (!updated) throw new Error(`Error al resucitar folio ${id}`)
+  if (!updated) throw new Error(`Error al restaurar folio ${id}`)
   return mapFolio(updated)
 }
 
@@ -687,7 +658,6 @@ export function restoreLore(id: string): LoreItem {
 
 // -------------------------------------------------------------------------
 // PURGE / EMPTY TRASH (IRREVERSIBLE PURGE FOR ARCHIVED TRASH ITEMS)
-// Graveyard items are protected and NEVER purged by emptyTrash.
 // -------------------------------------------------------------------------
 
 export function emptyTrash(projectId: string): { purgedFolios: number; purgedLore: number } {
@@ -696,8 +666,7 @@ export function emptyTrash(projectId: string): { purgedFolios: number; purgedLor
   const foliosRes = db.delete(schema.folios)
     .where(and(
       eq(schema.folios.projectId, projectId),
-      eq(schema.folios.isArchived, true),
-      eq(schema.folios.isGraveyard, false)
+      eq(schema.folios.isArchived, true)
     ))
     .run()
 

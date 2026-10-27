@@ -35,7 +35,6 @@ export interface Folio {
   status: string
   isFavorite: boolean
   isArchived: boolean
-  isGraveyard: boolean
   createdAt: string | Date
   updatedAt: string | Date
 }
@@ -50,7 +49,6 @@ export interface CreateFolioInput {
   icon?: string
   sortOrder?: number
   status?: string
-  isGraveyard?: boolean
 }
 
 export interface UpdateFolioInput {
@@ -65,7 +63,6 @@ export interface UpdateFolioInput {
   icon?: string
   isFavorite?: boolean
   isArchived?: boolean
-  isGraveyard?: boolean
 }
 
 export interface LoreItem {
@@ -118,7 +115,6 @@ export interface FolioApi {
   folio: {
     getAll: (projectId?: string) => Promise<Folio[]>
     getTrash: (projectId?: string) => Promise<Folio[]>
-    getGraveyard: (projectId?: string) => Promise<Folio[]>
     getById: (id: string) => Promise<Folio | null>
     create: (input: CreateFolioInput) => Promise<Folio>
     update: (input: UpdateFolioInput) => Promise<Folio>

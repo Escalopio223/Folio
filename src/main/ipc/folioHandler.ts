@@ -2,7 +2,6 @@ import { ipcMain } from 'electron'
 import {
   getAllFolios,
   getTrashFolios,
-  getGraveyardFolios,
   getFolioById,
   createFolio,
   updateFolio,
@@ -19,10 +18,6 @@ export function registerFolioHandlers(): void {
 
   ipcMain.handle('folio:getTrash', async (_event, projectId?: string) => {
     return getTrashFolios(projectId)
-  })
-
-  ipcMain.handle('folio:getGraveyard', async (_event, projectId?: string) => {
-    return getGraveyardFolios(projectId)
   })
 
   ipcMain.handle('folio:getById', async (_event, id: string) => {

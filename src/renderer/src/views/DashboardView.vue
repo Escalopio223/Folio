@@ -16,7 +16,6 @@ import {
   FileText,
   Bookmark,
   Trash2,
-  Archive,
   Check,
   AlignVerticalSpaceAround,
   Eye,
@@ -355,7 +354,7 @@ async function handleProjectChange(projectId: string): Promise<void> {
   await Promise.all([
     folioStore.fetchFolios(projectId),
     loreStore.fetchLore(projectId),
-    trashStore.fetchAll(projectId)
+    trashStore.fetchTrash(projectId)
   ])
 }
 
@@ -368,7 +367,6 @@ async function handleProjectDeleted(): Promise<void> {
     folioStore.trashedFolios = []
     folioStore.selectFolio('')
     loreStore.items = []
-    trashStore.graveyardFolios = []
     trashStore.trashFolios = []
     trashStore.trashLore = []
   }
@@ -388,7 +386,7 @@ onMounted(async () => {
     await Promise.all([
       folioStore.fetchFolios(projectStore.activeProjectId),
       loreStore.fetchLore(projectStore.activeProjectId),
-      trashStore.fetchAll(projectStore.activeProjectId)
+      trashStore.fetchTrash(projectStore.activeProjectId)
     ])
   }
   // Smoothly hide splash screen after initial load
@@ -468,7 +466,7 @@ onBeforeUnmount(async () => {
               </span>
             </div>
 
-            <!-- Controles del Capítulo: Añadir escena, Descartar al Cementerio y Mover a Papelera -->
+            <!-- Controles del Capítulo: Añadir escena y Mover a Papelera -->
             <div class="flex items-center gap-1 shrink-0" @click.stop>
               <button
                 type="button"
@@ -480,15 +478,7 @@ onBeforeUnmount(async () => {
               </button>
               <button
                 type="button"
-                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
-                title="Descartar capítulo al Cementerio"
-                @click="trashStore.moveToGraveyard(chap.id)"
-              >
-                <Archive :size="11" />
-              </button>
-              <button
-                type="button"
-                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
+                class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
                 title="Mover capítulo a papelera"
                 @click="trashStore.moveToTrash(chap.id, 'folio')"
               >
@@ -520,20 +510,11 @@ onBeforeUnmount(async () => {
                   </span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0" @click.stop>
-                  <!-- Botón Descartar al Cementerio siempre visible con neumorfismo -->
+                  <!-- Botón Borrar a Papelera siempre visible con relieve neumórfico -->
                   <button
                     type="button"
-                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
-                    title="Descartar al Cementerio de Capítulos"
-                    @click="trashStore.moveToGraveyard(scene.id)"
-                  >
-                    <Archive :size="11" />
-                  </button>
-                  <!-- Botón Borrar a Papelera siempre visible con neumorfismo -->
-                  <button
-                    type="button"
-                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
-                    title="Mover a papelera"
+                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
+                    title="Mover escena a papelera"
                     @click="trashStore.moveToTrash(scene.id, 'folio')"
                   >
                     <Trash2 :size="11" />
@@ -557,20 +538,11 @@ onBeforeUnmount(async () => {
                   <span class="truncate">{{ scene.title }}</span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0" @click.stop>
-                  <!-- Botón Descartar al Cementerio siempre visible con neumorfismo -->
+                  <!-- Botón Borrar a Papelera siempre visible con relieve neumórfico -->
                   <button
                     type="button"
-                    class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
-                    title="Descartar al Cementerio de Capítulos"
-                    @click="trashStore.moveToGraveyard(scene.id)"
-                  >
-                    <Archive :size="11" />
-                  </button>
-                  <!-- Botón Borrar a Papelera siempre visible con neumorfismo -->
-                  <button
-                    type="button"
-                    class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
-                    title="Mover a papelera"
+                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
+                    title="Mover escena a papelera"
                     @click="trashStore.moveToTrash(scene.id, 'folio')"
                   >
                     <Trash2 :size="11" />
@@ -609,31 +581,24 @@ onBeforeUnmount(async () => {
         </div>
       </div>
 
-      <!-- Botón sutil neumórfico: Papelera y Cementerio de Capítulos -->
+      <!-- Botón sutil neumórfico: Papelera de Reciclaje -->
       <button
         type="button"
         class="neu-btn w-full py-2 px-2.5 flex items-center justify-between text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 transition-all active:scale-[0.98] group cursor-pointer"
-        title="Abrir Cementerio de Capítulos y Papelera de Reciclaje"
-        @click="trashStore.openModal('graveyard', projectStore.activeProjectId)"
+        title="Abrir Papelera de Reciclaje"
+        @click="trashStore.openModal(projectStore.activeProjectId)"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <Archive :size="13" class="text-[var(--accent)] shrink-0 group-hover:scale-110 transition-transform" />
-          <span class="truncate font-editorial font-medium">Papelera y Cementerio</span>
+          <Trash2 :size="13" class="text-[var(--accent)] shrink-0 group-hover:scale-110 transition-transform" />
+          <span class="truncate font-editorial font-medium">Papelera de Reciclaje</span>
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <span
-            v-if="trashStore.graveyardFolios.length > 0"
+            v-if="trashStore.totalCount > 0"
             class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--accent)] rounded-full"
-            title="Descartes narrativos en el cementerio"
+            title="Elementos en la papelera"
           >
-            {{ trashStore.graveyardFolios.length }}
-          </span>
-          <span
-            v-if="trashStore.trashFolios.length + trashStore.trashLore.length > 0"
-            class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--text-muted)] rounded-full"
-            title="Elementos en papelera"
-          >
-            {{ trashStore.trashFolios.length + trashStore.trashLore.length }}
+            {{ trashStore.totalCount }}
           </span>
         </div>
       </button>
@@ -744,15 +709,6 @@ onBeforeUnmount(async () => {
             >
               <Eye :size="13" />
               <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
-            </button>
-
-            <button
-              type="button"
-              class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-[var(--accent)] cursor-pointer"
-              title="Descartar escena al Cementerio de Capítulos"
-              @click="trashStore.moveToGraveyard(folioStore.activeFolio.id)"
-            >
-              <Archive :size="13" />
             </button>
 
             <button

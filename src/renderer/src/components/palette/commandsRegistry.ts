@@ -9,7 +9,6 @@ import {
   AlignVerticalSpaceAround,
   Eye,
   Save,
-  Archive,
   Trash2
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
@@ -205,40 +204,28 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
-      id: 'open-graveyard',
-      title: 'Abrir Cementerio de Capítulos',
-      description: 'Consultar, leer y resucitar fragmentos y escenas descartadas',
-      category: 'action',
-      badge: 'Editorial',
-      icon: Archive,
-      keywords: ['cementerio', 'graveyard', 'descartes', 'resucitar', 'fragmentos', 'capitulos', 'papelera'],
-      execute: () => {
-        trashStore.openModal('graveyard', projectStore.activeProjectId || undefined)
-      }
-    },
-    {
       id: 'open-trash',
       title: 'Abrir Papelera de Reciclaje',
-      description: 'Inspeccionar elementos eliminados de la novela o vaciar papelera',
+      description: 'Inspeccionar o recuperar escenas y fichas eliminadas, o vaciar residuos',
       category: 'action',
       badge: 'Sistema',
       icon: Trash2,
       keywords: ['papelera', 'basura', 'reciclaje', 'vaciar', 'eliminar', 'trash', 'residuos'],
       execute: () => {
-        trashStore.openModal('trash', projectStore.activeProjectId || undefined)
+        trashStore.openModal(projectStore.activeProjectId || undefined)
       }
     },
     {
-      id: 'send-to-graveyard',
-      title: 'Enviar Escena Actual al Cementerio',
-      description: 'Archivar escena activa como descarte literario de referencia sin alterar métricas',
+      id: 'send-to-trash',
+      title: 'Mover Escena Actual a la Papelera',
+      description: 'Descartar la escena activa y enviarla a la papelera de reciclaje',
       category: 'action',
       badge: 'Manuscrito',
-      icon: Archive,
-      keywords: ['descartar', 'cementerio', 'escena', 'archivar', 'guardar', 'descarte'],
+      icon: Trash2,
+      keywords: ['descartar', 'papelera', 'escena', 'archivar', 'borrar', 'eliminar'],
       execute: async () => {
         if (folioStore.activeFolioId) {
-          await trashStore.moveToGraveyard(folioStore.activeFolioId)
+          await trashStore.moveToTrash(folioStore.activeFolioId, 'folio')
         }
       }
     }

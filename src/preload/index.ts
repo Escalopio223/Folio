@@ -25,7 +25,6 @@ const api: FolioApi = {
   folio: {
     getAll: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getAll', projectId),
     getTrash: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getTrash', projectId),
-    getGraveyard: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getGraveyard', projectId),
     getById: (id: string): Promise<Folio | null> => ipcRenderer.invoke('folio:getById', id),
     create: (input: CreateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:create', input),
     update: (input: UpdateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:update', input),

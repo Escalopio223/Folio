@@ -153,9 +153,7 @@ export const useFolioStore = defineStore('folio', () => {
       if (index !== -1) {
         if (updated.isArchived) {
           folios.value.splice(index, 1)
-          if (!updated.isGraveyard) {
-            trashedFolios.value.unshift(updated)
-          }
+          trashedFolios.value.unshift(updated)
           if (activeFolioId.value === updated.id) {
             activeFolioId.value = folios.value[0]?.id || null
             if (activeFolioId.value) {
@@ -175,11 +173,7 @@ export const useFolioStore = defineStore('folio', () => {
             folios.value.push(updated)
             selectFolio(updated.id)
           } else {
-            if (updated.isGraveyard) {
-              trashedFolios.value.splice(trashIndex, 1)
-            } else {
-              trashedFolios.value[trashIndex] = updated
-            }
+            trashedFolios.value[trashIndex] = updated
           }
         }
       }
@@ -192,12 +186,7 @@ export const useFolioStore = defineStore('folio', () => {
   }
 
   async function moveToTrash(id: string): Promise<boolean> {
-    const res = await updateFolio({ id, isArchived: true, isGraveyard: false })
-    return Boolean(res)
-  }
-
-  async function moveToGraveyard(id: string): Promise<boolean> {
-    const res = await updateFolio({ id, isArchived: true, isGraveyard: true })
+    const res = await updateFolio({ id, isArchived: true })
     return Boolean(res)
   }
 
@@ -276,7 +265,6 @@ export const useFolioStore = defineStore('folio', () => {
     updateFolio,
     saveCurrentFolio,
     moveToTrash,
-    moveToGraveyard,
     restoreFolio,
     restoreFromTrash,
     deletePermanently

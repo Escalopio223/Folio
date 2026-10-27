@@ -6,19 +6,21 @@ import { useLoreStore } from './loreStore'
 
 export const useTrashStore = defineStore('trash', () => {
   const isModalOpen = ref(false)
-  const activeTab = ref<'graveyard' | 'trash'>('graveyard')
 
-  const graveyardFolios = ref<Folio[]>([])
   const trashFolios = ref<Folio[]>([])
   const trashLore = ref<LoreItem[]>([])
 
-  const selectedGraveyardFolioId = ref<string | null>(null)
+  const selectedFolioId = ref<string | null>(null)
   const isLoading = ref(false)
   const isActionLoading = ref(false)
 
-  const selectedGraveyardFolio = computed<Folio | null>(() => {
-    if (!selectedGraveyardFolioId.value) return null
-    return graveyardFolios.value.find((f) => f.id === selectedGraveyardFolioId.value) || null
+  const selectedFolio = computed<Folio | null>(() => {
+    if (!selectedFolioId.value) return null
+    return trashFolios.value.find((f) => f.id === selectedFolioId.value) || null
+  })
+
+  const totalCount = computed<number>(() => {
+    return trashFolios.value.length + trashLore.value.length
   })
 
   // Count words helper
@@ -35,23 +37,8 @@ export const useTrashStore = defineStore('trash', () => {
     return cleanText.length > maxLength ? cleanText.slice(0, maxLength) + '…' : cleanText
   }
 
-  async function fetchGraveyard(projectId?: string | null): Promise<void> {
-    try {
-      const items = await window.api.folio.getGraveyard(projectId || undefined)
-      graveyardFolios.value = items
-      if (items.length > 0) {
-        if (!selectedGraveyardFolioId.value || !items.some((f) => f.id === selectedGraveyardFolioId.value)) {
-          selectedGraveyardFolioId.value = items[0].id
-        }
-      } else {
-        selectedGraveyardFolioId.value = null
-      }
-    } catch (err) {
-      console.error('[TrashStore] fetchGraveyard failed:', err)
-    }
-  }
-
   async function fetchTrash(projectId?: string | null): Promise<void> {
+    isLoading.value = true
     try {
       const [folios, lore] = await Promise.all([
         window.api.folio.getTrash(projectId || undefined),
@@ -59,103 +46,47 @@ export const useTrashStore = defineStore('trash', () => {
       ])
       trashFolios.value = folios
       trashLore.value = lore
+
+      if (folios.length > 0) {
+        if (!selectedFolioId.value || !folios.some((f) => f.id === selectedFolioId.value)) {
+          selectedFolioId.value = folios[0].id
+        }
+      } else {
+        selectedFolioId.value = null
+      }
     } catch (err) {
       console.error('[TrashStore] fetchTrash failed:', err)
-    }
-  }
-
-  async function fetchAll(projectId?: string | null): Promise<void> {
-    isLoading.value = true
-    try {
-      await Promise.all([
-        fetchGraveyard(projectId),
-        fetchTrash(projectId)
-      ])
     } finally {
       isLoading.value = false
     }
   }
 
-  function openModal(tab: 'graveyard' | 'trash' = 'graveyard', projectId?: string | null): void {
-    activeTab.value = tab
+  function openModal(projectId?: string | null): void {
     isModalOpen.value = true
-    fetchAll(projectId)
+    fetchTrash(projectId)
   }
 
   function closeModal(): void {
     isModalOpen.value = false
   }
 
-  function selectGraveyardFolio(id: string): void {
-    selectedGraveyardFolioId.value = id
+  function selectFolio(id: string): void {
+    selectedFolioId.value = id
   }
 
-  // Resucitar escena/capítulo
-  async function resurrectFolio(id: string): Promise<boolean> {
-    isActionLoading.value = true
-    try {
-      const folioStore = useFolioStore()
-      const restored = await window.api.folio.restore(id)
-      if (restored) {
-        graveyardFolios.value = graveyardFolios.value.filter((f) => f.id !== id)
-        trashFolios.value = trashFolios.value.filter((f) => f.id !== id)
-
-        // Agregar a folios activos si no está
-        if (!folioStore.folios.some((f) => f.id === restored.id)) {
-          folioStore.folios.push(restored)
-        }
-        folioStore.selectFolio(restored.id)
-
-        if (selectedGraveyardFolioId.value === id) {
-          selectedGraveyardFolioId.value = graveyardFolios.value[0]?.id || null
-        }
-        return true
-      }
-      return false
-    } catch (err) {
-      console.error('[TrashStore] resurrectFolio failed:', err)
-      return false
-    } finally {
-      isActionLoading.value = false
-    }
-  }
-
-  // Mover folio al cementerio (Descarte narrativo)
-  async function moveToGraveyard(id: string): Promise<boolean> {
-    isActionLoading.value = true
-    try {
-      const folioStore = useFolioStore()
-      const updated = await folioStore.updateFolio({ id, isArchived: true, isGraveyard: true })
-      if (updated) {
-        trashFolios.value = trashFolios.value.filter((f) => f.id !== id)
-        if (!graveyardFolios.value.some((f) => f.id === id)) {
-          graveyardFolios.value.unshift(updated)
-        }
-        return true
-      }
-      return false
-    } catch (err) {
-      console.error('[TrashStore] moveToGraveyard failed:', err)
-      return false
-    } finally {
-      isActionLoading.value = false
-    }
-  }
-
-  // Mover elemento a papelera (descarte definitivo previsto)
+  // Mover elemento a la papelera
   async function moveToTrash(id: string, type: 'folio' | 'lore'): Promise<boolean> {
     isActionLoading.value = true
     try {
       if (type === 'folio') {
         const folioStore = useFolioStore()
-        const updated = await folioStore.updateFolio({ id, isArchived: true, isGraveyard: false })
+        const updated = await folioStore.updateFolio({ id, isArchived: true })
         if (updated) {
-          graveyardFolios.value = graveyardFolios.value.filter((f) => f.id !== id)
           if (!trashFolios.value.some((f) => f.id === id)) {
             trashFolios.value.unshift(updated)
           }
-          if (selectedGraveyardFolioId.value === id) {
-            selectedGraveyardFolioId.value = graveyardFolios.value[0]?.id || null
+          if (!selectedFolioId.value) {
+            selectedFolioId.value = updated.id
           }
           return true
         }
@@ -178,12 +109,25 @@ export const useTrashStore = defineStore('trash', () => {
     }
   }
 
-  // Restaurar elemento desde papelera
+  // Restaurar elemento desde papelera al manuscrito o wiki activa
   async function restoreItem(id: string, type: 'folio' | 'lore'): Promise<boolean> {
     isActionLoading.value = true
     try {
       if (type === 'folio') {
-        return await resurrectFolio(id)
+        const folioStore = useFolioStore()
+        const restored = await window.api.folio.restore(id)
+        if (restored) {
+          trashFolios.value = trashFolios.value.filter((f) => f.id !== id)
+          if (!folioStore.folios.some((f) => f.id === restored.id)) {
+            folioStore.folios.push(restored)
+          }
+          folioStore.selectFolio(restored.id)
+
+          if (selectedFolioId.value === id) {
+            selectedFolioId.value = trashFolios.value[0]?.id || null
+          }
+          return true
+        }
       } else {
         const loreStore = useLoreStore()
         const ok = await loreStore.restoreFromTrash(id)
@@ -192,6 +136,7 @@ export const useTrashStore = defineStore('trash', () => {
         }
         return ok
       }
+      return false
     } catch (err) {
       console.error('[TrashStore] restoreItem failed:', err)
       return false
@@ -209,9 +154,8 @@ export const useTrashStore = defineStore('trash', () => {
         const ok = await folioStore.deletePermanently(id)
         if (ok) {
           trashFolios.value = trashFolios.value.filter((f) => f.id !== id)
-          graveyardFolios.value = graveyardFolios.value.filter((f) => f.id !== id)
-          if (selectedGraveyardFolioId.value === id) {
-            selectedGraveyardFolioId.value = graveyardFolios.value[0]?.id || null
+          if (selectedFolioId.value === id) {
+            selectedFolioId.value = trashFolios.value[0]?.id || null
           }
         }
         return ok
@@ -231,16 +175,16 @@ export const useTrashStore = defineStore('trash', () => {
     }
   }
 
-  // Vaciar Papelera: Purga irreversible en SQLite de elementos archivados en papelera
-  // NUNCA toca el cementerio de capítulos
+  // Vaciar Papelera: Purga irreversible en SQLite de todos los elementos archivados en papelera
   async function emptyTrash(projectId: string): Promise<{ purgedFolios: number; purgedLore: number }> {
     isActionLoading.value = true
     try {
       const res = await window.api.folio.emptyTrash(projectId)
       trashFolios.value = []
       trashLore.value = []
+      selectedFolioId.value = null
 
-      // Sincronizar stores
+      // Sincronizar stores activos
       const folioStore = useFolioStore()
       folioStore.trashedFolios = []
 
@@ -258,24 +202,19 @@ export const useTrashStore = defineStore('trash', () => {
 
   return {
     isModalOpen,
-    activeTab,
-    graveyardFolios,
     trashFolios,
     trashLore,
-    selectedGraveyardFolioId,
-    selectedGraveyardFolio,
+    selectedFolioId,
+    selectedFolio,
+    totalCount,
     isLoading,
     isActionLoading,
     countWords,
     getSnippet,
     openModal,
     closeModal,
-    selectGraveyardFolio,
-    fetchAll,
-    fetchGraveyard,
+    selectFolio,
     fetchTrash,
-    resurrectFolio,
-    moveToGraveyard,
     moveToTrash,
     restoreItem,
     deletePermanently,
