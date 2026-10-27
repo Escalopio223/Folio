@@ -8,6 +8,7 @@ import { useDebounceFn, onClickOutside } from '@vueuse/core'
 import ProjectModal from '../components/ProjectModal.vue'
 import FolioLogo from '../components/FolioLogo.vue'
 import BookSelector from '../components/BookSelector.vue'
+import WikiInspector from '../components/WikiInspector.vue'
 import {
   ChevronDown,
   ChevronRight,
@@ -16,29 +17,20 @@ import {
   Bookmark,
   Trash2,
   Check,
-  Compass,
-  Tag,
-  SlidersHorizontal,
-  X,
   AlignVerticalSpaceAround,
   Eye,
   Flame
 } from 'lucide-vue-next'
 import { getCaretCoordinates } from '../utils/caret'
-import type { Folio, LoreItem } from '@shared/types'
+import type { Folio } from '@shared/types'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
 const loreStore = useLoreStore()
 const uiStore = useUiStore()
 
-// View Mode: 'manuscript' (Chapters/Scenes) or 'lore' (Wiki)
-const viewMode = ref<'manuscript' | 'lore'>('manuscript')
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
-
-// Canvas Active Target: 'folio' (Scene/Chapter) or 'lore' (Wiki entry)
-const activeTargetType = ref<'folio' | 'lore'>('folio')
 
 // Manuscript Editable States
 const editFolioTitle = ref('')
@@ -59,7 +51,7 @@ const statusOptions = [
 ]
 
 const currentStatusObj = computed(() => {
-  return statusOptions.find(o => o.value === editFolioStatus.value) || statusOptions[0]
+  return statusOptions.find((o) => o.value === editFolioStatus.value) || statusOptions[0]
 })
 
 function setFolioStatus(status: string): void {
@@ -67,15 +59,6 @@ function setFolioStatus(status: string): void {
   isStatusDropdownOpen.value = false
   onEditorInput()
 }
-
-// Lore Editable States
-const editLoreName = ref('')
-const editLoreCategory = ref('personaje')
-const editLoreSummary = ref('')
-const editLoreContent = ref('')
-const editLoreAttributes = ref<Array<{ key: string; value: string }>>([])
-const newAttrKey = ref('')
-const newAttrValue = ref('')
 
 // Save states & indicators
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
@@ -105,9 +88,9 @@ function syncTypewriterCenter(instant = false): void {
   const textareaRect = textarea.getBoundingClientRect()
 
   // Coordenada Y absoluta del cursor en el viewport
-  const caretViewportY = textareaRect.top + coords.top + (coords.height / 2)
+  const caretViewportY = textareaRect.top + coords.top + coords.height / 2
   // Coordenada Y del centro exacto del viewport del contenedor
-  const containerCenterY = containerRect.top + (container.clientHeight / 2)
+  const containerCenterY = containerRect.top + container.clientHeight / 2
 
   // Desfase entre el cursor y el centro vertical exacto
   const deltaY = caretViewportY - containerCenterY
@@ -237,7 +220,6 @@ const readingTime = computed(() => {
 watch(
   () => folioStore.activeFolio,
   (folio) => {
-    if (activeTargetType.value !== 'folio') return
     isSyncing = true
     if (folio) {
       editFolioTitle.value = folio.title
@@ -271,44 +253,6 @@ watch(
   { immediate: true }
 )
 
-// Sync active lore item when changed
-watch(
-  () => loreStore.activeLore,
-  (item) => {
-    if (activeTargetType.value !== 'lore') return
-    isSyncing = true
-    if (item) {
-      editLoreName.value = item.name
-      editLoreCategory.value = item.category
-      editLoreSummary.value = item.summary
-      editLoreContent.value = item.content
-      editLoreAttributes.value = Object.entries(item.attributes || {}).map(([key, value]) => ({
-        key,
-        value
-      }))
-      saveStatus.value = 'saved'
-      hasPendingChanges.value = false
-      lastSavedTime.value = new Date(item.updatedAt).toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-    } else {
-      editLoreName.value = ''
-      editLoreCategory.value = 'personaje'
-      editLoreSummary.value = ''
-      editLoreContent.value = ''
-      editLoreAttributes.value = []
-      saveStatus.value = 'saved'
-      hasPendingChanges.value = false
-    }
-    setTimeout(() => {
-      isSyncing = false
-    }, 50)
-  },
-  { immediate: true }
-)
-
 // Flush & Save inmediato en SQLite
 async function flushSave(): Promise<void> {
   if (!hasPendingChanges.value) return
@@ -317,14 +261,14 @@ async function flushSave(): Promise<void> {
   hasPendingChanges.value = false
 
   try {
-    if (activeTargetType.value === 'folio' && folioStore.activeFolioId) {
+    if (folioStore.activeFolioId) {
       const targetId = folioStore.activeFolioId
       const titleToSave = editFolioTitle.value.trim() || 'Sin título'
       const contentToSave = editFolioContent.value
       const synopsisToSave = editFolioSynopsis.value
       const statusToSave = editFolioStatus.value
 
-      // Actualizar réplica reactiva en el store para zero-lag en el sidebar
+      // Actualizar réplica reactiva en el store para zero-lag en el árbol
       const item = folioStore.folios.find((f) => f.id === targetId)
       if (item) {
         item.title = titleToSave
@@ -339,34 +283,6 @@ async function flushSave(): Promise<void> {
         content: contentToSave,
         synopsis: synopsisToSave,
         status: statusToSave
-      })
-    } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
-      const targetId = loreStore.activeLoreId
-      const nameToSave = editLoreName.value.trim() || 'Sin nombre'
-      const categoryToSave = editLoreCategory.value.trim() || 'personaje'
-      const summaryToSave = editLoreSummary.value
-      const contentToSave = editLoreContent.value
-      const attrsObj: Record<string, string> = {}
-      for (const attr of editLoreAttributes.value) {
-        if (attr.key.trim()) attrsObj[attr.key.trim()] = attr.value.trim()
-      }
-
-      const item = loreStore.items.find((l) => l.id === targetId)
-      if (item) {
-        item.name = nameToSave
-        item.category = categoryToSave
-        item.summary = summaryToSave
-        item.content = contentToSave
-        item.attributes = attrsObj
-      }
-
-      await loreStore.updateLore({
-        id: targetId,
-        name: nameToSave,
-        category: categoryToSave,
-        summary: summaryToSave,
-        content: contentToSave,
-        attributes: attrsObj
       })
     }
 
@@ -395,7 +311,7 @@ function onEditorInput(): void {
   saveStatus.value = 'pending'
 
   // Actualización instantánea en memoria (Zero-Lag)
-  if (activeTargetType.value === 'folio' && folioStore.activeFolioId) {
+  if (folioStore.activeFolioId) {
     const target = folioStore.folios.find((f) => f.id === folioStore.activeFolioId)
     if (target) {
       target.title = editFolioTitle.value.trim() || 'Sin título'
@@ -404,14 +320,6 @@ function onEditorInput(): void {
       target.content = editFolioContent.value
     }
     folioStore.updateSessionWords(folioStore.activeFolioId, editFolioContent.value)
-  } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
-    const target = loreStore.items.find((l) => l.id === loreStore.activeLoreId)
-    if (target) {
-      target.name = editLoreName.value.trim() || 'Sin nombre'
-      target.summary = editLoreSummary.value
-      target.content = editLoreContent.value
-      target.category = editLoreCategory.value
-    }
   }
 
   adjustTextareaHeight()
@@ -450,7 +358,7 @@ function onTitleFocus(): void {
     const titleEl = titleInputRef.value
     const containerRect = container.getBoundingClientRect()
     const titleRect = titleEl.getBoundingClientRect()
-    const deltaY = (titleRect.top + titleRect.height / 2) - (containerRect.top + container.clientHeight / 2)
+    const deltaY = titleRect.top + titleRect.height / 2 - (containerRect.top + container.clientHeight / 2)
     container.scrollTo({ top: Math.max(0, container.scrollTop + deltaY), behavior: 'smooth' })
   }
 }
@@ -537,25 +445,13 @@ function isChapterExpanded(chapterId: string): boolean {
 
 // Selection Handlers con flush forzado previo para garantizar CERO pérdida de datos
 async function selectSceneOrChapter(folio: Folio): Promise<void> {
-  if (folioStore.activeFolioId === folio.id && activeTargetType.value === 'folio') return
+  if (folioStore.activeFolioId === folio.id) return
 
   if (hasPendingChanges.value) {
     await flushSave()
   }
 
-  activeTargetType.value = 'folio'
   folioStore.selectFolio(folio.id)
-}
-
-async function selectLoreEntry(item: LoreItem): Promise<void> {
-  if (loreStore.activeLoreId === item.id && activeTargetType.value === 'lore') return
-
-  if (hasPendingChanges.value) {
-    await flushSave()
-  }
-
-  activeTargetType.value = 'lore'
-  loreStore.selectLore(item.id)
 }
 
 // Creation Handlers
@@ -583,40 +479,6 @@ async function handleCreateScene(chapterId: string): Promise<void> {
   }
 }
 
-async function handleCreateLoreItem(categoryPreset?: string): Promise<void> {
-  if (!projectStore.activeProjectId) return
-  if (hasPendingChanges.value) {
-    await flushSave()
-  }
-  const created = await loreStore.createLore({
-    projectId: projectStore.activeProjectId,
-    category: categoryPreset || loreStore.selectedCategory === 'todos' ? 'personaje' : loreStore.selectedCategory,
-    name: 'Nuevo Registro de Wiki',
-    summary: '',
-    content: ''
-  })
-  if (created) {
-    activeTargetType.value = 'lore'
-  }
-}
-
-// Dynamic attributes helper for Lore
-function addAttribute(): void {
-  if (!newAttrKey.value.trim()) return
-  editLoreAttributes.value.push({
-    key: newAttrKey.value.trim(),
-    value: newAttrValue.value.trim()
-  })
-  newAttrKey.value = ''
-  newAttrValue.value = ''
-  onEditorInput()
-}
-
-function removeAttribute(index: number): void {
-  editLoreAttributes.value.splice(index, 1)
-  onEditorInput()
-}
-
 // Project Change con salvaguarda de datos pendientes
 async function handleProjectChange(projectId: string): Promise<void> {
   if (hasPendingChanges.value) {
@@ -630,7 +492,7 @@ async function handleProjectChange(projectId: string): Promise<void> {
 }
 
 // Project Delete
-async function handleProjectDeleted(_deletedProjectId: string): Promise<void> {
+async function handleProjectDeleted(): Promise<void> {
   if (projectStore.activeProjectId) {
     await handleProjectChange(projectStore.activeProjectId)
   } else {
@@ -672,8 +534,7 @@ onBeforeUnmount(async () => {
 </script>
 
 <template>
-  <div class="flex h-full w-full gap-4 overflow-hidden bg-[var(--bg-base)] relative p-4">
-
+  <div class="flex h-full w-full gap-3 md:gap-4 overflow-hidden bg-[var(--bg-base)] relative p-3 md:p-4">
     <!-- Modal para nuevo proyecto/libro -->
     <ProjectModal
       v-if="isProjectModalOpen"
@@ -682,11 +543,11 @@ onBeforeUnmount(async () => {
     />
 
     <!-- ================================================================= -->
-    <!-- COLUMNA 1: SIDEBAR LATERAL DINÁMICO (COLAPSIBLE)                   -->
+    <!-- COLUMNA 1: ÁRBOL DEL MANUSCRITO (CAPÍTULOS Y ESCENAS - COLAPSIBLE) -->
     <!-- ================================================================= -->
     <aside
       class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-      :class="uiStore.isSidebarOpen ? 'w-80 p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+      :class="uiStore.isLeftSidebarOpen ? 'w-72 xl:w-80 p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
     >
       <!-- Selector Personalizado de Libros -->
       <BookSelector
@@ -695,301 +556,150 @@ onBeforeUnmount(async () => {
         @project-deleted="handleProjectDeleted"
       />
 
-      <!-- Conmutador Principal de Modo: Manuscrito vs Librería de Datos -->
-      <div class="neu-well-sm p-1 grid grid-cols-2 gap-1 shrink-0 text-xs font-medium">
-        <button
-          type="button"
-          class="flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all"
-          :class="viewMode === 'manuscript' ? 'neu-btn is-active font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
-          @click="viewMode = 'manuscript'"
+      <!-- Botón para añadir capítulo -->
+      <button
+        type="button"
+        class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0 active:scale-95 transition-transform"
+        @click="handleCreateChapter"
+      >
+        <Plus :size="14" />
+        <span>Nuevo Capítulo</span>
+      </button>
+
+      <!-- Árbol jerárquico de Capítulos y Escenas -->
+      <div class="flex-1 overflow-y-auto space-y-2 pr-1 editorial-scrollbar">
+        <div
+          v-for="chap in folioStore.chapters"
+          :key="chap.id"
+          class="space-y-1"
         >
-          <Bookmark :size="13" />
-          <span>Manuscrito</span>
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all"
-          :class="viewMode === 'lore' ? 'neu-btn is-active font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
-          @click="viewMode = 'lore'"
-        >
-          <Compass :size="13" />
-          <span>Librería / Wiki</span>
-        </button>
-      </div>
-
-      <div class="neu-groove-h"></div>
-
-      <!-- =============================================================== -->
-      <!-- VISTA 1: MANUSCRITO (CAPÍTULOS Y ESCENAS)                       -->
-      <!-- =============================================================== -->
-      <template v-if="viewMode === 'manuscript'">
-        <!-- Botón para añadir capítulo -->
-        <button
-          type="button"
-          class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0"
-          @click="handleCreateChapter"
-        >
-          <Plus :size="14" />
-          <span>Nuevo Capítulo</span>
-        </button>
-
-        <!-- Árbol jerárquico de Capítulos y Escenas -->
-        <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <!-- Cabecera de Capítulo -->
           <div
-            v-for="chap in folioStore.chapters"
-            :key="chap.id"
-            class="space-y-1"
+            class="neu-btn w-full p-2.5 flex items-center justify-between group transition-all cursor-pointer"
+            :class="folioStore.activeFolioId === chap.id ? 'is-active !border-[#C85A32]' : ''"
+            @click="selectSceneOrChapter(chap)"
           >
-            <!-- Cabecera de Capítulo -->
-            <div
-              class="neu-btn w-full p-2.5 flex items-center justify-between group transition-all"
-              :class="activeTargetType === 'folio' && folioStore.activeFolioId === chap.id ? 'is-active !border-[#C85A32]' : ''"
-              @click="selectSceneOrChapter(chap)"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <button
-                  type="button"
-                  class="p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  @click.stop="toggleChapter(chap.id)"
-                >
-                  <ChevronDown v-if="isChapterExpanded(chap.id)" :size="14" />
-                  <ChevronRight v-else :size="14" />
-                </button>
-                <span class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate">
-                  {{ chap.title }}
-                </span>
-              </div>
-
-              <!-- Botón rápido para agregar escena al capítulo -->
-              <div class="flex items-center gap-1 shrink-0" @click.stop>
-                <button
-                  type="button"
-                  class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors opacity-0 group-hover:opacity-100"
-                  title="Añadir escena a este capítulo"
-                  @click="handleCreateScene(chap.id)"
-                >
-                  <Plus :size="12" />
-                </button>
-              </div>
+            <div class="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                class="p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                @click.stop="toggleChapter(chap.id)"
+              >
+                <ChevronDown v-if="isChapterExpanded(chap.id)" :size="14" />
+                <ChevronRight v-else :size="14" />
+              </button>
+              <span class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate">
+                {{ chap.title }}
+              </span>
             </div>
 
-            <!-- Lista de Escenas anidadas dentro del Capítulo -->
-            <div
-              v-if="isChapterExpanded(chap.id)"
-              class="pl-4 space-y-1.5 border-l border-white/5 ml-3 mt-1"
-            >
-              <div
-                v-for="scene in folioStore.getScenesForChapter(chap.id)"
-                :key="scene.id"
-                class="transition-all"
-              >
-                <!-- Escena activa (Hundida) -->
-                <div
-                  v-if="activeTargetType === 'folio' && folioStore.activeFolioId === scene.id"
-                  class="neu-well p-2.5 border-l-4 border-[#C85A32] cursor-pointer flex items-center justify-between gap-2"
-                  @click="selectSceneOrChapter(scene)"
-                >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <FileText :size="13" class="text-[var(--accent)] shrink-0" />
-                    <span class="text-xs font-medium text-[var(--text-primary)] truncate">
-                      {{ scene.title }}
-                    </span>
-                  </div>
-                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase">
-                    {{ scene.status }}
-                  </span>
-                </div>
-
-                <!-- Escena inactiva -->
-                <div
-                  v-else
-                  role="button"
-                  tabindex="0"
-                  class="neu-btn w-full p-2 text-left flex items-center justify-between text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] group cursor-pointer"
-                  @click="selectSceneOrChapter(scene)"
-                >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <FileText :size="12" class="opacity-40 shrink-0" />
-                    <span class="truncate">{{ scene.title }}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
-                    title="Mover a papelera"
-                    @click.stop="folioStore.moveToTrash(scene.id)"
-                  >
-                    <Trash2 :size="11" />
-                  </button>
-                </div>
-              </div>
-
-              <!-- Botón rápido para agregar escena si no hay -->
+            <!-- Botón rápido para agregar escena al capítulo -->
+            <div class="flex items-center gap-1 shrink-0" @click.stop>
               <button
-                v-if="folioStore.getScenesForChapter(chap.id).length === 0"
                 type="button"
-                class="w-full py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] italic text-left pl-2 transition-colors flex items-center gap-1.5"
+                class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors opacity-0 group-hover:opacity-100"
+                title="Añadir escena a este capítulo"
                 @click="handleCreateScene(chap.id)"
               >
-                <Plus :size="11" />
-                <span>Crear primera escena</span>
+                <Plus :size="12" />
               </button>
             </div>
           </div>
 
-          <!-- Empty State si no hay capítulos -->
+          <!-- Lista de Escenas anidadas dentro del Capítulo -->
           <div
-            v-if="folioStore.chapters.length === 0"
-            class="h-40 flex flex-col items-center justify-center text-center p-4 text-[var(--text-muted)] space-y-2"
+            v-if="isChapterExpanded(chap.id)"
+            class="pl-3 space-y-1.5 border-l border-[var(--groove-dark)]/40 ml-3.5 mt-1"
           >
-            <Bookmark :size="20" class="opacity-40" />
-            <p class="text-xs">No hay capítulos en este libro</p>
-            <button
-              type="button"
-              class="text-xs text-[var(--accent)] hover:underline"
-              @click="handleCreateChapter"
-            >
-              Comenzar Capítulo I
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <!-- =============================================================== -->
-      <!-- VISTA 2: LIBRERÍA DE DATOS (WIKI DEL MUNDO / CODEX)             -->
-      <!-- =============================================================== -->
-      <template v-else>
-        <!-- Botón para añadir registro de wiki -->
-        <button
-          type="button"
-          class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0"
-          @click="handleCreateLoreItem()"
-        >
-          <Plus :size="14" />
-          <span>Nueva Entrada Wiki</span>
-        </button>
-
-        <!-- Filtro de Categorías Dinámicas -->
-        <div class="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none text-[11px] shrink-0">
-          <button
-            type="button"
-            class="px-2.5 py-1 rounded-lg shrink-0 transition-all font-medium"
-            :class="loreStore.selectedCategory === 'todos' ? 'neu-btn is-active text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
-            @click="loreStore.selectedCategory = 'todos'"
-          >
-            Todos ({{ loreStore.items.length }})
-          </button>
-
-          <button
-            v-for="cat in loreStore.categories"
-            :key="cat"
-            type="button"
-            class="px-2.5 py-1 rounded-lg shrink-0 transition-all capitalize"
-            :class="loreStore.selectedCategory === cat ? 'neu-btn is-active text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
-            @click="loreStore.selectedCategory = cat"
-          >
-            {{ cat }}
-          </button>
-        </div>
-
-        <!-- Lista de Entradas de la Wiki -->
-        <div class="flex-1 overflow-y-auto space-y-2 pr-1">
-          <div
-            v-for="item in loreStore.filteredItems"
-            :key="item.id"
-            class="transition-all"
-          >
-            <!-- Entrada Activa -->
             <div
-              v-if="activeTargetType === 'lore' && loreStore.activeLoreId === item.id"
-              class="neu-well p-3 border-l-4 border-[#C85A32] cursor-pointer"
-              @click="selectLoreEntry(item)"
+              v-for="scene in folioStore.getScenesForChapter(chap.id)"
+              :key="scene.id"
+              class="transition-all"
             >
-              <div class="flex items-start justify-between gap-2">
-                <h4 class="text-xs font-bold text-[var(--text-primary)] truncate font-editorial">
-                  {{ item.name }}
-                </h4>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--accent)] uppercase shrink-0">
-                  {{ item.category }}
+              <!-- Escena activa (Hundida) -->
+              <div
+                v-if="folioStore.activeFolioId === scene.id"
+                class="neu-well p-2.5 border-l-4 border-[#C85A32] cursor-pointer flex items-center justify-between gap-2"
+                @click="selectSceneOrChapter(scene)"
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <FileText :size="13" class="text-[var(--accent)] shrink-0" />
+                  <span class="text-xs font-medium text-[var(--text-primary)] truncate">
+                    {{ scene.title }}
+                  </span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase">
+                  {{ scene.status }}
                 </span>
               </div>
-              <p v-if="item.summary" class="text-[11px] text-[var(--text-muted)] truncate mt-1">
-                {{ item.summary }}
-              </p>
-            </div>
 
-            <!-- Entrada Inactiva -->
-            <div
-              v-else
-              role="button"
-              tabindex="0"
-              class="neu-btn w-full p-2.5 text-left flex items-center justify-between group transition-all cursor-pointer"
-              @click="selectLoreEntry(item)"
-            >
-              <div class="min-w-0 pr-2">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-medium text-[var(--text-primary)] truncate">
-                    {{ item.name }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <span class="text-[9px] font-mono uppercase text-[var(--accent)] opacity-80">
-                    {{ item.category }}
-                  </span>
-                  <span v-if="item.summary" class="text-[10px] text-[var(--text-muted)] truncate">
-                    · {{ item.summary }}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity shrink-0"
-                title="Mover a papelera"
-                @click.stop="loreStore.moveToTrash(item.id)"
+              <!-- Escena inactiva -->
+              <div
+                v-else
+                role="button"
+                tabindex="0"
+                class="neu-btn w-full p-2 text-left flex items-center justify-between text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] group cursor-pointer"
+                @click="selectSceneOrChapter(scene)"
               >
-                <Trash2 :size="12" />
-              </button>
+                <div class="flex items-center gap-2 min-w-0">
+                  <FileText :size="12" class="opacity-40 shrink-0" />
+                  <span class="truncate">{{ scene.title }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
+                  title="Mover a papelera"
+                  @click.stop="folioStore.moveToTrash(scene.id)"
+                >
+                  <Trash2 :size="11" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <!-- Empty state para wiki -->
-          <div
-            v-if="loreStore.filteredItems.length === 0"
-            class="h-40 flex flex-col items-center justify-center text-center p-4 text-[var(--text-muted)] space-y-2"
-          >
-            <Compass :size="20" class="opacity-40" />
-            <p class="text-xs">No hay entradas en esta categoría</p>
+            <!-- Botón rápido para agregar escena si no hay -->
             <button
+              v-if="folioStore.getScenesForChapter(chap.id).length === 0"
               type="button"
-              class="text-xs text-[var(--accent)] hover:underline"
-              @click="handleCreateLoreItem()"
+              class="w-full py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] italic text-left pl-2 transition-colors flex items-center gap-1.5"
+              @click="handleCreateScene(chap.id)"
             >
-              Crear primer personaje o lugar
+              <Plus :size="11" />
+              <span>Crear primera escena</span>
             </button>
           </div>
         </div>
-      </template>
 
-      <!-- Pie del Sidebar -->
+        <!-- Empty State si no hay capítulos -->
+        <div
+          v-if="folioStore.chapters.length === 0"
+          class="h-40 flex flex-col items-center justify-center text-center p-4 text-[var(--text-muted)] space-y-2 neu-well rounded-xl"
+        >
+          <Bookmark :size="20" class="opacity-40" />
+          <p class="text-xs">No hay capítulos en este libro</p>
+          <button
+            type="button"
+            class="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+            @click="handleCreateChapter"
+          >
+            Comenzar Capítulo I
+          </button>
+        </div>
+      </div>
+
+      <!-- Pie del Sidebar Izquierdo -->
       <div class="neu-groove-h"></div>
-      <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
+      <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0">
         <span>{{ folioStore.chapters.length }} caps · {{ folioStore.folios.length }} docs</span>
-        <span>{{ loreStore.items.length }} en wiki</span>
+        <span>Manuscrito</span>
       </div>
     </aside>
 
-
-
     <!-- ================================================================= -->
-    <!-- COLUMNA 2: LIENZO EDITORIAL DE ESCRITURA Y FICHA DE WIKI           -->
+    <!-- COLUMNA 2: LIENZO EDITORIAL DE ESCRITURA (CENTRAL, max-w-3xl)     -->
     <!-- ================================================================= -->
-    <main class="flex-1 flex flex-col neu-surface p-6 gap-4 overflow-hidden relative">
-      <!-- --------------------------------------------------------------- -->
-      <!-- CASO A: EDITANDO ESCENA O CAPÍTULO (MANUSCRITO)                 -->
-      <!-- --------------------------------------------------------------- -->
-      <template v-if="activeTargetType === 'folio' && folioStore.activeFolio">
-        <!-- Cabecera de Herramientas -->
+    <main class="flex-1 h-full min-w-0 flex flex-col neu-surface p-4 md:p-6 gap-4 overflow-hidden relative">
+      <template v-if="folioStore.activeFolio">
+        <!-- Cabecera de Herramientas del Editor -->
         <header
           class="flex items-center justify-between gap-3 shrink-0 transition-opacity duration-300"
           :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
@@ -1084,8 +794,8 @@ onBeforeUnmount(async () => {
 
             <button
               type="button"
-              class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400"
-              title="Mover a papelera"
+              class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400 cursor-pointer"
+              title="Mover escena a papelera"
               @click="folioStore.moveToTrash(folioStore.activeFolio.id)"
             >
               <Trash2 :size="13" />
@@ -1103,7 +813,6 @@ onBeforeUnmount(async () => {
               title="Forzar guardado manual inmediato (Ctrl+S)"
               @click="handleManualSave"
             >
-              <!-- Punto indicador reactivo -->
               <span class="relative flex h-2 w-2">
                 <span
                   v-if="saveStatus === 'saving'"
@@ -1241,222 +950,40 @@ onBeforeUnmount(async () => {
         </div>
       </template>
 
-      <!-- --------------------------------------------------------------- -->
-      <!-- CASO B: EDITANDO ENTRADA DE LA WIKI / LIBRERÍA DE DATOS          -->
-      <!-- --------------------------------------------------------------- -->
-      <template v-else-if="activeTargetType === 'lore' && loreStore.activeLore">
-        <!-- Cabecera de Entrada Wiki -->
-        <header class="flex items-center justify-between gap-3 shrink-0">
-          <div class="flex items-center gap-2 min-w-0">
-            <Compass :size="14" class="text-[var(--accent)] shrink-0" />
-            <span class="text-xs text-[var(--text-muted)] font-mono shrink-0">
-              Librería de Datos /
-            </span>
-            <span class="text-xs font-semibold text-[var(--text-primary)] truncate font-editorial">
-              {{ loreStore.activeLore.name || 'Sin nombre' }}
-            </span>
-          </div>
-
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400"
-              title="Eliminar de la wiki"
-              @click="loreStore.moveToTrash(loreStore.activeLore.id)"
-            >
-              <Trash2 :size="13" />
-            </button>
-
-            <!-- Indicador sutil de Autoguardado & Guardado Manual Wiki -->
-            <button
-              type="button"
-              class="neu-btn px-3 py-1.5 text-xs flex items-center gap-2 transition-all cursor-pointer group"
-              :class="{
-                'neu-well border-amber-500/40 text-amber-500': saveStatus === 'pending',
-                'neu-well border-[var(--accent)]/40 text-[var(--accent)]': saveStatus === 'saving',
-                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': saveStatus === 'saved'
-              }"
-              title="Forzar guardado manual inmediato (Ctrl+S)"
-              @click="handleManualSave"
-            >
-              <span class="relative flex h-2 w-2">
-                <span
-                  v-if="saveStatus === 'saving'"
-                  class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"
-                ></span>
-                <span
-                  class="relative inline-flex rounded-full h-2 w-2 transition-colors duration-200"
-                  :class="{
-                    'bg-amber-400': saveStatus === 'pending',
-                    'bg-[var(--accent)]': saveStatus === 'saving',
-                    'bg-emerald-500': saveStatus === 'saved',
-                    'bg-rose-500': saveStatus === 'error'
-                  }"
-                ></span>
-              </span>
-
-              <span class="text-[11px] font-mono select-none">
-                <template v-if="saveStatus === 'saving'">Guardando...</template>
-                <template v-else-if="saveStatus === 'pending'">Sin guardar...</template>
-                <template v-else-if="saveStatus === 'error'">Error en SQLite</template>
-                <template v-else>Guardado local {{ lastSavedTime ? `· ${lastSavedTime}` : '' }}</template>
-              </span>
-
-              <span class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75">
-                Ctrl+S
-              </span>
-            </button>
-          </div>
-        </header>
-
-        <div class="neu-groove-h"></div>
-
-        <!-- Ficha de Registro de la Wiki con scrollbar delgado -->
-        <div class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar space-y-5">
-          <!-- Nombre y Categoría -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <input
-              v-model="editLoreName"
-              type="text"
-              placeholder="Nombre del personaje, lugar, objeto, idea..."
-              class="font-editorial text-3xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)] flex-1"
-              @input="onEditorInput"
-            />
-
-            <!-- Selector de Categoría Dinámica -->
-            <div class="flex items-center gap-1.5 neu-well-sm px-3 py-1.5 shrink-0">
-              <Tag :size="13" class="text-[var(--accent)]" />
-              <input
-                v-model="editLoreCategory"
-                type="text"
-                placeholder="Categoría (ej. personaje, lugar)"
-                class="bg-transparent border-none text-xs font-medium text-[var(--accent)] focus:outline-none capitalize w-28"
-                @input="onEditorInput"
-              />
-            </div>
-          </div>
-
-          <!-- Resumen breve -->
-          <input
-            v-model="editLoreSummary"
-            type="text"
-            placeholder="Resumen descriptivo en una línea..."
-            class="text-xs text-[var(--text-secondary)] bg-transparent border-none focus:outline-none w-full italic"
-            @input="onEditorInput"
-          />
-
-          <!-- Atributos Dinámicos (Clave / Valor) -->
-          <div class="neu-surface p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <SlidersHorizontal :size="13" class="text-[var(--accent)]" />
-                <span>Atributos y Datos Específicos</span>
-              </span>
-              <span class="text-[10px] text-[var(--text-muted)] font-mono">
-                Campos dinámicos del personaje u objeto
-              </span>
-            </div>
-
-            <!-- Chips de atributos existentes -->
-            <div class="flex flex-wrap gap-2">
-              <div
-                v-for="(attr, idx) in editLoreAttributes"
-                :key="idx"
-                class="neu-well-sm px-2.5 py-1 text-xs flex items-center gap-2 group"
-              >
-                <span class="font-semibold text-[var(--accent)]">{{ attr.key }}:</span>
-                <span class="text-[var(--text-primary)]">{{ attr.value }}</span>
-                <button
-                  type="button"
-                  class="text-[var(--text-muted)] hover:text-rose-400 ml-1 opacity-60 group-hover:opacity-100"
-                  @click="removeAttribute(idx)"
-                >
-                  <X :size="11" />
-                </button>
-              </div>
-            </div>
-
-            <!-- Formulario para añadir nuevo atributo dinámico -->
-            <div class="flex items-center gap-2 pt-1">
-              <input
-                v-model="newAttrKey"
-                type="text"
-                placeholder="Propiedad (ej. Rol, Edad, Clima)"
-                class="neu-well-sm px-2.5 py-1 text-xs bg-transparent border-none text-[var(--text-primary)] focus:outline-none w-36"
-                @keydown.enter.prevent="addAttribute"
-              />
-              <input
-                v-model="newAttrValue"
-                type="text"
-                placeholder="Valor (ej. Protagonista, 28, Frío)"
-                class="neu-well-sm px-2.5 py-1 text-xs bg-transparent border-none text-[var(--text-primary)] focus:outline-none flex-1"
-                @keydown.enter.prevent="addAttribute"
-              />
-              <button
-                type="button"
-                class="neu-btn px-3 py-1 text-xs text-[var(--accent)] font-medium flex items-center gap-1 shrink-0"
-                @click="addAttribute"
-              >
-                <Plus :size="12" />
-                <span>Añadir</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="neu-groove-h opacity-60"></div>
-
-          <!-- Descripción detallada / Notas / Lore -->
-          <div class="flex-1 flex flex-col space-y-1">
-            <label class="text-[11px] font-mono text-[var(--text-muted)]">
-              Información Detallada / Historia / Biografía:
-            </label>
-            <textarea
-              v-model="editLoreContent"
-              placeholder="Escribe aquí los antecedentes, historia, psicología o características completas de esta entrada..."
-              class="flex-1 w-full min-h-[220px] bg-transparent border-none resize-none focus:outline-none text-base leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] select-text caret-[#C85A32]"
-              @input="onEditorInput"
-            ></textarea>
-          </div>
-        </div>
-      </template>
-
-      <!-- --------------------------------------------------------------- -->
-      <!-- CASO C: ESTADO VACÍO (NINGÚN ELEMENTO SELECCIONADO)             -->
-      <!-- --------------------------------------------------------------- -->
+      <!-- Estado Vacío cuando no hay folio activo -->
       <div
         v-else
         class="flex-1 flex flex-col items-center justify-center neu-well p-8 text-center"
       >
-        <div class="w-28 h-28 mb-5 flex items-center justify-center shrink-0 drop-shadow-xl">
+        <div class="w-24 h-24 mb-4 flex items-center justify-center shrink-0 drop-shadow-xl">
           <FolioLogo />
         </div>
         <h3 class="font-editorial text-2xl font-bold text-[var(--text-primary)] mb-1">
           {{ projectStore.activeProject?.title || 'Bienvenido a Folio' }}
         </h3>
         <p class="text-xs text-[var(--text-muted)] max-w-sm mb-6">
-          Selecciona un capítulo o escena en el manuscrito, o navega por la wiki de tu mundo literario.
+          Selecciona un capítulo o escena en el árbol del manuscrito a la izquierda para comenzar a escribir.
         </p>
 
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="neu-btn-terracotta py-2 px-5 text-xs flex items-center gap-2 active:scale-95 transition-all"
-            @click="handleCreateChapter"
-          >
-            <Plus :size="14" />
-            <span>Crear Capítulo</span>
-          </button>
-
-          <button
-            type="button"
-            class="neu-btn py-2 px-5 text-xs flex items-center gap-2 active:scale-95 transition-all"
-            @click="handleCreateLoreItem()"
-          >
-            <Compass :size="14" />
-            <span>Nueva Entrada Wiki</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          class="neu-btn-terracotta py-2 px-5 text-xs flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+          @click="handleCreateChapter"
+        >
+          <Plus :size="14" />
+          <span>Crear Primer Capítulo</span>
+        </button>
       </div>
     </main>
+
+    <!-- ================================================================= -->
+    <!-- COLUMNA 3: WIKI / LORE INSPECTOR (COLAPSIBLE)                     -->
+    <!-- ================================================================= -->
+    <aside
+      class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
+      :class="uiStore.isRightSidebarOpen ? 'w-80 lg:w-96 xl:w-[390px] p-4 gap-3.5' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+    >
+      <WikiInspector />
+    </aside>
   </div>
 </template>

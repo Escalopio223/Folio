@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Minus, Square, Copy, X, Sun, Moon, PanelLeft, PanelLeftClose } from 'lucide-vue-next'
+import {
+  Minus,
+  Square,
+  Copy,
+  X,
+  Sun,
+  Moon,
+  PanelLeft,
+  PanelLeftClose,
+  PanelRight,
+  PanelRightClose
+} from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import { useUiStore } from '../stores/uiStore'
 import type { WindowAction } from '@shared/types'
@@ -44,9 +55,20 @@ async function handleAction(action: WindowAction): Promise<void> {
 }
 
 function handleKeydown(e: KeyboardEvent): void {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+  const isCtrlOrCmd = e.ctrlKey || e.metaKey
+
+  // Ctrl+B / Cmd+B: Alternar Árbol de Manuscrito
+  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'b') {
     e.preventDefault()
-    uiStore.toggleSidebar()
+    uiStore.toggleLeftSidebar()
+    return
+  }
+
+  // Ctrl+Shift+L / Cmd+Shift+L: Alternar Wiki / Lore Inspector
+  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'l') {
+    e.preventDefault()
+    uiStore.toggleRightSidebar()
+    return
   }
 }
 
@@ -67,16 +89,17 @@ onUnmounted(() => {
 <template>
   <div class="w-full flex flex-col shrink-0 select-none bg-[var(--bg-base)]">
     <header class="drag-region h-11 w-full flex items-center justify-between px-3.5 text-xs">
-      <!-- Left: Brand / Title / Logo / Sidebar Toggle -->
+      <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle -->
       <div class="flex items-center gap-2.5">
-        <!-- Sidebar Toggle Button -->
+        <!-- Tree Toggle Button -->
         <button
           type="button"
-          class="no-drag neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[var(--accent)]"
-          :title="uiStore.isSidebarOpen ? 'Ocultar barra lateral (Ctrl+B)' : 'Mostrar barra lateral (Ctrl+B)'"
-          @click="uiStore.toggleSidebar"
+          class="no-drag neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all"
+          :class="{ 'neu-well !text-[var(--accent)]': uiStore.isLeftSidebarOpen }"
+          :title="uiStore.isLeftSidebarOpen ? 'Ocultar árbol de manuscrito (Ctrl+B)' : 'Mostrar árbol de manuscrito (Ctrl+B)'"
+          @click="uiStore.toggleLeftSidebar"
         >
-          <PanelLeftClose v-if="uiStore.isSidebarOpen" :size="13" />
+          <PanelLeftClose v-if="uiStore.isLeftSidebarOpen" :size="13" />
           <PanelLeft v-else :size="13" />
         </button>
 
@@ -96,8 +119,23 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Right: Controls -->
+      <!-- Right: Controls & Lore Toggle -->
       <div class="no-drag flex items-center gap-2">
+        <!-- Wiki / Lore Inspector Toggle Button -->
+        <button
+          type="button"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isRightSidebarOpen }"
+          :title="uiStore.isRightSidebarOpen ? 'Ocultar Wiki / Lore (Ctrl+Shift+L)' : 'Mostrar Wiki / Lore (Ctrl+Shift+L)'"
+          @click="uiStore.toggleRightSidebar"
+        >
+          <PanelRightClose v-if="uiStore.isRightSidebarOpen" :size="13" />
+          <PanelRight v-else :size="13" />
+          <span class="text-[11px] font-medium hidden sm:inline">Wiki</span>
+        </button>
+
+        <div class="neu-groove-v h-4 my-auto"></div>
+
         <!-- Theme Toggle Button -->
         <button
           type="button"
