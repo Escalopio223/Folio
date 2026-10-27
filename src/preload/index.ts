@@ -25,10 +25,14 @@ const api: FolioApi = {
   folio: {
     getAll: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getAll', projectId),
     getTrash: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getTrash', projectId),
+    getGraveyard: (projectId?: string): Promise<Folio[]> => ipcRenderer.invoke('folio:getGraveyard', projectId),
     getById: (id: string): Promise<Folio | null> => ipcRenderer.invoke('folio:getById', id),
     create: (input: CreateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:create', input),
     update: (input: UpdateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:update', input),
-    deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('folio:deletePermanent', id)
+    restore: (id: string): Promise<Folio> => ipcRenderer.invoke('folio:restore', id),
+    deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('folio:deletePermanent', id),
+    emptyTrash: (projectId: string): Promise<{ purgedFolios: number; purgedLore: number }> =>
+      ipcRenderer.invoke('folio:emptyTrash', projectId)
   },
   lore: {
     getAll: (projectId?: string, category?: string): Promise<LoreItem[]> =>
@@ -37,6 +41,7 @@ const api: FolioApi = {
     getById: (id: string): Promise<LoreItem | null> => ipcRenderer.invoke('lore:getById', id),
     create: (input: CreateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:create', input),
     update: (input: UpdateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:update', input),
+    restore: (id: string): Promise<LoreItem> => ipcRenderer.invoke('lore:restore', id),
     deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('lore:deletePermanent', id)
   },
   window: {

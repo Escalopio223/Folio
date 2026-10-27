@@ -48,6 +48,7 @@ function mapFolio(row: schema.FolioSelect): Folio {
     status: row.status,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
+    isGraveyard: Boolean(row.isGraveyard),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
@@ -125,6 +126,7 @@ export function initDatabase(): {
       status TEXT NOT NULL DEFAULT 'draft',
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
+      is_graveyard INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -133,6 +135,7 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_folios_parent_id ON folios(parent_id);
     CREATE INDEX IF NOT EXISTS idx_folios_type ON folios(type);
     CREATE INDEX IF NOT EXISTS idx_folios_is_archived ON folios(is_archived);
+    CREATE INDEX IF NOT EXISTS idx_folios_is_graveyard ON folios(is_graveyard);
 
     CREATE TABLE IF NOT EXISTS lore_items (
       id TEXT PRIMARY KEY NOT NULL,
@@ -153,6 +156,18 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
     CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
   `)
+
+  // Ensure is_graveyard column exists on legacy databases
+  try {
+    sqliteInstance.exec('ALTER TABLE folios ADD COLUMN is_graveyard INTEGER NOT NULL DEFAULT 0;')
+  } catch {
+    // Column already exists or fresh table
+  }
+  try {
+    sqliteInstance.exec('CREATE INDEX IF NOT EXISTS idx_folios_is_graveyard ON folios(is_graveyard);')
+  } catch {
+    // Index already exists
+  }
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
 
@@ -440,16 +455,23 @@ export function getAllFolios(projectId?: string): Folio[] {
 
 export function getTrashFolios(projectId?: string): Folio[] {
   const db = getDb()
-  if (projectId) {
-    const rows = db.select().from(schema.folios)
-      .where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, true)))
-      .orderBy(desc(schema.folios.updatedAt))
-      .all()
-    return rows.map(mapFolio)
-  }
+  const conditions = [eq(schema.folios.isArchived, true), eq(schema.folios.isGraveyard, false)]
+  if (projectId) conditions.push(eq(schema.folios.projectId, projectId))
 
   const rows = db.select().from(schema.folios)
-    .where(eq(schema.folios.isArchived, true))
+    .where(and(...conditions))
+    .orderBy(desc(schema.folios.updatedAt))
+    .all()
+  return rows.map(mapFolio)
+}
+
+export function getGraveyardFolios(projectId?: string): Folio[] {
+  const db = getDb()
+  const conditions = [eq(schema.folios.isArchived, true), eq(schema.folios.isGraveyard, true)]
+  if (projectId) conditions.push(eq(schema.folios.projectId, projectId))
+
+  const rows = db.select().from(schema.folios)
+    .where(and(...conditions))
     .orderBy(desc(schema.folios.updatedAt))
     .all()
   return rows.map(mapFolio)
@@ -479,6 +501,7 @@ export function createFolio(input: CreateFolioInput): Folio {
     status: input.status || 'draft',
     isFavorite: false,
     isArchived: false,
+    isGraveyard: input.isGraveyard ?? false,
     createdAt: now,
     updatedAt: now
   }).returning().get()
@@ -503,6 +526,7 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   if (input.icon !== undefined) values.icon = input.icon
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
+  if (input.isGraveyard !== undefined) values.isGraveyard = input.isGraveyard
 
   const updated = db.update(schema.folios)
     .set(values)
@@ -511,6 +535,40 @@ export function updateFolio(input: UpdateFolioInput): Folio {
     .get()
 
   if (!updated) throw new Error(`Folio ${input.id} no encontrado`)
+  return mapFolio(updated)
+}
+
+export function restoreFolio(id: string): Folio {
+  const db = getDb()
+  const now = new Date()
+  const folio = getFolioById(id)
+  if (!folio) throw new Error(`Folio ${id} no encontrado`)
+
+  let parentId = folio.parentId
+  let type = folio.type
+
+  // Si tiene capítulo padre, verificar que aún exista y no esté archivado
+  if (parentId) {
+    const parent = db.select().from(schema.folios).where(eq(schema.folios.id, parentId)).get()
+    if (!parent || parent.isArchived) {
+      parentId = null
+      type = 'chapter'
+    }
+  }
+
+  const updated = db.update(schema.folios)
+    .set({
+      isArchived: false,
+      isGraveyard: false,
+      parentId,
+      type,
+      updatedAt: now
+    })
+    .where(eq(schema.folios.id, id))
+    .returning()
+    .get()
+
+  if (!updated) throw new Error(`Error al resucitar folio ${id}`)
   return mapFolio(updated)
 }
 
@@ -611,3 +669,49 @@ export function deleteLorePermanent(id: string): boolean {
   const res = db.delete(schema.loreItems).where(eq(schema.loreItems.id, id)).run()
   return res.changes > 0
 }
+
+export function restoreLore(id: string): LoreItem {
+  const db = getDb()
+  const now = new Date()
+  const updated = db.update(schema.loreItems)
+    .set({
+      isArchived: false,
+      updatedAt: now
+    })
+    .where(eq(schema.loreItems.id, id))
+    .returning()
+    .get()
+
+  if (!updated) throw new Error(`Registro ${id} no encontrado en la librería`)
+  return mapLoreItem(updated)
+}
+
+// -------------------------------------------------------------------------
+// PURGE / EMPTY TRASH (IRREVERSIBLE PURGE FOR ARCHIVED TRASH ITEMS)
+// Graveyard items are protected and NEVER purged by emptyTrash.
+// -------------------------------------------------------------------------
+
+export function emptyTrash(projectId: string): { purgedFolios: number; purgedLore: number } {
+  const db = getDb()
+
+  const foliosRes = db.delete(schema.folios)
+    .where(and(
+      eq(schema.folios.projectId, projectId),
+      eq(schema.folios.isArchived, true),
+      eq(schema.folios.isGraveyard, false)
+    ))
+    .run()
+
+  const loreRes = db.delete(schema.loreItems)
+    .where(and(
+      eq(schema.loreItems.projectId, projectId),
+      eq(schema.loreItems.isArchived, true)
+    ))
+    .run()
+
+  return {
+    purgedFolios: foliosRes.changes,
+    purgedLore: loreRes.changes
+  }
+}
+

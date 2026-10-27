@@ -5,6 +5,7 @@ import {
   getLoreById,
   createLore,
   updateLore,
+  restoreLore,
   deleteLorePermanent
 } from '../db'
 import type { CreateLoreInput, UpdateLoreInput } from '@shared/types'
@@ -37,6 +38,13 @@ export function registerLoreHandlers(): void {
       throw new Error('Valid lore ID is required for update')
     }
     return updateLore(input)
+  })
+
+  ipcMain.handle('lore:restore', async (_event, id: string) => {
+    if (!id || typeof id !== 'string') {
+      throw new Error('Valid lore ID is required for restore')
+    }
+    return restoreLore(id)
   })
 
   ipcMain.handle('lore:deletePermanent', async (_event, id: string) => {

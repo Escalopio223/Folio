@@ -16,6 +16,7 @@ import {
   FileText,
   Bookmark,
   Trash2,
+  Archive,
   Check,
   AlignVerticalSpaceAround,
   Eye,
@@ -25,11 +26,13 @@ import TiptapEditor from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import type { Editor } from '@tiptap/vue-3'
 import type { Folio } from '@shared/types'
+import { useTrashStore } from '../stores/trashStore'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
 const loreStore = useLoreStore()
 const uiStore = useUiStore()
+const trashStore = useTrashStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
@@ -351,7 +354,8 @@ async function handleProjectChange(projectId: string): Promise<void> {
   projectStore.selectProject(projectId)
   await Promise.all([
     folioStore.fetchFolios(projectId),
-    loreStore.fetchLore(projectId)
+    loreStore.fetchLore(projectId),
+    trashStore.fetchAll(projectId)
   ])
 }
 
@@ -364,6 +368,9 @@ async function handleProjectDeleted(): Promise<void> {
     folioStore.trashedFolios = []
     folioStore.selectFolio('')
     loreStore.items = []
+    trashStore.graveyardFolios = []
+    trashStore.trashFolios = []
+    trashStore.trashLore = []
   }
 }
 
@@ -380,7 +387,8 @@ onMounted(async () => {
   if (projectStore.activeProjectId) {
     await Promise.all([
       folioStore.fetchFolios(projectStore.activeProjectId),
-      loreStore.fetchLore(projectStore.activeProjectId)
+      loreStore.fetchLore(projectStore.activeProjectId),
+      trashStore.fetchAll(projectStore.activeProjectId)
     ])
   }
   // Smoothly hide splash screen after initial load
@@ -483,7 +491,7 @@ onBeforeUnmount(async () => {
               <!-- Escena activa (Hundida) -->
               <div
                 v-if="folioStore.activeFolioId === scene.id"
-                class="neu-well p-2.5 border-l-4 border-[#C85A32] cursor-pointer flex items-center justify-between gap-2"
+                class="neu-well p-2.5 border-l-4 border-[#C85A32] cursor-pointer flex items-center justify-between gap-2 group"
                 @click="selectSceneOrChapter(scene)"
               >
                 <div class="flex items-center gap-2 min-w-0">
@@ -492,9 +500,27 @@ onBeforeUnmount(async () => {
                     {{ scene.title }}
                   </span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase">
-                  {{ scene.status }}
-                </span>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity"
+                    title="Descartar al Cementerio de Capítulos"
+                    @click.stop="trashStore.moveToGraveyard(scene.id)"
+                  >
+                    <Archive :size="11" />
+                  </button>
+                  <button
+                    type="button"
+                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
+                    title="Mover a papelera"
+                    @click.stop="trashStore.moveToTrash(scene.id, 'folio')"
+                  >
+                    <Trash2 :size="11" />
+                  </button>
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase">
+                    {{ scene.status }}
+                  </span>
+                </div>
               </div>
 
               <!-- Escena inactiva -->
@@ -509,14 +535,24 @@ onBeforeUnmount(async () => {
                   <FileText :size="12" class="opacity-40 shrink-0" />
                   <span class="truncate">{{ scene.title }}</span>
                 </div>
-                <button
-                  type="button"
-                  class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
-                  title="Mover a papelera"
-                  @click.stop="folioStore.moveToTrash(scene.id)"
-                >
-                  <Trash2 :size="11" />
-                </button>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity"
+                    title="Descartar al Cementerio de Capítulos"
+                    @click.stop="trashStore.moveToGraveyard(scene.id)"
+                  >
+                    <Archive :size="11" />
+                  </button>
+                  <button
+                    type="button"
+                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
+                    title="Mover a papelera"
+                    @click.stop="trashStore.moveToTrash(scene.id, 'folio')"
+                  >
+                    <Trash2 :size="11" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -549,6 +585,35 @@ onBeforeUnmount(async () => {
           </button>
         </div>
       </div>
+
+      <!-- Botón sutil neumórfico: Papelera y Cementerio de Capítulos -->
+      <button
+        type="button"
+        class="neu-btn w-full py-2 px-2.5 flex items-center justify-between text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 transition-all active:scale-[0.98] group cursor-pointer"
+        title="Abrir Cementerio de Capítulos y Papelera de Reciclaje"
+        @click="trashStore.openModal('graveyard', projectStore.activeProjectId)"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <Archive :size="13" class="text-[var(--accent)] shrink-0 group-hover:scale-110 transition-transform" />
+          <span class="truncate font-editorial font-medium">Papelera y Cementerio</span>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <span
+            v-if="trashStore.graveyardFolios.length > 0"
+            class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--accent)] rounded-full"
+            title="Descartes narrativos en el cementerio"
+          >
+            {{ trashStore.graveyardFolios.length }}
+          </span>
+          <span
+            v-if="trashStore.trashFolios.length + trashStore.trashLore.length > 0"
+            class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--text-muted)] rounded-full"
+            title="Elementos en papelera"
+          >
+            {{ trashStore.trashFolios.length + trashStore.trashLore.length }}
+          </span>
+        </div>
+      </button>
 
       <!-- Pie del Sidebar Izquierdo con atajo de teclado visible -->
       <div class="neu-groove-h"></div>
@@ -660,9 +725,18 @@ onBeforeUnmount(async () => {
 
             <button
               type="button"
+              class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-[var(--accent)] cursor-pointer"
+              title="Descartar escena al Cementerio de Capítulos"
+              @click="trashStore.moveToGraveyard(folioStore.activeFolio.id)"
+            >
+              <Archive :size="13" />
+            </button>
+
+            <button
+              type="button"
               class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400 cursor-pointer"
               title="Mover escena a papelera"
-              @click="folioStore.moveToTrash(folioStore.activeFolio.id)"
+              @click="trashStore.moveToTrash(folioStore.activeFolio.id, 'folio')"
             >
               <Trash2 :size="13" />
             </button>

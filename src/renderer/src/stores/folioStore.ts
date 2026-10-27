@@ -153,7 +153,9 @@ export const useFolioStore = defineStore('folio', () => {
       if (index !== -1) {
         if (updated.isArchived) {
           folios.value.splice(index, 1)
-          trashedFolios.value.unshift(updated)
+          if (!updated.isGraveyard) {
+            trashedFolios.value.unshift(updated)
+          }
           if (activeFolioId.value === updated.id) {
             activeFolioId.value = folios.value[0]?.id || null
             if (activeFolioId.value) {
@@ -173,7 +175,11 @@ export const useFolioStore = defineStore('folio', () => {
             folios.value.push(updated)
             selectFolio(updated.id)
           } else {
-            trashedFolios.value[trashIndex] = updated
+            if (updated.isGraveyard) {
+              trashedFolios.value.splice(trashIndex, 1)
+            } else {
+              trashedFolios.value[trashIndex] = updated
+            }
           }
         }
       }
@@ -186,13 +192,36 @@ export const useFolioStore = defineStore('folio', () => {
   }
 
   async function moveToTrash(id: string): Promise<boolean> {
-    const res = await updateFolio({ id, isArchived: true })
+    const res = await updateFolio({ id, isArchived: true, isGraveyard: false })
     return Boolean(res)
   }
 
-  async function restoreFromTrash(id: string): Promise<boolean> {
-    const res = await updateFolio({ id, isArchived: false })
+  async function moveToGraveyard(id: string): Promise<boolean> {
+    const res = await updateFolio({ id, isArchived: true, isGraveyard: true })
     return Boolean(res)
+  }
+
+  async function restoreFolio(id: string): Promise<boolean> {
+    try {
+      const restored = await window.api.folio.restore(id)
+      if (restored) {
+        trashedFolios.value = trashedFolios.value.filter((f) => f.id !== id)
+        const exists = folios.value.some((f) => f.id === id)
+        if (!exists) {
+          folios.value.push(restored)
+        }
+        selectFolio(restored.id)
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('[Folio Store] restoreFolio failed:', err)
+      return false
+    }
+  }
+
+  async function restoreFromTrash(id: string): Promise<boolean> {
+    return restoreFolio(id)
   }
 
   async function deletePermanently(id: string): Promise<boolean> {
@@ -247,6 +276,8 @@ export const useFolioStore = defineStore('folio', () => {
     updateFolio,
     saveCurrentFolio,
     moveToTrash,
+    moveToGraveyard,
+    restoreFolio,
     restoreFromTrash,
     deletePermanently
   }

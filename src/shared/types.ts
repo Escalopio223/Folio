@@ -35,6 +35,7 @@ export interface Folio {
   status: string
   isFavorite: boolean
   isArchived: boolean
+  isGraveyard: boolean
   createdAt: string | Date
   updatedAt: string | Date
 }
@@ -49,6 +50,7 @@ export interface CreateFolioInput {
   icon?: string
   sortOrder?: number
   status?: string
+  isGraveyard?: boolean
 }
 
 export interface UpdateFolioInput {
@@ -63,6 +65,7 @@ export interface UpdateFolioInput {
   icon?: string
   isFavorite?: boolean
   isArchived?: boolean
+  isGraveyard?: boolean
 }
 
 export interface LoreItem {
@@ -115,10 +118,13 @@ export interface FolioApi {
   folio: {
     getAll: (projectId?: string) => Promise<Folio[]>
     getTrash: (projectId?: string) => Promise<Folio[]>
+    getGraveyard: (projectId?: string) => Promise<Folio[]>
     getById: (id: string) => Promise<Folio | null>
     create: (input: CreateFolioInput) => Promise<Folio>
     update: (input: UpdateFolioInput) => Promise<Folio>
+    restore: (id: string) => Promise<Folio>
     deletePermanent: (id: string) => Promise<boolean>
+    emptyTrash: (projectId: string) => Promise<{ purgedFolios: number; purgedLore: number }>
   }
   lore: {
     getAll: (projectId?: string, category?: string) => Promise<LoreItem[]>
@@ -126,6 +132,7 @@ export interface FolioApi {
     getById: (id: string) => Promise<LoreItem | null>
     create: (input: CreateLoreInput) => Promise<LoreItem>
     update: (input: UpdateLoreInput) => Promise<LoreItem>
+    restore: (id: string) => Promise<LoreItem>
     deletePermanent: (id: string) => Promise<boolean>
   }
   window: {

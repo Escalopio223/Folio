@@ -107,8 +107,22 @@ export const useLoreStore = defineStore('lore', () => {
   }
 
   async function restoreFromTrash(id: string): Promise<boolean> {
-    const res = await updateLore({ id, isArchived: false })
-    return Boolean(res)
+    try {
+      const restored = await window.api.lore.restore(id)
+      if (restored) {
+        trashedItems.value = trashedItems.value.filter((i) => i.id !== id)
+        const exists = items.value.some((i) => i.id === id)
+        if (!exists) {
+          items.value.unshift(restored)
+        }
+        selectLore(restored.id)
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('[Lore Store] restoreFromTrash failed:', err)
+      return false
+    }
   }
 
   async function deletePermanently(id: string): Promise<boolean> {

@@ -8,12 +8,15 @@ import {
   PanelRight,
   AlignVerticalSpaceAround,
   Eye,
-  Save
+  Save,
+  Archive,
+  Trash2
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
 import type { useLoreStore } from '../../stores/loreStore'
 import type { useProjectStore } from '../../stores/projectStore'
+import { useTrashStore } from '../../stores/trashStore'
 
 export interface CommandAction {
   id: string
@@ -32,6 +35,7 @@ export interface StoreContext {
   folioStore: ReturnType<typeof useFolioStore>
   loreStore: ReturnType<typeof useLoreStore>
   projectStore: ReturnType<typeof useProjectStore>
+  trashStore?: ReturnType<typeof useTrashStore>
 }
 
 /**
@@ -40,6 +44,7 @@ export interface StoreContext {
  */
 export function getSystemCommands(ctx: StoreContext): CommandAction[] {
   const { uiStore, folioStore, loreStore, projectStore } = ctx
+  const trashStore = ctx.trashStore || useTrashStore()
 
   return [
     {
@@ -197,6 +202,44 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       keywords: ['guardar', 'salvar', 'sqlite', 'base de datos', 'save'],
       execute: async () => {
         await folioStore.saveCurrentFolio()
+      }
+    },
+    {
+      id: 'open-graveyard',
+      title: 'Abrir Cementerio de Capítulos',
+      description: 'Consultar, leer y resucitar fragmentos y escenas descartadas',
+      category: 'action',
+      badge: 'Editorial',
+      icon: Archive,
+      keywords: ['cementerio', 'graveyard', 'descartes', 'resucitar', 'fragmentos', 'capitulos', 'papelera'],
+      execute: () => {
+        trashStore.openModal('graveyard', projectStore.activeProjectId || undefined)
+      }
+    },
+    {
+      id: 'open-trash',
+      title: 'Abrir Papelera de Reciclaje',
+      description: 'Inspeccionar elementos eliminados de la novela o vaciar papelera',
+      category: 'action',
+      badge: 'Sistema',
+      icon: Trash2,
+      keywords: ['papelera', 'basura', 'reciclaje', 'vaciar', 'eliminar', 'trash', 'residuos'],
+      execute: () => {
+        trashStore.openModal('trash', projectStore.activeProjectId || undefined)
+      }
+    },
+    {
+      id: 'send-to-graveyard',
+      title: 'Enviar Escena Actual al Cementerio',
+      description: 'Archivar escena activa como descarte literario de referencia sin alterar métricas',
+      category: 'action',
+      badge: 'Manuscrito',
+      icon: Archive,
+      keywords: ['descartar', 'cementerio', 'escena', 'archivar', 'guardar', 'descarte'],
+      execute: async () => {
+        if (folioStore.activeFolioId) {
+          await trashStore.moveToGraveyard(folioStore.activeFolioId)
+        }
       }
     }
   ]

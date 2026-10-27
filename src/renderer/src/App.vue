@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import AppSplash from './components/AppSplash.vue'
 import CommandPaletteModal from './components/palette/CommandPaletteModal.vue'
+import GraveyardTrashModal from './components/graveyard/GraveyardTrashModal.vue'
 import { useUiStore } from './stores/uiStore'
 
 const uiStore = useUiStore()
@@ -37,6 +38,9 @@ onMounted(() => {
 
     <!-- Omnibox / Paleta de Comandos Modal Global (Ctrl+K / Cmd+K) -->
     <CommandPaletteModal />
+
+    <!-- Modal de Gestión de Residuos y Cementerio de Capítulos -->
+    <GraveyardTrashModal />
   </div>
 </template>
 

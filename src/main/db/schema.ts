@@ -24,6 +24,7 @@ export const folios = sqliteTable(
     status: text('status').notNull().default('draft'), // 'draft' | 'in_progress' | 'completed'
     isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
+    isGraveyard: integer('is_graveyard', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
   },
@@ -31,7 +32,8 @@ export const folios = sqliteTable(
     index('idx_folios_project_id').on(table.projectId),
     index('idx_folios_parent_id').on(table.parentId),
     index('idx_folios_type').on(table.type),
-    index('idx_folios_is_archived').on(table.isArchived)
+    index('idx_folios_is_archived').on(table.isArchived),
+    index('idx_folios_is_graveyard').on(table.isGraveyard)
   ]
 )
 
