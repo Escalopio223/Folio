@@ -58,6 +58,46 @@ select {
   font-family: inherit;
 }
 
+/* =========================================================================
+   CURSORES GLOBALES Y COMPORTAMIENTO TÁCTIL / EDITORIAL
+   ========================================================================= */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.neu-btn,
+.neu-btn-terracotta,
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Áreas de redacción y campos de entrada de texto */
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+[contenteditable="true"],
+.ProseMirror,
+.ProseMirror p,
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror blockquote,
+.ProseMirror li,
+.tiptap,
+.editable-text,
+.editorial-input,
+.cursor-text {
+  cursor: text !important;
+  user-select: text;
+}
+
+/* Elementos especiales de descanso narrativo no seleccionables */
+.ProseMirror div[data-type="scene-break"],
+.ProseMirror .scene-break {
+  cursor: default !important;
+  user-select: none;
+}
+
 #app {
   height: 100vh;
   display: flex;
