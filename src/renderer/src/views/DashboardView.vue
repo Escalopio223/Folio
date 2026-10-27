@@ -301,13 +301,13 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
   }
 }
 
-// Chapter expansion toggle
+// Chapter expansion toggle (cerrado de base por defecto)
 function toggleChapter(chapterId: string): void {
   expandedChapters.value[chapterId] = !isChapterExpanded(chapterId)
 }
 
 function isChapterExpanded(chapterId: string): boolean {
-  return expandedChapters.value[chapterId] !== false // default expanded
+  return expandedChapters.value[chapterId] === true // default cerrado
 }
 
 // Selection Handlers con flush forzado previo para garantizar CERO pérdida de datos
@@ -452,28 +452,47 @@ onBeforeUnmount(async () => {
             @click="selectSceneOrChapter(chap)"
           >
             <div class="flex items-center gap-2 min-w-0">
+              <!-- Botón Neumórfico Táctil para Desplegar / Replegar -->
               <button
                 type="button"
-                class="p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/40 transition-all cursor-pointer shrink-0 active:scale-95"
+                :class="isChapterExpanded(chap.id) ? '!text-[var(--accent)] font-bold' : ''"
+                title="Desplegar / Replegar capítulo"
                 @click.stop="toggleChapter(chap.id)"
               >
-                <ChevronDown v-if="isChapterExpanded(chap.id)" :size="14" />
-                <ChevronRight v-else :size="14" />
+                <ChevronDown v-if="isChapterExpanded(chap.id)" :size="13" class="transition-transform duration-200" />
+                <ChevronRight v-else :size="13" class="transition-transform duration-200" />
               </button>
               <span class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate">
                 {{ chap.title }}
               </span>
             </div>
 
-            <!-- Botón rápido para agregar escena al capítulo -->
+            <!-- Controles del Capítulo: Añadir escena, Descartar al Cementerio y Mover a Papelera -->
             <div class="flex items-center gap-1 shrink-0" @click.stop>
               <button
                 type="button"
-                class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors opacity-0 group-hover:opacity-100"
+                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
                 title="Añadir escena a este capítulo"
                 @click="handleCreateScene(chap.id)"
               >
                 <Plus :size="12" />
+              </button>
+              <button
+                type="button"
+                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
+                title="Descartar capítulo al Cementerio"
+                @click="trashStore.moveToGraveyard(chap.id)"
+              >
+                <Archive :size="11" />
+              </button>
+              <button
+                type="button"
+                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
+                title="Mover capítulo a papelera"
+                @click="trashStore.moveToTrash(chap.id, 'folio')"
+              >
+                <Trash2 :size="11" />
               </button>
             </div>
           </div>
@@ -500,20 +519,22 @@ onBeforeUnmount(async () => {
                     {{ scene.title }}
                   </span>
                 </div>
-                <div class="flex items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1.5 shrink-0" @click.stop>
+                  <!-- Botón Descartar al Cementerio siempre visible con neumorfismo -->
                   <button
                     type="button"
-                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity"
+                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
                     title="Descartar al Cementerio de Capítulos"
-                    @click.stop="trashStore.moveToGraveyard(scene.id)"
+                    @click="trashStore.moveToGraveyard(scene.id)"
                   >
                     <Archive :size="11" />
                   </button>
+                  <!-- Botón Borrar a Papelera siempre visible con neumorfismo -->
                   <button
                     type="button"
-                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
+                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
                     title="Mover a papelera"
-                    @click.stop="trashStore.moveToTrash(scene.id, 'folio')"
+                    @click="trashStore.moveToTrash(scene.id, 'folio')"
                   >
                     <Trash2 :size="11" />
                   </button>
@@ -535,20 +556,22 @@ onBeforeUnmount(async () => {
                   <FileText :size="12" class="opacity-40 shrink-0" />
                   <span class="truncate">{{ scene.title }}</span>
                 </div>
-                <div class="flex items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1.5 shrink-0" @click.stop>
+                  <!-- Botón Descartar al Cementerio siempre visible con neumorfismo -->
                   <button
                     type="button"
-                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity"
+                    class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
                     title="Descartar al Cementerio de Capítulos"
-                    @click.stop="trashStore.moveToGraveyard(scene.id)"
+                    @click="trashStore.moveToGraveyard(scene.id)"
                   >
                     <Archive :size="11" />
                   </button>
+                  <!-- Botón Borrar a Papelera siempre visible con neumorfismo -->
                   <button
                     type="button"
-                    class="p-1 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-rose-400 transition-opacity"
+                    class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-400/40 transition-all cursor-pointer active:scale-95"
                     title="Mover a papelera"
-                    @click.stop="trashStore.moveToTrash(scene.id, 'folio')"
+                    @click="trashStore.moveToTrash(scene.id, 'folio')"
                   >
                     <Trash2 :size="11" />
                   </button>
