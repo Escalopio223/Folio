@@ -5,6 +5,10 @@ export const useUiStore = defineStore('ui', () => {
   const isSidebarOpen = ref(true)
   const isSplashLoading = ref(true)
 
+  // Modos de Escritura
+  const isTypewriterMode = ref(false)
+  const isFocusMode = ref(false)
+
   function toggleSidebar(): void {
     isSidebarOpen.value = !isSidebarOpen.value
   }
@@ -13,10 +17,22 @@ export const useUiStore = defineStore('ui', () => {
     isSplashLoading.value = val
   }
 
+  function toggleTypewriterMode(): void {
+    isTypewriterMode.value = !isTypewriterMode.value
+  }
+
+  function toggleFocusMode(): void {
+    isFocusMode.value = !isFocusMode.value
+  }
+
   return {
     isSidebarOpen,
     isSplashLoading,
+    isTypewriterMode,
+    isFocusMode,
     toggleSidebar,
-    setSplashLoading
+    setSplashLoading,
+    toggleTypewriterMode,
+    toggleFocusMode
   }
 })

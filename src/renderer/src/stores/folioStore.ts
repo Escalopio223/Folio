@@ -29,9 +29,46 @@ export const useFolioStore = defineStore('folio', () => {
       .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
+  // Session Words Tracking
+  const sessionWordsAdded = ref<number>(0)
+  const baselineWordCounts = new Map<string, number>()
+  const folioDeltas = new Map<string, number>()
+
+  function countWords(text: string): number {
+    const trimmed = (text || '').trim()
+    if (!trimmed) return 0
+    return trimmed.split(/\s+/).length
+  }
+
+  function recordBaseline(folioId: string, content: string): void {
+    if (!baselineWordCounts.has(folioId)) {
+      baselineWordCounts.set(folioId, countWords(content))
+    }
+  }
+
+  function updateSessionWords(folioId: string, currentContent: string): void {
+    const currentWords = countWords(currentContent)
+    if (!baselineWordCounts.has(folioId)) {
+      baselineWordCounts.set(folioId, currentWords)
+    }
+    const baseline = baselineWordCounts.get(folioId) || 0
+    const delta = Math.max(0, currentWords - baseline)
+    folioDeltas.set(folioId, delta)
+
+    let total = 0
+    folioDeltas.forEach((d) => {
+      total += d
+    })
+    sessionWordsAdded.value = total
+  }
+
   function selectFolio(id: string): void {
     activeFolioId.value = id
     localStorage.setItem(LAST_ACTIVE_FOLIO_KEY, id)
+    const target = folios.value.find((f) => f.id === id)
+    if (target) {
+      recordBaseline(id, target.content || '')
+    }
   }
 
   async function fetchFolios(projectId?: string): Promise<void> {
@@ -186,6 +223,9 @@ export const useFolioStore = defineStore('folio', () => {
     activeFolio,
     chapters,
     isLoading,
+    sessionWordsAdded,
+    recordBaseline,
+    updateSessionWords,
     getScenesForChapter,
     selectFolio,
     fetchFolios,

@@ -43,12 +43,19 @@ html.dark {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Newsreader', 'Playfair Display', Georgia, serif;
   user-select: none;
   overflow: hidden;
   margin: 0;
   padding: 0;
   height: 100vh;
+}
+
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
 }
 
 #app {
@@ -190,4 +197,12 @@ body {
 .editorial-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+
+/* Ergonomía Modo Máquina de Escribir: Centrado al 50% exacto del viewport */
+.typewriter-active {
+  padding-top: 50vh !important;
+  padding-bottom: 50vh !important;
+}
+
+
 

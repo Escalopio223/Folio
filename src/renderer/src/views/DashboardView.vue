@@ -20,8 +20,11 @@ import {
   Tag,
   SlidersHorizontal,
   X,
-  PanelLeft
+  AlignVerticalSpaceAround,
+  Eye,
+  Flame
 } from 'lucide-vue-next'
+import { getCaretCoordinates } from '../utils/caret'
 import type { Folio, LoreItem } from '@shared/types'
 
 const projectStore = useProjectStore()
@@ -81,8 +84,139 @@ const lastSavedTime = ref<string>('')
 const hasPendingChanges = ref(false)
 let isSyncing = false
 
-// Input DOM references for focus control
+// Input DOM references for focus and scroll control
 const titleInputRef = ref<HTMLInputElement | null>(null)
+const contentInputRef = ref<HTMLTextAreaElement | null>(null)
+const scrollContainerRef = ref<HTMLElement | null>(null)
+const cursorPosition = ref(0)
+
+// =========================================================================
+// MODO MÁQUINA DE ESCRIBIR: CENTRADO BLOQUEADO DEL CURSOR EN EL MEDIO
+// =========================================================================
+function syncTypewriterCenter(instant = false): void {
+  if (!uiStore.isTypewriterMode || !contentInputRef.value || !scrollContainerRef.value) return
+
+  const container = scrollContainerRef.value
+  const textarea = contentInputRef.value
+  const pos = textarea.selectionStart ?? 0
+
+  const coords = getCaretCoordinates(textarea, pos)
+  const containerRect = container.getBoundingClientRect()
+  const textareaRect = textarea.getBoundingClientRect()
+
+  // Coordenada Y absoluta del cursor en el viewport
+  const caretViewportY = textareaRect.top + coords.top + (coords.height / 2)
+  // Coordenada Y del centro exacto del viewport del contenedor
+  const containerCenterY = containerRect.top + (container.clientHeight / 2)
+
+  // Desfase entre el cursor y el centro vertical exacto
+  const deltaY = caretViewportY - containerCenterY
+
+  // Si el cursor se ha desplazado del centro por más de 1.5px, corregir inmediatamente el scroll
+  if (Math.abs(deltaY) > 1.5) {
+    const targetScrollTop = Math.max(0, container.scrollTop + deltaY)
+    if (instant) {
+      container.scrollTop = targetScrollTop
+    } else {
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      })
+    }
+  }
+}
+
+// =========================================================================
+// MODO ENFOQUE: SPOTLIGHT LUMINOSO SOBRE EL PÁRRAFO ACTIVO
+// =========================================================================
+function getParagraphBounds(content: string, pos: number): { start: number; end: number } {
+  if (!content) return { start: 0, end: 0 }
+  const clampedPos = Math.max(0, Math.min(pos, content.length))
+
+  const lastNewline = content.lastIndexOf('\n', clampedPos > 0 ? clampedPos - 1 : 0)
+  const start = lastNewline === -1 ? 0 : lastNewline + 1
+
+  const nextNewline = content.indexOf('\n', clampedPos)
+  const end = nextNewline === -1 ? content.length : nextNewline
+
+  return { start, end }
+}
+
+const focusSpotlightTop = ref(0)
+const focusSpotlightBottom = ref(40)
+
+function updateSpotlightPosition(): void {
+  if (!contentInputRef.value) return
+  const textarea = contentInputRef.value
+  const content = editFolioContent.value || ''
+  const pos = textarea.selectionStart ?? 0
+
+  const { start, end } = getParagraphBounds(content, pos)
+  const startCoords = getCaretCoordinates(textarea, start)
+  const endCoords = getCaretCoordinates(textarea, Math.max(start, end === 0 ? 0 : end - 1))
+
+  focusSpotlightTop.value = Math.max(0, startCoords.top - 6)
+  focusSpotlightBottom.value = endCoords.top + endCoords.height + 6
+}
+
+// Estilo del velo de enfoque: atenuación elegante del resto del documento al 18% de contraste
+const focusSpotlightStyle = computed(() => {
+  if (!uiStore.isFocusMode) {
+    return { display: 'none' }
+  }
+  const top = focusSpotlightTop.value
+  const bottom = focusSpotlightBottom.value
+
+  return {
+    background: `linear-gradient(to bottom,
+      var(--bg-base) 0px,
+      var(--bg-base) ${Math.max(0, top - 10)}px,
+      transparent ${top}px,
+      transparent ${bottom}px,
+      var(--bg-base) ${bottom + 10}px,
+      var(--bg-base) 100%)`,
+    opacity: 0.82
+  }
+})
+
+// Controlador central de eventos de cursor
+function onCaretMove(instant = false): void {
+  if (!contentInputRef.value) return
+  cursorPosition.value = contentInputRef.value.selectionStart ?? 0
+  updateSpotlightPosition()
+  if (uiStore.isTypewriterMode) {
+    syncTypewriterCenter(instant)
+  }
+}
+
+function adjustTextareaHeight(): void {
+  if (!contentInputRef.value) return
+  const el = contentInputRef.value
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(350, el.scrollHeight)}px`
+}
+
+watch(
+  () => uiStore.isTypewriterMode,
+  (active) => {
+    if (active) {
+      nextTick(() => {
+        onCaretMove(false)
+      })
+    }
+  }
+)
+
+watch(
+  () => uiStore.isFocusMode,
+  (active) => {
+    if (active) {
+      nextTick(() => {
+        updateSpotlightPosition()
+      })
+    }
+  }
+)
 
 // Word, character count and estimated reading time
 const wordCount = computed(() => {
@@ -116,6 +250,12 @@ watch(
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
+      })
+      folioStore.recordBaseline(folio.id, folio.content || '')
+      cursorPosition.value = 0
+      nextTick(() => {
+        adjustTextareaHeight()
+        onCaretMove(true)
       })
     } else {
       editFolioTitle.value = ''
@@ -263,6 +403,7 @@ function onEditorInput(): void {
       target.status = editFolioStatus.value
       target.content = editFolioContent.value
     }
+    folioStore.updateSessionWords(folioStore.activeFolioId, editFolioContent.value)
   } else if (activeTargetType.value === 'lore' && loreStore.activeLoreId) {
     const target = loreStore.items.find((l) => l.id === loreStore.activeLoreId)
     if (target) {
@@ -273,10 +414,12 @@ function onEditorInput(): void {
     }
   }
 
+  adjustTextareaHeight()
+  onCaretMove(true)
   debouncedSave()
 }
 
-// Manejador de tecla Tab en el área de escritura de prosa (2 espacios)
+// Manejo reactivo de teclas en el área de escritura de prosa
 function handleTextareaKeydown(e: KeyboardEvent): void {
   if (e.key === 'Tab') {
     e.preventDefault()
@@ -290,6 +433,25 @@ function handleTextareaKeydown(e: KeyboardEvent): void {
     editFolioContent.value = textarea.value
     textarea.selectionStart = textarea.selectionEnd = start + indent.length
     onEditorInput()
+    return
+  }
+
+  // Teclas de navegación que desplazan el cursor (Enter, Flechas, Retroceso)
+  if (['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete'].includes(e.key)) {
+    nextTick(() => {
+      onCaretMove(false)
+    })
+  }
+}
+
+function onTitleFocus(): void {
+  if (uiStore.isTypewriterMode && titleInputRef.value && scrollContainerRef.value) {
+    const container = scrollContainerRef.value
+    const titleEl = titleInputRef.value
+    const containerRect = container.getBoundingClientRect()
+    const titleRect = titleEl.getBoundingClientRect()
+    const deltaY = (titleRect.top + titleRect.height / 2) - (containerRect.top + container.clientHeight / 2)
+    container.scrollTo({ top: Math.max(0, container.scrollTop + deltaY), behavior: 'smooth' })
   }
 }
 
@@ -335,15 +497,29 @@ async function handleQuickNewFolio(): Promise<void> {
 function handleGlobalKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
 
-  // Ctrl+S / Cmd+S: Guardado forzado instantáneo
-  if (isCtrlOrCmd && e.key.toLowerCase() === 's') {
+  // Ctrl+Shift+T / Cmd+Shift+T: Alternar Modo Máquina de Escribir
+  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 't') {
+    e.preventDefault()
+    uiStore.toggleTypewriterMode()
+    return
+  }
+
+  // Ctrl+Shift+F / Cmd+Shift+F: Alternar Modo Enfoque
+  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    uiStore.toggleFocusMode()
+    return
+  }
+
+  // Ctrl+S / Cmd+S: Guardado forzado instantáneo (sin shift)
+  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault()
     handleManualSave()
     return
   }
 
-  // Ctrl+N / Cmd+N: Nuevo folio sin usar el ratón
-  if (isCtrlOrCmd && e.key.toLowerCase() === 'n') {
+  // Ctrl+N / Cmd+N: Nuevo folio sin usar el ratón (sin shift)
+  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'n') {
     e.preventDefault()
     handleQuickNewFolio()
     return
@@ -496,7 +672,8 @@ onBeforeUnmount(async () => {
 </script>
 
 <template>
-  <div class="flex h-full w-full p-4 gap-4 overflow-hidden bg-[var(--bg-base)] relative">
+  <div class="flex h-full w-full gap-4 overflow-hidden bg-[var(--bg-base)] relative p-4">
+
     <!-- Modal para nuevo proyecto/libro -->
     <ProjectModal
       v-if="isProjectModalOpen"
@@ -802,19 +979,7 @@ onBeforeUnmount(async () => {
       </div>
     </aside>
 
-    <!-- ================================================================= -->
-    <!-- BOTÓN FLOTANTE PARA REABRIR EL SIDEBAR CUANDO ESTÁ COLAPSADO       -->
-    <!-- ================================================================= -->
-    <button
-      v-if="!uiStore.isSidebarOpen"
-      type="button"
-      class="neu-btn px-2.5 py-1.5 absolute top-6 left-6 z-20 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] shadow-md"
-      title="Mostrar barra lateral (Ctrl+B)"
-      @click="uiStore.toggleSidebar"
-    >
-      <PanelLeft :size="14" />
-      <span class="font-medium text-[11px]">Navegación</span>
-    </button>
+
 
     <!-- ================================================================= -->
     <!-- COLUMNA 2: LIENZO EDITORIAL DE ESCRITURA Y FICHA DE WIKI           -->
@@ -825,7 +990,10 @@ onBeforeUnmount(async () => {
       <!-- --------------------------------------------------------------- -->
       <template v-if="activeTargetType === 'folio' && folioStore.activeFolio">
         <!-- Cabecera de Herramientas -->
-        <header class="flex items-center justify-between gap-3 shrink-0">
+        <header
+          class="flex items-center justify-between gap-3 shrink-0 transition-opacity duration-300"
+          :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
+        >
           <div class="flex items-center gap-2 min-w-0">
             <Bookmark :size="14" class="text-[var(--accent)] shrink-0" />
             <span class="text-xs text-[var(--text-muted)] font-mono shrink-0">
@@ -884,6 +1052,36 @@ onBeforeUnmount(async () => {
               </Transition>
             </div>
 
+            <!-- Conmutador: Modo Máquina de Escribir -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': uiStore.isTypewriterMode,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !uiStore.isTypewriterMode
+              }"
+              :title="uiStore.isTypewriterMode ? 'Desactivar Modo Máquina de Escribir (Ctrl+Shift+T)' : 'Activar Modo Máquina de Escribir (Ctrl+Shift+T)'"
+              @click="uiStore.toggleTypewriterMode"
+            >
+              <AlignVerticalSpaceAround :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Máquina</span>
+            </button>
+
+            <!-- Conmutador: Modo Enfoque por Párrafo -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': uiStore.isFocusMode,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !uiStore.isFocusMode
+              }"
+              :title="uiStore.isFocusMode ? 'Desactivar Modo Enfoque por Párrafo (Ctrl+Shift+F)' : 'Activar Modo Enfoque por Párrafo (Ctrl+Shift+F)'"
+              @click="uiStore.toggleFocusMode"
+            >
+              <Eye :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
+            </button>
+
             <button
               type="button"
               class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400"
@@ -938,9 +1136,31 @@ onBeforeUnmount(async () => {
 
         <div class="neu-groove-h"></div>
 
-        <!-- Papel / Lienzo Hundido con scrollbar editorial delgado -->
-        <div class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar">
-          <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col">
+        <!-- Papel / Lienzo Hundido con scrollbar editorial delgado y centrado en Modo Máquina -->
+        <div
+          ref="scrollContainerRef"
+          class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar transition-all duration-300"
+          :class="{ 'typewriter-active': uiStore.isTypewriterMode }"
+        >
+          <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col transition-all duration-300 relative">
+            <!-- Insignia flotante sutil de Modo Enfoque -->
+            <Transition
+              enter-active-class="transition duration-200 ease-out"
+              enter-from-class="opacity-0 translate-y-[-4px]"
+              enter-to-class="opacity-100 translate-y-0"
+              leave-active-class="transition duration-150 ease-in"
+              leave-from-class="opacity-100 translate-y-0"
+              leave-to-class="opacity-0 translate-y-[-4px]"
+            >
+              <div
+                v-if="uiStore.isFocusMode"
+                class="absolute -top-3 right-0 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full neu-well-sm text-[10px] font-mono text-[var(--accent)] tracking-wide shadow-sm"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+                <span>Enfoque en párrafo</span>
+              </div>
+            </Transition>
+
             <!-- Título de la escena / capítulo -->
             <input
               ref="titleInputRef"
@@ -949,6 +1169,7 @@ onBeforeUnmount(async () => {
               placeholder="Título del capítulo o escena..."
               class="font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-2 placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
               @input="onEditorInput"
+              @focus="onTitleFocus"
             />
 
             <!-- Sinopsis o nota de la escena (opcional) -->
@@ -956,26 +1177,53 @@ onBeforeUnmount(async () => {
               v-model="editFolioSynopsis"
               type="text"
               placeholder="Sinopsis o nota de la escena..."
-              class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none mb-4 placeholder:text-[var(--text-muted)]/50 w-full italic"
+              class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none mb-4 placeholder:text-[var(--text-muted)]/50 w-full italic transition-opacity duration-300"
+              :class="{ 'opacity-25 focus:opacity-100': uiStore.isFocusMode }"
               @input="onEditorInput"
             />
 
             <div class="neu-groove-h mb-6 opacity-60"></div>
 
-            <!-- Área de Escritura Prosa -->
-            <textarea
-              ref="contentInputRef"
-              v-model="editFolioContent"
-              placeholder="Escribe la prosa de tu libro aquí..."
-              class="flex-1 w-full bg-transparent border-none resize-none focus:outline-none font-editorial text-lg md:text-[18px] leading-relaxed md:leading-loose text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/40 select-text caret-[var(--accent)] editorial-scrollbar"
-              @input="onEditorInput"
-              @keydown="handleTextareaKeydown"
-            ></textarea>
+            <!-- Contenedor de Prosa con Modo Enfoque Spotlight sobre el Párrafo Activo -->
+            <div class="relative w-full flex-1 flex flex-col">
+              <!-- Velo de Enfoque que atenúa todos los párrafos excepto el activo -->
+              <div
+                v-if="uiStore.isFocusMode"
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 z-10 transition-all duration-300"
+                :style="focusSpotlightStyle"
+              ></div>
 
-            <!-- Barra de Estado Inferior: Palabras, Caracteres, Tiempo de Lectura y Atajos -->
-            <div class="pt-4 mt-4 border-t border-[var(--groove-dark)]/40 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none">
+              <!-- Área de Escritura Prosa -->
+              <textarea
+                ref="contentInputRef"
+                v-model="editFolioContent"
+                placeholder="Escribe la prosa de tu libro aquí..."
+                class="w-full p-0 m-0 bg-transparent border-none resize-none focus:outline-none font-editorial text-lg md:text-[18px] leading-relaxed md:leading-loose text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/40 select-text caret-[var(--accent)] relative z-0"
+                style="field-sizing: content; min-height: 350px; overflow-y: hidden;"
+                @input="onEditorInput"
+                @keydown="handleTextareaKeydown"
+                @keyup="onCaretMove(false)"
+                @click="onCaretMove(false)"
+                @select="onCaretMove(false)"
+              ></textarea>
+            </div>
+
+            <!-- Barra de Estado Inferior: Palabras, Sesión, Caracteres, Tiempo de Lectura y Atajos -->
+            <div
+              class="pt-4 mt-4 border-t border-[var(--groove-dark)]/40 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none transition-opacity duration-300"
+              :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
+            >
               <div class="flex items-center gap-3">
                 <span>{{ wordCount }} palabras</span>
+                <span>·</span>
+                <span
+                  class="inline-flex items-center gap-1 font-semibold text-[var(--accent)]"
+                  title="Palabras netas añadidas en la sesión activa"
+                >
+                  <Flame :size="12" class="text-[var(--accent)] shrink-0" />
+                  +{{ folioStore.sessionWordsAdded }} sesión
+                </span>
                 <span>·</span>
                 <span>{{ charCount }} caracteres</span>
                 <span>·</span>
@@ -986,7 +1234,7 @@ onBeforeUnmount(async () => {
                 <span class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)]">
                   {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
                 </span>
-                <span class="text-[9px] opacity-60">Ctrl+N: Nueva escena · Tab: Indentar</span>
+                <span class="text-[9px] opacity-60">Ctrl+Shift+T: Máquina · Ctrl+Shift+F: Enfoque</span>
               </div>
             </div>
           </div>
