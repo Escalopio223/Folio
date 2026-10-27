@@ -13,6 +13,7 @@ import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
+import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
 
 const props = withDefaults(
@@ -86,7 +87,7 @@ function syncTypewriterCenter(instant = false): void {
 }
 
 const editor = useEditor({
-  content: props.content,
+  content: normalizeHtml(props.content),
   extensions: [
     StarterKit.configure({
       horizontalRule: false, // Reemplazado por SceneBreak (* * *)
@@ -141,7 +142,7 @@ watch(
     const currentHtml = editor.value.getHTML()
     if (currentHtml !== newContent) {
       // Reemplaza contenido sin disparar ciclo de eventos onUpdate
-      editor.value.commands.setContent(newContent || '', { emitUpdate: false })
+      editor.value.commands.setContent(normalizeHtml(newContent || ''), { emitUpdate: false })
       const text = editor.value.getText()
       emit('stats', calculateStats(text))
       nextTick(() => {

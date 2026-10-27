@@ -28,6 +28,7 @@ import {
   ChevronDown,
   RotateCcw
 } from 'lucide-vue-next'
+import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/blockFormatting'
 
 const props = defineProps<{
   editor: Editor | null | undefined
@@ -299,7 +300,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('paragraph') && !editor?.isActive('heading') }"
           title="Párrafo normal"
-          @click="editor?.chain().focus().setParagraph().run()"
+          @click="setParagraphSmart(editor)"
         >
           <Pilcrow :size="13" />
         </button>
@@ -309,7 +310,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 1 }) }"
           title="Encabezado 1 (Título)"
-          @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()"
+          @click="setHeadingSmart(editor, 1)"
         >
           <Heading1 :size="13" />
         </button>
@@ -319,7 +320,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 2 }) }"
           title="Encabezado 2 (Subtítulo de escena)"
-          @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"
+          @click="setHeadingSmart(editor, 2)"
         >
           <Heading2 :size="13" />
         </button>
@@ -329,7 +330,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 3 }) }"
           title="Encabezado 3 (Sección)"
-          @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()"
+          @click="setHeadingSmart(editor, 3)"
         >
           <Heading3 :size="13" />
         </button>
@@ -339,7 +340,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('blockquote') }"
           title="Cita en bloque editorial"
-          @click="editor?.chain().focus().toggleBlockquote().run()"
+          @click="setBlockquoteSmart(editor)"
         >
           <Quote :size="13" />
         </button>

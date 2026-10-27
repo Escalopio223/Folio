@@ -9,6 +9,7 @@ import {
   Heading2,
   Quote
 } from 'lucide-vue-next'
+import { setHeadingSmart, setBlockquoteSmart } from './utils/blockFormatting'
 
 defineProps<{
   editor: Editor | null | undefined
@@ -77,7 +78,7 @@ defineProps<{
       class="neu-btn px-2 h-7 flex items-center justify-center text-xs transition-all cursor-pointer font-bold"
       :class="{ 'neu-well !text-[var(--accent)]': editor.isActive('heading', { level: 2 }) }"
       title="Subtítulo H2"
-      @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
+      @click="setHeadingSmart(editor, 2)"
     >
       <Heading2 :size="13" />
     </button>
@@ -88,7 +89,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)]': editor.isActive('blockquote') }"
       title="Cita en bloque"
-      @click="editor.chain().focus().toggleBlockquote().run()"
+      @click="setBlockquoteSmart(editor)"
     >
       <Quote :size="13" />
     </button>
