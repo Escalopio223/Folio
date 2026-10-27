@@ -11,6 +11,8 @@ import type {
   LoreItem,
   CreateLoreInput,
   UpdateLoreInput,
+  ScratchpadNote,
+  SaveScratchpadNoteInput,
   WindowAction
 } from '@shared/types'
 
@@ -42,6 +44,11 @@ const api: FolioApi = {
     update: (input: UpdateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:update', input),
     restore: (id: string): Promise<LoreItem> => ipcRenderer.invoke('lore:restore', id),
     deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('lore:deletePermanent', id)
+  },
+  scratchpad: {
+    list: (projectId: string): Promise<ScratchpadNote[]> => ipcRenderer.invoke('scratchpad:list', projectId),
+    save: (note: SaveScratchpadNoteInput): Promise<ScratchpadNote> => ipcRenderer.invoke('scratchpad:save', note),
+    delete: (id: number): Promise<boolean> => ipcRenderer.invoke('scratchpad:delete', id)
   },
   window: {
     action: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)

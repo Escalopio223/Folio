@@ -4,9 +4,13 @@ import TitleBar from './components/TitleBar.vue'
 import AppSplash from './components/AppSplash.vue'
 import CommandPaletteModal from './components/palette/CommandPaletteModal.vue'
 import TrashModal from './components/trash/TrashModal.vue'
+import ScratchpadDrawer from './components/scratchpad/ScratchpadDrawer.vue'
 import { useUiStore } from './stores/uiStore'
+import { useScratchpadStore } from './stores/scratchpadStore'
+import { Feather } from 'lucide-vue-next'
 
 const uiStore = useUiStore()
+const scratchpadStore = useScratchpadStore()
 
 onMounted(() => {
   uiStore.initTheme()
@@ -32,7 +36,24 @@ onMounted(() => {
     <div class="neu-groove-h"></div>
 
     <!-- Bottom Warm Status Bar -->
-    <footer class="h-6 w-full px-4 flex items-center justify-end text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none">
+    <footer class="h-6 w-full px-4 flex items-center justify-between text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none">
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 hover:text-[var(--accent)] transition-colors cursor-pointer"
+          title="Abrir Scratchpad / Bloc Rápido (Ctrl+J)"
+          @click="scratchpadStore.toggleScratchpad()"
+        >
+          <Feather :size="11" />
+          <span>Bloc Rápido (Ctrl+J)</span>
+          <span
+            v-if="scratchpadStore.notes.length > 0"
+            class="px-1.5 py-0.2 rounded-full neu-well-sm text-[9px] text-[var(--accent)] font-semibold"
+          >
+            {{ scratchpadStore.notes.length }}
+          </span>
+        </button>
+      </div>
       <span>Folio v0.1.0</span>
     </footer>
 
@@ -41,6 +62,9 @@ onMounted(() => {
 
     <!-- Modal de Papelera de Reciclaje -->
     <TrashModal />
+
+    <!-- Scratchpad Global (Bloc de Captura Rápida) (Ctrl+J / Cmd+J) -->
+    <ScratchpadDrawer />
   </div>
 </template>
 

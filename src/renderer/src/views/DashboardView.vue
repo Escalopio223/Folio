@@ -19,19 +19,22 @@ import {
   Check,
   AlignVerticalSpaceAround,
   Eye,
-  Flame
+  Flame,
+  Feather
 } from 'lucide-vue-next'
 import TiptapEditor from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import type { Editor } from '@tiptap/vue-3'
 import type { Folio } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
+import { useScratchpadStore } from '../stores/scratchpadStore'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
 const loreStore = useLoreStore()
 const uiStore = useUiStore()
 const trashStore = useTrashStore()
+const scratchpadStore = useScratchpadStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
@@ -298,6 +301,13 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     handleQuickNewFolio()
     return
   }
+
+  // Ctrl+J / Cmd+J: Alternar Scratchpad / Bloc Rápido
+  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'j') {
+    e.preventDefault()
+    scratchpadStore.toggleScratchpad()
+    return
+  }
 }
 
 // Chapter expansion toggle (cerrado de base por defecto)
@@ -354,7 +364,8 @@ async function handleProjectChange(projectId: string): Promise<void> {
   await Promise.all([
     folioStore.fetchFolios(projectId),
     loreStore.fetchLore(projectId),
-    trashStore.fetchTrash(projectId)
+    trashStore.fetchTrash(projectId),
+    scratchpadStore.fetchNotes(projectId)
   ])
 }
 
@@ -369,6 +380,8 @@ async function handleProjectDeleted(): Promise<void> {
     loreStore.items = []
     trashStore.trashFolios = []
     trashStore.trashLore = []
+    scratchpadStore.notes = []
+    scratchpadStore.activeNoteId = null
   }
 }
 
@@ -386,7 +399,8 @@ onMounted(async () => {
     await Promise.all([
       folioStore.fetchFolios(projectStore.activeProjectId),
       loreStore.fetchLore(projectStore.activeProjectId),
-      trashStore.fetchTrash(projectStore.activeProjectId)
+      trashStore.fetchTrash(projectStore.activeProjectId),
+      scratchpadStore.fetchNotes(projectStore.activeProjectId)
     ])
   }
   // Smoothly hide splash screen after initial load
@@ -709,6 +723,27 @@ onBeforeUnmount(async () => {
             >
               <Eye :size="13" />
               <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
+            </button>
+
+            <!-- Botón Scratchpad / Bloc de Captura Rápida (Ctrl+J) -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': scratchpadStore.isOpen,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !scratchpadStore.isOpen
+              }"
+              title="Abrir Scratchpad / Bloc Rápido (Ctrl+J)"
+              @click="scratchpadStore.toggleScratchpad()"
+            >
+              <Feather :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Bloc</span>
+              <span
+                v-if="scratchpadStore.notes.length > 0"
+                class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--accent)] rounded-full font-semibold"
+              >
+                {{ scratchpadStore.notes.length }}
+              </span>
             </button>
 
             <button

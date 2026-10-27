@@ -102,6 +102,24 @@ export interface UpdateLoreInput {
   isArchived?: boolean
 }
 
+export interface ScratchpadNote {
+  id: number
+  projectId: string
+  content: string
+  isPinned: boolean
+  colorTag: string | null
+  createdAt: string | Date
+  updatedAt: string | Date
+}
+
+export interface SaveScratchpadNoteInput {
+  id?: number
+  projectId: string
+  content?: string
+  isPinned?: boolean
+  colorTag?: string | null
+}
+
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized'
 
 export interface FolioApi {
@@ -130,6 +148,11 @@ export interface FolioApi {
     update: (input: UpdateLoreInput) => Promise<LoreItem>
     restore: (id: string) => Promise<LoreItem>
     deletePermanent: (id: string) => Promise<boolean>
+  }
+  scratchpad: {
+    list: (projectId: string) => Promise<ScratchpadNote[]>
+    save: (note: SaveScratchpadNoteInput) => Promise<ScratchpadNote>
+    delete: (id: number) => Promise<boolean>
   }
   window: {
     action: (action: WindowAction) => Promise<boolean | void>

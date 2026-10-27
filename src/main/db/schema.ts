@@ -66,3 +66,23 @@ export type FolioInsert = typeof folios.$inferInsert
 
 export type LoreItemSelect = typeof loreItems.$inferSelect
 export type LoreItemInsert = typeof loreItems.$inferInsert
+
+export const scratchpadNotes = sqliteTable(
+  'scratchpad_notes',
+  {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    content: text('content').notNull().default(''),
+    isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
+    colorTag: text('color_tag'), // 'idea' | 'dialogo' | 'duda' | 'pendiente' | null
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('idx_scratchpad_project_id').on(table.projectId),
+    index('idx_scratchpad_is_pinned').on(table.isPinned)
+  ]
+)
+
+export type ScratchpadNoteSelect = typeof scratchpadNotes.$inferSelect
+export type ScratchpadNoteInsert = typeof scratchpadNotes.$inferInsert

@@ -9,13 +9,15 @@ import {
   AlignVerticalSpaceAround,
   Eye,
   Save,
-  Trash2
+  Trash2,
+  Feather
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
 import type { useLoreStore } from '../../stores/loreStore'
 import type { useProjectStore } from '../../stores/projectStore'
 import { useTrashStore } from '../../stores/trashStore'
+import { useScratchpadStore } from '../../stores/scratchpadStore'
 
 export interface CommandAction {
   id: string
@@ -35,6 +37,7 @@ export interface StoreContext {
   loreStore: ReturnType<typeof useLoreStore>
   projectStore: ReturnType<typeof useProjectStore>
   trashStore?: ReturnType<typeof useTrashStore>
+  scratchpadStore?: ReturnType<typeof useScratchpadStore>
 }
 
 /**
@@ -44,6 +47,7 @@ export interface StoreContext {
 export function getSystemCommands(ctx: StoreContext): CommandAction[] {
   const { uiStore, folioStore, loreStore, projectStore } = ctx
   const trashStore = ctx.trashStore || useTrashStore()
+  const scratchpadStore = ctx.scratchpadStore || useScratchpadStore()
 
   return [
     {
@@ -227,6 +231,32 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
         if (folioStore.activeFolioId) {
           await trashStore.moveToTrash(folioStore.activeFolioId, 'folio')
         }
+      }
+    },
+    {
+      id: 'toggle-scratchpad',
+      title: 'Abrir Scratchpad / Bloc Rápido',
+      description: 'Abrir o cerrar el bloc de captura rápida de ideas',
+      category: 'action',
+      badge: 'Herramienta',
+      icon: Feather,
+      shortcut: 'Ctrl+J',
+      keywords: ['scratchpad', 'bloc', 'rapido', 'ideas', 'notas', 'anotaciones', 'apunte', 'borrador'],
+      execute: () => {
+        scratchpadStore.toggleScratchpad()
+      }
+    },
+    {
+      id: 'new-scratchpad-note',
+      title: 'Nueva Nota en Scratchpad',
+      description: 'Crear una nueva anotación rápida en blanco en el bloc',
+      category: 'action',
+      badge: 'Herramienta',
+      icon: Feather,
+      keywords: ['scratchpad', 'nueva nota', 'apunte', 'idea'],
+      execute: async () => {
+        await scratchpadStore.openScratchpad()
+        await scratchpadStore.createQuickNote()
       }
     }
   ]

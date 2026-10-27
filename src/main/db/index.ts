@@ -15,7 +15,9 @@ import type {
   UpdateFolioInput,
   LoreItem,
   CreateLoreInput,
-  UpdateLoreInput
+  UpdateLoreInput,
+  ScratchpadNote,
+  SaveScratchpadNoteInput
 } from '@shared/types'
 
 let sqliteInstance: Database.Database | null = null
@@ -23,6 +25,17 @@ let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null
 let activeDbPath = ''
 
 // Mappers
+function mapScratchpadNote(row: schema.ScratchpadNoteSelect): ScratchpadNote {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    content: row.content,
+    isPinned: Boolean(row.isPinned),
+    colorTag: row.colorTag,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  }
+}
 function mapProject(row: schema.ProjectSelect): Project {
   return {
     id: row.id,
@@ -152,6 +165,19 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_lore_project_id ON lore_items(project_id);
     CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
     CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
+
+    CREATE TABLE IF NOT EXISTS scratchpad_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      color_tag TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_scratchpad_is_pinned ON scratchpad_notes(is_pinned);
   `)
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
@@ -413,6 +439,7 @@ export function deleteProject(id: string): boolean {
   const db = getDb()
   db.delete(schema.folios).where(eq(schema.folios.projectId, id)).run()
   db.delete(schema.loreItems).where(eq(schema.loreItems.projectId, id)).run()
+  db.delete(schema.scratchpadNotes).where(eq(schema.scratchpadNotes.projectId, id)).run()
   const res = db.delete(schema.projects).where(eq(schema.projects.id, id)).run()
   return res.changes > 0
 }
@@ -681,5 +708,68 @@ export function emptyTrash(projectId: string): { purgedFolios: number; purgedLor
     purgedFolios: foliosRes.changes,
     purgedLore: loreRes.changes
   }
+}
+
+// -------------------------------------------------------------------------
+// SCRATCHPAD (BLOC DE CAPTURA RÁPIDA)
+// -------------------------------------------------------------------------
+
+export function getScratchpadNotes(projectId: string): ScratchpadNote[] {
+  const db = getDb()
+  const rows = db.select()
+    .from(schema.scratchpadNotes)
+    .where(eq(schema.scratchpadNotes.projectId, projectId))
+    .orderBy(desc(schema.scratchpadNotes.isPinned), desc(schema.scratchpadNotes.updatedAt))
+    .all()
+
+  return rows.map(mapScratchpadNote)
+}
+
+export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNote {
+  const db = getDb()
+  const now = new Date()
+
+  if (input.id) {
+    const existing = db.select()
+      .from(schema.scratchpadNotes)
+      .where(eq(schema.scratchpadNotes.id, input.id))
+      .get()
+
+    if (existing) {
+      const values: Partial<typeof schema.scratchpadNotes.$inferInsert> = {
+        updatedAt: now
+      }
+      if (input.content !== undefined) values.content = input.content
+      if (input.isPinned !== undefined) values.isPinned = input.isPinned
+      if (input.colorTag !== undefined) values.colorTag = input.colorTag
+
+      const updated = db.update(schema.scratchpadNotes)
+        .set(values)
+        .where(eq(schema.scratchpadNotes.id, input.id))
+        .returning()
+        .get()
+
+      if (!updated) throw new Error(`Nota ${input.id} no encontrada`)
+      return mapScratchpadNote(updated)
+    }
+  }
+
+  // Crear nueva nota rápida
+  const inserted = db.insert(schema.scratchpadNotes).values({
+    projectId: input.projectId,
+    content: input.content ?? '',
+    isPinned: input.isPinned ?? false,
+    colorTag: input.colorTag ?? null,
+    createdAt: now,
+    updatedAt: now
+  }).returning().get()
+
+  return mapScratchpadNote(inserted)
+}
+
+export function deleteScratchpadNote(id: number): boolean {
+  const db = getDb()
+  const res = db.delete(schema.scratchpadNotes).where(eq(schema.scratchpadNotes.id, id)).run()
+  return res.changes > 0
 }
 

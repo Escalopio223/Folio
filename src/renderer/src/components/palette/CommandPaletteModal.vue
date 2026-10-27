@@ -20,6 +20,7 @@ import { useFolioStore } from '../../stores/folioStore'
 import { useLoreStore } from '../../stores/loreStore'
 import { useProjectStore } from '../../stores/projectStore'
 import { useTrashStore } from '../../stores/trashStore'
+import { useScratchpadStore } from '../../stores/scratchpadStore'
 import { getSystemCommands, type CommandAction } from './commandsRegistry'
 
 const paletteStore = usePaletteStore()
@@ -28,6 +29,7 @@ const folioStore = useFolioStore()
 const loreStore = useLoreStore()
 const projectStore = useProjectStore()
 const trashStore = useTrashStore()
+const scratchpadStore = useScratchpadStore()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const modalRef = ref<HTMLElement | null>(null)
@@ -103,7 +105,8 @@ const systemCommands = computed<CommandAction[]>(() => {
     folioStore,
     loreStore,
     projectStore,
-    trashStore
+    trashStore,
+    scratchpadStore
   })
 })
 
