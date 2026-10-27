@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { watch, nextTick, onBeforeUnmount } from 'vue'
+import { watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
+import type { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
+import { TextStyle, FontSize, FontFamily, Color } from '@tiptap/extension-text-style'
+import Highlight from '@tiptap/extension-highlight'
+import TextAlign from '@tiptap/extension-text-align'
 import { SceneBreak } from './extensions/SceneBreak'
 import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
+import { Indent } from './extensions/Indent'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { useUiStore } from '../../stores/uiStore'
 
@@ -31,6 +36,7 @@ const emit = defineEmits<{
     e: 'stats',
     value: { wordCount: number; charCount: number; readingTime: number; plainText: string }
   ): void
+  (e: 'ready', editor: Editor): void
 }>()
 
 const uiStore = useUiStore()
@@ -89,12 +95,19 @@ const editor = useEditor({
       }
     }),
     Underline,
+    TextStyle,
+    FontSize,
+    FontFamily,
+    Color,
+    Highlight.configure({ multicolor: true }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Placeholder.configure({
       placeholder: () => props.placeholder
     }),
     SceneBreak,
     TabIndent,
-    FocusMode
+    FocusMode,
+    Indent
   ],
   editorProps: {
     attributes: {
@@ -149,6 +162,22 @@ watch(
     }
   }
 )
+
+watch(
+  editor,
+  (ed) => {
+    if (ed) {
+      emit('ready', ed)
+    }
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (editor.value) {
+    emit('ready', editor.value)
+  }
+})
 
 onBeforeUnmount(() => {
   editor.value?.destroy()
@@ -275,6 +304,49 @@ defineExpose({
   pointer-events: none;
   font-style: italic;
   opacity: 0.45;
+}
+
+/* Listas */
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.35rem;
+}
+
+/* Resaltado */
+.ProseMirror mark {
+  background-color: #fef08a;
+  border-radius: 3px;
+  padding: 0.1em 0.25em;
+  color: inherit;
+}
+
+/* Alineaciones de texto */
+.ProseMirror [style*="text-align: right"],
+.ProseMirror [data-text-align="right"] {
+  text-align: right;
+}
+.ProseMirror [style*="text-align: center"],
+.ProseMirror [data-text-align="center"] {
+  text-align: center;
+}
+.ProseMirror [style*="text-align: justify"],
+.ProseMirror [data-text-align="justify"] {
+  text-align: justify;
+}
+.ProseMirror [style*="text-align: left"],
+.ProseMirror [data-text-align="left"] {
+  text-align: left;
 }
 
 /* Modo Enfoque en Párrafo (Focus Mode) */

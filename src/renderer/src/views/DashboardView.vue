@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useProjectStore } from '../stores/projectStore'
 import { useFolioStore } from '../stores/folioStore'
 import { useLoreStore } from '../stores/loreStore'
@@ -22,6 +22,8 @@ import {
   Flame
 } from 'lucide-vue-next'
 import TiptapEditor from '../components/editor/TiptapEditor.vue'
+import EditorToolbar from '../components/editor/EditorToolbar.vue'
+import type { Editor } from '@tiptap/vue-3'
 import type { Folio } from '@shared/types'
 
 const projectStore = useProjectStore()
@@ -71,6 +73,11 @@ let isSyncing = false
 const titleInputRef = ref<HTMLInputElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const tiptapEditorRef = ref<InstanceType<typeof TiptapEditor> | null>(null)
+const activeEditor = shallowRef<Editor | null>(null)
+
+function onEditorReady(ed: Editor): void {
+  activeEditor.value = ed
+}
 
 // Word, character count and estimated reading time (Zero-Lag reactive from TipTap)
 const wordCount = ref(0)
@@ -701,6 +708,11 @@ onBeforeUnmount(async () => {
 
         <div class="neu-groove-h"></div>
 
+        <!-- Barra de Herramientas Editorial Superior -->
+        <EditorToolbar :editor="activeEditor" />
+
+        <div class="neu-groove-h"></div>
+
         <!-- Papel / Lienzo Hundido con scrollbar editorial delgado y centrado en Modo Máquina -->
         <div
           ref="scrollContainerRef"
@@ -756,6 +768,7 @@ onBeforeUnmount(async () => {
                 v-model:content="editFolioContent"
                 :scroll-container="scrollContainerRef"
                 placeholder="Empieza a escribir tu escena..."
+                @ready="onEditorReady"
                 @stats="handleEditorStats"
                 @change="onEditorInput"
                 @save="handleManualSave"
