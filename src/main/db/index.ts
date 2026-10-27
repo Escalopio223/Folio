@@ -29,6 +29,7 @@ function mapScratchpadNote(row: schema.ScratchpadNoteSelect): ScratchpadNote {
   return {
     id: row.id,
     projectId: row.projectId,
+    title: row.title || '',
     content: row.content,
     isPinned: Boolean(row.isPinned),
     colorTag: row.colorTag,
@@ -169,6 +170,7 @@ export function initDatabase(): {
     CREATE TABLE IF NOT EXISTS scratchpad_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
       is_pinned INTEGER NOT NULL DEFAULT 0,
       color_tag TEXT,
@@ -179,6 +181,17 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
     CREATE INDEX IF NOT EXISTS idx_scratchpad_is_pinned ON scratchpad_notes(is_pinned);
   `)
+
+  // Asegurar que la columna title existe en bases de datos ya inicializadas
+  try {
+    const tableColumns = sqliteInstance.prepare("PRAGMA table_info(scratchpad_notes)").all() as Array<{ name: string }>
+    const hasTitle = tableColumns.some((col) => col.name === 'title')
+    if (!hasTitle) {
+      sqliteInstance.exec('ALTER TABLE scratchpad_notes ADD COLUMN title TEXT NOT NULL DEFAULT "";')
+    }
+  } catch (err) {
+    console.warn('[Folio DB] scratchpad title column migration check:', err)
+  }
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
 
@@ -739,6 +752,7 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
       const values: Partial<typeof schema.scratchpadNotes.$inferInsert> = {
         updatedAt: now
       }
+      if (input.title !== undefined) values.title = input.title
       if (input.content !== undefined) values.content = input.content
       if (input.isPinned !== undefined) values.isPinned = input.isPinned
       if (input.colorTag !== undefined) values.colorTag = input.colorTag
@@ -757,6 +771,7 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
   // Crear nueva nota rápida
   const inserted = db.insert(schema.scratchpadNotes).values({
     projectId: input.projectId,
+    title: input.title ?? '',
     content: input.content ?? '',
     isPinned: input.isPinned ?? false,
     colorTag: input.colorTag ?? null,

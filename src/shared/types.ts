@@ -105,6 +105,7 @@ export interface UpdateLoreInput {
 export interface ScratchpadNote {
   id: number
   projectId: string
+  title: string
   content: string
   isPinned: boolean
   colorTag: string | null
@@ -115,6 +116,7 @@ export interface ScratchpadNote {
 export interface SaveScratchpadNoteInput {
   id?: number
   projectId: string
+  title?: string
   content?: string
   isPinned?: boolean
   colorTag?: string | null

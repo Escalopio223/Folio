@@ -5,7 +5,7 @@ import type { ScratchpadNote, SaveScratchpadNoteInput, Folio } from '@shared/typ
 import { useProjectStore } from './projectStore'
 import { useFolioStore } from './folioStore'
 
-export type ScratchpadColorTag = 'idea' | 'dialogo' | 'duda' | 'pendiente' | null
+export type ScratchpadColorTag = 'idea' | 'duda' | 'pendiente' | null
 
 export const useScratchpadStore = defineStore('scratchpad', () => {
   const isOpen = ref(false)
@@ -45,7 +45,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
           return false
         }
         if (!q) return true
-        return normalize(note.content).includes(q)
+        return normalize(note.title).includes(q) || normalize(note.content).includes(q)
       })
       .sort((a, b) => {
         if (a.isPinned !== b.isPinned) {
@@ -94,6 +94,27 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   }, 400)
 
   // Actualización instantánea en memoria (Zero-Lag) + Debounce a SQLite
+  function updateActiveTitle(title: string): void {
+    if (!activeNoteId.value) return
+    const note = activeNote.value
+    if (!note) return
+
+    note.title = title
+    note.updatedAt = new Date()
+
+    pendingSavePayload = {
+      id: note.id,
+      projectId: note.projectId,
+      title: note.title,
+      content: note.content,
+      isPinned: note.isPinned,
+      colorTag: note.colorTag
+    }
+
+    saveStatus.value = 'saving'
+    debouncedSave()
+  }
+
   function updateActiveContent(content: string): void {
     if (!activeNoteId.value) return
     const note = activeNote.value
@@ -105,6 +126,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     pendingSavePayload = {
       id: note.id,
       projectId: note.projectId,
+      title: note.title,
       content: note.content,
       isPinned: note.isPinned,
       colorTag: note.colorTag
@@ -148,7 +170,11 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     }
   }
 
-  async function createQuickNote(initialContent = '', colorTag: ScratchpadColorTag = null): Promise<ScratchpadNote | null> {
+  async function createQuickNote(
+    title = '',
+    initialContent = '',
+    colorTag: ScratchpadColorTag = null
+  ): Promise<ScratchpadNote | null> {
     const projectStore = useProjectStore()
     if (!projectStore.activeProjectId) return null
 
@@ -158,6 +184,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     try {
       const newNote = await window.api.scratchpad.save({
         projectId: projectStore.activeProjectId,
+        title,
         content: initialContent,
         isPinned: false,
         colorTag
@@ -289,9 +316,10 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
 
     await flushSave()
 
-    // Extraer título limpio de la primera línea (máx 50 caracteres)
+    // Priorizar el título de la nota si existe, o la primera línea
+    const noteTitle = note.title?.trim()
     const firstLine = note.content.trim().split('\n')[0] || ''
-    const cleanTitle = firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 50).trim() || 'Nueva Escena (Scratchpad)'
+    const cleanTitle = noteTitle || firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 50).trim() || 'Nueva Escena (Scratchpad)'
 
     // Determinar capítulo de destino:
     // 1. Si el folio activo es un capítulo, usarlo.
@@ -383,6 +411,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     closeScratchpad,
     createQuickNote,
     selectNote,
+    updateActiveTitle,
     updateActiveContent,
     flushSave,
     deleteNote,

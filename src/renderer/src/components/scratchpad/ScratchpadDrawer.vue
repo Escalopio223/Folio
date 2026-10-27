@@ -11,7 +11,6 @@ import {
   Check,
   BookOpen,
   Lightbulb,
-  MessageSquare,
   HelpCircle,
   Clock,
   ListFilter,
@@ -24,6 +23,7 @@ import { useScratchpadStore, type ScratchpadColorTag } from '../../stores/scratc
 const scratchpadStore = useScratchpadStore()
 
 const drawerRef = ref<HTMLElement | null>(null)
+const titleInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isListCollapsed = ref(false)
 const copyToast = ref(false)
@@ -78,13 +78,13 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown, true)
 })
 
-// Auto-focus en el textarea cuando se abre el drawer o cambia la nota activa (Zero-clicks)
+// Auto-focus en el título o textarea cuando se abre el drawer o cambia la nota activa
 watch(
   () => scratchpadStore.isOpen,
   (open) => {
     if (open) {
       nextTick(() => {
-        focusTextarea()
+        focusInitialInput()
       })
     }
   }
@@ -95,22 +95,23 @@ watch(
   () => {
     if (scratchpadStore.isOpen) {
       nextTick(() => {
-        focusTextarea()
+        focusInitialInput()
       })
     }
   }
 )
 
-function focusTextarea(): void {
-  if (textareaRef.value) {
+function focusInitialInput(): void {
+  if (scratchpadStore.activeNote && !scratchpadStore.activeNote.title) {
+    titleInputRef.value?.focus()
+  } else if (textareaRef.value) {
     textareaRef.value.focus()
-    // Mover el cursor al final del contenido
     const len = textareaRef.value.value.length
     textareaRef.value.setSelectionRange(len, len)
   }
 }
 
-// Configuración de Categorías / Color Tags
+// Configuración de Categorías / Color Tags (Sin diálogo)
 interface TagOption {
   value: ScratchpadColorTag
   label: string
@@ -128,14 +129,6 @@ const colorTagOptions: TagOption[] = [
     badgeClass: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
     borderClass: 'border-l-amber-500',
     dotClass: 'bg-amber-400'
-  },
-  {
-    value: 'dialogo',
-    label: 'Diálogo',
-    icon: MessageSquare,
-    badgeClass: 'text-sky-500 bg-sky-500/10 border-sky-500/30',
-    borderClass: 'border-l-sky-500',
-    dotClass: 'bg-sky-400'
   },
   {
     value: 'duda',
@@ -160,16 +153,20 @@ function getTagOption(tag: string | null): TagOption | undefined {
 }
 
 // Extractor del extracto o título resumido de una nota
-function getNoteSummary(content: string): { title: string; subtitle: string } {
-  if (!content || !content.trim()) {
-    return { title: 'Nota vacía', subtitle: 'Sin contenido adicional' }
-  }
-  const lines = content.trim().split('\n').filter((l) => l.trim().length > 0)
-  const first = lines[0]?.replace(/^[#*\-•\s]+/, '').trim() || 'Nota sin título'
-  const second = lines[1]?.trim() || (first.length > 36 ? first.slice(36) : '')
+function getNoteSummary(note: { title?: string; content?: string }): { title: string; subtitle: string } {
+  const noteTitle = note.title?.trim()
+  const content = note.content?.trim() || ''
+  const lines = content.split('\n').filter((l) => l.trim().length > 0)
+  const firstLine = lines[0]?.replace(/^[#*\-•\s]+/, '').trim() || ''
+
+  const displayTitle = noteTitle || firstLine || 'Nota sin título'
+  const displaySubtitle = noteTitle
+    ? (firstLine || 'Sin contenido adicional')
+    : (lines[1]?.trim() || 'Sin contenido adicional')
+
   return {
-    title: first.slice(0, 36) + (first.length > 36 ? '…' : ''),
-    subtitle: second.slice(0, 48) + (second.length > 48 ? '…' : '')
+    title: displayTitle.slice(0, 36) + (displayTitle.length > 36 ? '…' : ''),
+    subtitle: displaySubtitle.slice(0, 48) + (displaySubtitle.length > 48 ? '…' : '')
   }
 }
 
@@ -228,9 +225,9 @@ async function handlePromote(): Promise<void> {
 }
 
 async function handleCreateNewNote(): Promise<void> {
-  await scratchpadStore.createQuickNote('', null)
+  await scratchpadStore.createQuickNote('', '', null)
   nextTick(() => {
-    focusTextarea()
+    focusInitialInput()
   })
 }
 </script>
@@ -290,15 +287,6 @@ async function handleCreateNewNote(): Promise<void> {
               <Plus :size="13" />
               <span class="text-[11px]">Nueva</span>
             </button>
-
-            <!-- Atajo ESC para cerrar -->
-            <kbd
-              class="neu-btn px-1.5 py-1 text-[9px] font-mono text-[var(--text-muted)] rounded cursor-pointer hover:text-[var(--text-primary)]"
-              title="Cerrar (ESC)"
-              @click="handleClose"
-            >
-              ESC
-            </kbd>
 
             <!-- Botón Cerrar -->
             <button
@@ -404,7 +392,7 @@ async function handleCreateNewNote(): Promise<void> {
                     <Pin :size="10" class="fill-current rotate-45" />
                   </span>
                   <span class="text-xs font-medium truncate text-[var(--text-primary)]">
-                    {{ getNoteSummary(note.content).title }}
+                    {{ getNoteSummary(note).title }}
                   </span>
                 </div>
                 <div class="flex items-center gap-2 mt-0.5 text-[9px] text-[var(--text-muted)] font-mono">
@@ -490,14 +478,26 @@ async function handleCreateNewNote(): Promise<void> {
               </button>
             </div>
 
-            <!-- Textarea neumórfico con auto-focus -->
+            <!-- 1. Bloque pequeño: Nombre / Título de la idea o apunte -->
+            <div class="neu-well-sm rounded-xl px-3 py-1.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)] transition-all shrink-0">
+              <input
+                ref="titleInputRef"
+                :value="scratchpadStore.activeNote.title"
+                type="text"
+                placeholder="Nombre o concepto de la idea (ej. 'Giro en el capítulo III')..."
+                class="w-full bg-transparent border-none outline-none font-editorial font-bold text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]/60"
+                @input="scratchpadStore.updateActiveTitle(($event.target as HTMLInputElement).value)"
+              />
+            </div>
+
+            <!-- 2. Bloque principal: Contenido / Desarrollo de la idea -->
             <div class="flex-1 neu-well rounded-2xl p-3 flex flex-col overflow-hidden relative border border-[var(--groove-dark)]/40">
               <textarea
                 ref="textareaRef"
                 :value="scratchpadStore.activeNote.content"
-                placeholder="Anota una idea repentina, un diálogo espontáneo, una duda de trama o un recordatorio...
+                placeholder="Desarrolla aquí tu idea, nota o pensamiento...
 
-(Escribe directamente con cero clics. Se autoguarda cada 400ms en SQLite)."
+(Se autoguarda cada 400ms en SQLite)."
                 class="w-full h-full bg-transparent resize-none border-none outline-none font-sans text-xs md:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]/70 leading-relaxed editorial-scrollbar"
                 @input="scratchpadStore.updateActiveContent(($event.target as HTMLTextAreaElement).value)"
               />

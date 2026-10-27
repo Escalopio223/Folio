@@ -72,9 +72,10 @@ export const scratchpadNotes = sqliteTable(
   {
     id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    title: text('title').notNull().default(''),
     content: text('content').notNull().default(''),
     isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
-    colorTag: text('color_tag'), // 'idea' | 'dialogo' | 'duda' | 'pendiente' | null
+    colorTag: text('color_tag'), // 'idea' | 'duda' | 'pendiente' | null
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
   },

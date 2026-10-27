@@ -11,15 +11,18 @@ import {
   PanelLeftClose,
   PanelRight,
   PanelRightClose,
-  Search
+  Search,
+  Feather
 } from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import { useUiStore } from '../stores/uiStore'
 import { usePaletteStore } from '../stores/paletteStore'
+import { useScratchpadStore } from '../stores/scratchpadStore'
 import type { WindowAction } from '@shared/types'
 
 const uiStore = useUiStore()
 const paletteStore = usePaletteStore()
+const scratchpadStore = useScratchpadStore()
 const isMaximized = ref(false)
 
 async function handleAction(action: WindowAction): Promise<void> {
@@ -76,16 +79,17 @@ onUnmounted(() => {
     <header class="drag-region h-11 w-full flex items-center justify-between px-3.5 text-xs">
       <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle -->
       <div class="flex items-center gap-2.5">
-        <!-- Tree Toggle Button -->
+        <!-- Tree Toggle Button con texto referente al apartado -->
         <button
           type="button"
-          class="no-drag neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all"
-          :class="{ 'neu-well !text-[var(--accent)]': uiStore.isLeftSidebarOpen }"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isLeftSidebarOpen }"
           :title="uiStore.isLeftSidebarOpen ? 'Ocultar árbol de manuscrito (Ctrl+B)' : 'Mostrar árbol de manuscrito (Ctrl+B)'"
           @click="uiStore.toggleLeftSidebar"
         >
           <PanelLeftClose v-if="uiStore.isLeftSidebarOpen" :size="13" />
           <PanelLeft v-else :size="13" />
+          <span class="text-[11px] font-medium hidden sm:inline">Manuscrito</span>
         </button>
 
         <div class="neu-groove-v h-4 my-auto"></div>
@@ -123,7 +127,7 @@ onUnmounted(() => {
         <!-- Wiki / Lore Inspector Toggle Button -->
         <button
           type="button"
-          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isRightSidebarOpen }"
           :title="uiStore.isRightSidebarOpen ? 'Ocultar Wiki & Lore (Ctrl+N)' : 'Mostrar Wiki & Lore (Ctrl+N)'"
           @click="uiStore.toggleRightSidebar"
@@ -131,6 +135,24 @@ onUnmounted(() => {
           <PanelRightClose v-if="uiStore.isRightSidebarOpen" :size="13" />
           <PanelRight v-else :size="13" />
           <span class="text-[11px] font-medium hidden sm:inline">Wiki</span>
+        </button>
+
+        <!-- Scratchpad / Bloc Rápido Toggle Button -->
+        <button
+          type="button"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': scratchpadStore.isOpen }"
+          :title="scratchpadStore.isOpen ? 'Cerrar Scratchpad (Ctrl+J)' : 'Abrir Scratchpad / Bloc Rápido (Ctrl+J)'"
+          @click="scratchpadStore.toggleScratchpad()"
+        >
+          <Feather :size="13" />
+          <span class="text-[11px] font-medium hidden sm:inline">Scratchpad</span>
+          <span
+            v-if="scratchpadStore.notes.length > 0"
+            class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--accent)] rounded-full font-semibold"
+          >
+            {{ scratchpadStore.notes.length }}
+          </span>
         </button>
 
         <div class="neu-groove-v h-4 my-auto"></div>
