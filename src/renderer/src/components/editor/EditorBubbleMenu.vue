@@ -32,6 +32,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('bold') }"
       title="Negrita (Ctrl+B)"
+      @mousedown.prevent
       @click="editor.chain().focus().toggleBold().run()"
     >
       <Bold :size="13" />
@@ -43,6 +44,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('italic') }"
       title="Cursiva (Ctrl+I)"
+      @mousedown.prevent
       @click="editor.chain().focus().toggleItalic().run()"
     >
       <Italic :size="13" />
@@ -54,6 +56,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('underline') }"
       title="Subrayado (Ctrl+U)"
+      @mousedown.prevent
       @click="editor.chain().focus().toggleUnderline().run()"
     >
       <Underline :size="13" />
@@ -65,6 +68,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('strike') }"
       title="Tachado (Ctrl+Shift+X)"
+      @mousedown.prevent
       @click="editor.chain().focus().toggleStrike().run()"
     >
       <Strikethrough :size="13" />
@@ -78,6 +82,7 @@ defineProps<{
       class="neu-btn px-2 h-7 flex items-center justify-center text-xs transition-all cursor-pointer font-bold"
       :class="{ 'neu-well !text-[var(--accent)]': editor.isActive('heading', { level: 2 }) }"
       title="Subtítulo H2"
+      @mousedown.prevent
       @click="setHeadingSmart(editor, 2)"
     >
       <Heading2 :size="13" />
@@ -89,6 +94,7 @@ defineProps<{
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)]': editor.isActive('blockquote') }"
       title="Cita en bloque"
+      @mousedown.prevent
       @click="setBlockquoteSmart(editor)"
     >
       <Quote :size="13" />
@@ -99,6 +105,7 @@ defineProps<{
       type="button"
       class="neu-btn px-2 h-7 flex items-center justify-center text-[10px] font-mono font-bold tracking-widest text-[var(--accent)] transition-all cursor-pointer"
       title="Descanso de Escena (* * *)"
+      @mousedown.prevent
       @click="editor.chain().focus().setSceneBreak().run()"
     >
       <span>* * *</span>

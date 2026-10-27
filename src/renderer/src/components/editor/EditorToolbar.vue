@@ -186,6 +186,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[var(--text-primary)]"
           :disabled="!editor?.can().undo()"
           title="Deshacer (Ctrl+Z)"
+          @mousedown.prevent
           @click="editor?.chain().focus().undo().run()"
         >
           <Undo :size="13" />
@@ -196,6 +197,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[var(--text-primary)]"
           :disabled="!editor?.can().redo()"
           title="Rehacer (Ctrl+Y)"
+          @mousedown.prevent
           @click="editor?.chain().focus().redo().run()"
         >
           <Redo :size="13" />
@@ -211,6 +213,7 @@ function insertSceneBreak(): void {
           class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'font' }"
           title="Elegir familia tipográfica"
+          @mousedown.prevent
           @click="toggleModal('font')"
         >
           <Type :size="13" />
@@ -240,6 +243,7 @@ function insertSceneBreak(): void {
               type="button"
               class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer text-[var(--text-primary)]"
               :class="font.preview"
+              @mousedown.prevent
               @click="selectFontFamily(font.value)"
             >
               <span>{{ font.label }}</span>
@@ -255,6 +259,7 @@ function insertSceneBreak(): void {
           class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'size' }"
           title="Elegir tamaño de letra"
+          @mousedown.prevent
           @click="toggleModal('size')"
         >
           <span class="text-[11px] font-mono font-medium">T</span>
@@ -283,6 +288,7 @@ function insertSceneBreak(): void {
               :key="size.label"
               type="button"
               class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-mono hover:bg-[var(--bg-base)] transition-colors cursor-pointer text-[var(--text-primary)]"
+              @mousedown.prevent
               @click="selectFontSize(size.value)"
             >
               <span>{{ size.label }}</span>
@@ -298,8 +304,9 @@ function insertSceneBreak(): void {
         <button
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
-          :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('paragraph') && !editor?.isActive('heading') }"
+          :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('paragraph') && !editor?.isActive('heading') && !editor?.isActive('blockquote') }"
           title="Párrafo normal"
+          @mousedown.prevent
           @click="setParagraphSmart(editor)"
         >
           <Pilcrow :size="13" />
@@ -310,6 +317,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 1 }) }"
           title="Encabezado 1 (Título)"
+          @mousedown.prevent
           @click="setHeadingSmart(editor, 1)"
         >
           <Heading1 :size="13" />
@@ -320,6 +328,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 2 }) }"
           title="Encabezado 2 (Subtítulo de escena)"
+          @mousedown.prevent
           @click="setHeadingSmart(editor, 2)"
         >
           <Heading2 :size="13" />
@@ -330,6 +339,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('heading', { level: 3 }) }"
           title="Encabezado 3 (Sección)"
+          @mousedown.prevent
           @click="setHeadingSmart(editor, 3)"
         >
           <Heading3 :size="13" />
@@ -340,6 +350,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('blockquote') }"
           title="Cita en bloque editorial"
+          @mousedown.prevent
           @click="setBlockquoteSmart(editor)"
         >
           <Quote :size="13" />
@@ -355,6 +366,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('bold') }"
           title="Negrita (Ctrl+B)"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleBold().run()"
         >
           <Bold :size="13" />
@@ -365,6 +377,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('italic') }"
           title="Cursiva (Ctrl+I)"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleItalic().run()"
         >
           <Italic :size="13" />
@@ -375,6 +388,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('underline') }"
           title="Subrayado (Ctrl+U)"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleUnderline().run()"
         >
           <Underline :size="13" />
@@ -385,6 +399,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('strike') }"
           title="Tachado (Ctrl+Shift+X)"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleStrike().run()"
         >
           <Strikethrough :size="13" />
@@ -402,6 +417,7 @@ function insertSceneBreak(): void {
             class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
             :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'color' }"
             title="Color de texto"
+            @mousedown.prevent
             @click="toggleModal('color')"
           >
             <Baseline :size="13" class="text-[var(--accent)]" />
@@ -432,6 +448,7 @@ function insertSceneBreak(): void {
                   class="w-6 h-6 rounded-full border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
                   :style="{ backgroundColor: color.value }"
                   :title="color.label"
+                  @mousedown.prevent
                   @click="selectColor(color.value)"
                 ></button>
               </div>
@@ -441,6 +458,7 @@ function insertSceneBreak(): void {
               <button
                 type="button"
                 class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                @mousedown.prevent
                 @click="resetColor"
               >
                 <RotateCcw :size="11" />
@@ -457,6 +475,7 @@ function insertSceneBreak(): void {
             class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
             :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'highlight' || editor?.isActive('highlight') }"
             title="Resaltar texto"
+            @mousedown.prevent
             @click="toggleModal('highlight')"
           >
             <Highlighter :size="13" />
@@ -487,6 +506,7 @@ function insertSceneBreak(): void {
                   class="w-6 h-6 rounded-md border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
                   :style="{ backgroundColor: h.value }"
                   :title="h.label"
+                  @mousedown.prevent
                   @click="selectHighlight(h.value)"
                 ></button>
               </div>
@@ -496,6 +516,7 @@ function insertSceneBreak(): void {
               <button
                 type="button"
                 class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                @mousedown.prevent
                 @click="resetHighlight"
               >
                 <RotateCcw :size="11" />
@@ -515,6 +536,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive({ textAlign: 'left' }) }"
           title="Alinear a la izquierda"
+          @mousedown.prevent
           @click="editor?.chain().focus().setTextAlign('left').run()"
         >
           <AlignLeft :size="13" />
@@ -525,6 +547,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive({ textAlign: 'center' }) }"
           title="Centrar texto"
+          @mousedown.prevent
           @click="editor?.chain().focus().setTextAlign('center').run()"
         >
           <AlignCenter :size="13" />
@@ -535,6 +558,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive({ textAlign: 'justify' }) }"
           title="Justificar texto"
+          @mousedown.prevent
           @click="editor?.chain().focus().setTextAlign('justify').run()"
         >
           <AlignJustify :size="13" />
@@ -545,6 +569,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive({ textAlign: 'right' }) }"
           title="Alinear a la derecha"
+          @mousedown.prevent
           @click="editor?.chain().focus().setTextAlign('right').run()"
         >
           <AlignRight :size="13" />
@@ -559,6 +584,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn px-2 h-7 flex items-center gap-1 text-[11px] font-mono transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           title="Insertar Tabulación (2 espacios)"
+          @mousedown.prevent
           @click="insertTabSpaces"
         >
           <span class="font-bold">⇥</span>
@@ -569,6 +595,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           title="Aumentar Sangría de Párrafo"
+          @mousedown.prevent
           @click="handleIndent"
         >
           <IndentIncrease :size="13" />
@@ -578,6 +605,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           title="Disminuir Sangría de Párrafo (Shift+Tab)"
+          @mousedown.prevent
           @click="handleOutdent"
         >
           <IndentDecrease :size="13" />
@@ -593,6 +621,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('bulletList') }"
           title="Lista con viñetas"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleBulletList().run()"
         >
           <List :size="13" />
@@ -603,6 +632,7 @@ function insertSceneBreak(): void {
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('orderedList') }"
           title="Lista numerada"
+          @mousedown.prevent
           @click="editor?.chain().focus().toggleOrderedList().run()"
         >
           <ListOrdered :size="13" />
@@ -613,6 +643,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn px-2.5 h-7 flex items-center gap-1 transition-all cursor-pointer font-bold text-[var(--accent)] hover:!text-[var(--accent-hover)] bg-[var(--accent)]/5 hover:bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg shadow-sm"
           title="Añadir Florón de Corte Narrativo (* * *)"
+          @mousedown.prevent
           @click="insertSceneBreak"
         >
           <span class="font-mono text-xs tracking-widest leading-none">* * *</span>

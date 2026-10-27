@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/vue-3'
+import type { EditorState } from '@tiptap/pm/state'
 import { TextSelection } from '@tiptap/pm/state'
-import { setBlockType, wrapIn, lift } from '@tiptap/pm/commands'
+import { lift, wrapIn, setBlockType } from '@tiptap/pm/commands'
 
 /**
  * Normaliza el contenido HTML/texto para asegurar que los saltos de línea
@@ -33,215 +34,165 @@ export function normalizeHtml(raw: string): string {
 }
 
 /**
+ * Comprueba si la selección actual se encuentra dentro de un nodo blockquote.
+ */
+export function isInsideBlockquote(state: EditorState): boolean {
+  const { $from } = state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type === state.schema.nodes.blockquote) return true
+  }
+  return false
+}
+
+/**
  * Aplica un encabezado (H1, H2, H3) de manera inteligente:
- * 1. Si hay texto seleccionado (incluso dentro de un párrafo), separa ese fragmento
- *    exacto en su propio bloque de encabezado sin afectar al resto del texto.
- * 2. Si el cursor está en una línea dentro de un bloque con saltos de línea, aísla dicha línea.
- * 3. Si el bloque completo ya es un encabezado del mismo nivel, lo alterna a párrafo.
+ * 1. Si está dentro de un blockquote, lo levanta primero a nivel raíz.
+ * 2. Si ya es este mismo encabezado sin selección, lo alterna a párrafo normal.
+ * 3. Si hay texto seleccionado dentro de un bloque, separa ese fragmento exacto
+ *    en su propio encabezado manteniendo el resto como párrafos y reubicando
+ *    la selección sobre el nuevo encabezado.
+ * 4. Si el cursor está en una línea o hay múltiples bloques seleccionados,
+ *    transforma los bloques mediante setBlockType estándar de ProseMirror.
  */
 export function setHeadingSmart(editor: Editor | null | undefined, level: 1 | 2 | 3): boolean {
   if (!editor || !editor.view) return false
-  const { state, view } = editor
-  const { selection, doc, schema } = state
-  const { from, to, empty } = selection
+  const view = editor.view
+  const targetType = view.state.schema.nodes.heading
+  const targetAttrs = { level }
 
-  // Si ya tiene este nivel de encabezado, alternar a párrafo
-  if (editor.isActive('heading', { level })) {
+  // 1. Si está dentro de una cita en bloque, sacarlo a nivel raíz
+  if (isInsideBlockquote(view.state)) {
+    lift(view.state, view.dispatch.bind(view))
+  }
+
+  const { selection } = view.state
+  const { from, to, empty, $from, $to } = selection
+
+  // 2. Si el bloque actual ya es este encabezado y no hay selección, alternar a párrafo
+  if (empty && $from.parent.type === targetType && $from.parent.attrs.level === level) {
     return setParagraphSmart(editor)
   }
 
-  const targetType = schema.nodes.heading
-  const targetAttrs = { level }
+  // 3. Selección parcial dentro de un mismo bloque de texto -> división atómica
+  if (!empty && $from.sameParent($to) && $from.parent.isTextblock) {
+    const blockStart = $from.start()
+    const blockEnd = $from.end()
 
-  // 1. TEXTO SELECCIONADO (empty === false)
-  if (!empty) {
-    const resFrom = doc.resolve(from)
-    const resTo = doc.resolve(to)
-
-    // Si la selección está dentro de un mismo bloque de texto
-    if (resFrom.parent === resTo.parent && resFrom.parent.isTextblock) {
-      const blockStart = resFrom.start()
-      const blockEnd = resFrom.end()
-
-      // Si la selección es un subconjunto del bloque (no abarca todo el bloque)
-      if (from > blockStart || to < blockEnd) {
-        let tr = state.tr
-        if (to < blockEnd) {
-          tr = tr.split(to)
-        }
-        if (from > blockStart) {
-          tr = tr.split(from)
-        }
-        view.dispatch(tr)
-
-        // Aplicar el encabezado únicamente al bloque seleccionado resultante
-        const newState = view.state
-        const newDoc = newState.doc
-        const midPos = from + (from > blockStart ? 2 : 1)
-        const safePos = Math.min(Math.max(1, midPos), newDoc.content.size - 1)
-        const newSel = TextSelection.create(newDoc, safePos)
-        let headingTr = newState.tr.setSelection(newSel)
-
-        setBlockType(targetType, targetAttrs)(newState, (t) => {
-          headingTr = t
-        })
-        view.dispatch(headingTr)
-        editor.commands.focus()
-        return true
+    if (from > blockStart || to < blockEnd) {
+      const tr = view.state.tr
+      if (to < blockEnd) {
+        tr.split(to, 1, [{ type: view.state.schema.nodes.paragraph }])
       }
-    }
-
-    // Si abarca el bloque completo o múltiples bloques completos
-    return editor.chain().focus().setHeading({ level }).run()
-  }
-
-  // 2. CURSOR SIN SELECCIÓN (empty === true)
-  const res = doc.resolve(from)
-  const parent = res.parent
-  if (parent.isTextblock) {
-    const text = parent.textContent
-    const offset = res.parentOffset
-
-    // Si el bloque contiene saltos de línea \n sueltos alrededor del cursor
-    if (text.includes('\n')) {
-      const lastNl = text.lastIndexOf('\n', Math.max(0, offset - 1))
-      const lineStart = lastNl === -1 ? 0 : lastNl + 1
-      const nextNl = text.indexOf('\n', offset)
-      const lineEnd = nextNl === -1 ? text.length : nextNl
-
-      const docStart = res.start() + lineStart
-      const docEnd = res.start() + lineEnd
-
-      if (docStart > res.start() || docEnd < res.end()) {
-        let tr = state.tr
-        if (docEnd < res.end()) {
-          tr = tr.split(docEnd)
-        }
-        if (docStart > res.start()) {
-          tr = tr.split(docStart)
-        }
-        view.dispatch(tr)
-
-        const newState = view.state
-        const newDoc = newState.doc
-        const midPos = docStart + (docStart > res.start() ? 2 : 1)
-        const safePos = Math.min(Math.max(1, midPos), newDoc.content.size - 1)
-        const newSel = TextSelection.create(newDoc, safePos)
-        let headingTr = newState.tr.setSelection(newSel)
-
-        setBlockType(targetType, targetAttrs)(newState, (t) => {
-          headingTr = t
-        })
-        view.dispatch(headingTr)
-        editor.commands.focus()
-        return true
+      if (from > blockStart) {
+        tr.split(from, 1, [{ type: targetType, attrs: targetAttrs }])
+      } else {
+        tr.setNodeMarkup($from.before(), targetType, targetAttrs)
       }
+
+      const mappedFrom = tr.mapping.map(from, 1)
+      const mappedTo = tr.mapping.map(to, -1)
+      tr.setSelection(TextSelection.create(tr.doc, mappedFrom, mappedTo))
+      view.dispatch(tr)
+      editor.commands.focus()
+      return true
     }
   }
 
-  // Bloque estándar sin saltos internos
-  return editor.chain().focus().toggleHeading({ level }).run()
+  // 4. Cursor en un bloque completo o selección multilineal
+  const success = setBlockType(targetType, targetAttrs)(view.state, view.dispatch.bind(view))
+  editor.commands.focus()
+  return success
 }
 
 /**
- * Convierte a párrafo normal el fragmento seleccionado o el bloque activo.
+ * Convierte a párrafo normal el fragmento seleccionado o el bloque activo:
+ * 1. Si está dentro de blockquote, lo levanta a párrafo.
+ * 2. Si hay texto seleccionado dentro de un encabezado o bloque, separa ese fragmento.
+ * 3. Si no hay selección, convierte el encabezado o bloque actual a párrafo.
  */
 export function setParagraphSmart(editor: Editor | null | undefined): boolean {
   if (!editor || !editor.view) return false
-  const { state, view } = editor
-  const { selection, doc, schema } = state
-  const { from, to, empty } = selection
+  const view = editor.view
 
-  const targetType = schema.nodes.paragraph
+  // 1. Si está dentro de un blockquote, levantarlo
+  if (isInsideBlockquote(view.state)) {
+    lift(view.state, view.dispatch.bind(view))
+  }
 
-  if (!empty) {
-    const resFrom = doc.resolve(from)
-    const resTo = doc.resolve(to)
+  const targetType = view.state.schema.nodes.paragraph
+  const { selection } = view.state
+  const { from, to, empty, $from, $to } = selection
 
-    if (resFrom.parent === resTo.parent && resFrom.parent.isTextblock) {
-      const blockStart = resFrom.start()
-      const blockEnd = resFrom.end()
+  // 2. Selección parcial dentro de un bloque de texto
+  if (!empty && $from.sameParent($to) && $from.parent.isTextblock) {
+    const blockStart = $from.start()
+    const blockEnd = $from.end()
 
-      if (from > blockStart || to < blockEnd) {
-        let tr = state.tr
-        if (to < blockEnd) {
-          tr = tr.split(to)
-        }
-        if (from > blockStart) {
-          tr = tr.split(from)
-        }
-        view.dispatch(tr)
-
-        const newState = view.state
-        const newDoc = newState.doc
-        const midPos = from + (from > blockStart ? 2 : 1)
-        const safePos = Math.min(Math.max(1, midPos), newDoc.content.size - 1)
-        const newSel = TextSelection.create(newDoc, safePos)
-        let pTr = newState.tr.setSelection(newSel)
-
-        setBlockType(targetType)(newState, (t) => {
-          pTr = t
-        })
-        view.dispatch(pTr)
-        editor.commands.focus()
-        return true
+    if (from > blockStart || to < blockEnd) {
+      const tr = view.state.tr
+      if (to < blockEnd) {
+        tr.split(to, 1, [{ type: targetType }])
       }
+      if (from > blockStart) {
+        tr.split(from, 1, [{ type: targetType, attrs: {} }])
+      } else {
+        tr.setNodeMarkup($from.before(), targetType, {})
+      }
+
+      const mappedFrom = tr.mapping.map(from, 1)
+      const mappedTo = tr.mapping.map(to, -1)
+      tr.setSelection(TextSelection.create(tr.doc, mappedFrom, mappedTo))
+      view.dispatch(tr)
+      editor.commands.focus()
+      return true
     }
   }
 
-  return editor.chain().focus().setParagraph().run()
+  // 3. Bloque completo o selección múltiple
+  const success = setBlockType(targetType, {})(view.state, view.dispatch.bind(view))
+  editor.commands.focus()
+  return success
 }
 
 /**
- * Convierte a cita en bloque (blockquote) el fragmento seleccionado o el bloque activo.
+ * Convierte a cita en bloque (blockquote) el fragmento seleccionado o el bloque activo:
+ * 1. Si ya está dentro de una cita, la levanta (toggle off).
+ * 2. Si hay texto seleccionado parcialmente, lo separa primero en su propio bloque.
+ * 3. Envuelve el bloque en un nodo blockquote editorial.
  */
 export function setBlockquoteSmart(editor: Editor | null | undefined): boolean {
   if (!editor || !editor.view) return false
-  const { state, view } = editor
-  const { selection, doc, schema } = state
-  const { from, to, empty } = selection
+  const view = editor.view
 
-  // Si ya es blockquote, levantarlo a párrafo
-  if (editor.isActive('blockquote')) {
-    lift(state, view.dispatch)
+  // 1. Si ya es blockquote, alternar apagándolo (lift)
+  if (isInsideBlockquote(view.state)) {
+    const success = lift(view.state, view.dispatch.bind(view))
     editor.commands.focus()
-    return true
+    return success
   }
 
-  if (!empty) {
-    const resFrom = doc.resolve(from)
-    const resTo = doc.resolve(to)
+  // 2. Si es una selección parcial, dividir primero
+  const { from, to, empty, $from, $to } = view.state.selection
+  if (!empty && $from.sameParent($to) && $from.parent.isTextblock) {
+    const blockStart = $from.start()
+    const blockEnd = $from.end()
 
-    if (resFrom.parent === resTo.parent && resFrom.parent.isTextblock) {
-      const blockStart = resFrom.start()
-      const blockEnd = resFrom.end()
-
-      if (from > blockStart || to < blockEnd) {
-        let tr = state.tr
-        if (to < blockEnd) {
-          tr = tr.split(to)
-        }
-        if (from > blockStart) {
-          tr = tr.split(from)
-        }
-        view.dispatch(tr)
-
-        const newState = view.state
-        const newDoc = newState.doc
-        const midPos = from + (from > blockStart ? 2 : 1)
-        const safePos = Math.min(Math.max(1, midPos), newDoc.content.size - 1)
-        const newSel = TextSelection.create(newDoc, safePos)
-        let bqTr = newState.tr.setSelection(newSel)
-
-        wrapIn(schema.nodes.blockquote)(newState, (t) => {
-          bqTr = t
-        })
-        view.dispatch(bqTr)
-        editor.commands.focus()
-        return true
+    if (from > blockStart || to < blockEnd) {
+      const tr = view.state.tr
+      if (to < blockEnd) {
+        tr.split(to, 1)
       }
+      if (from > blockStart) {
+        tr.split(from, 1)
+      }
+      const mappedFrom = tr.mapping.map(from, 1)
+      const mappedTo = tr.mapping.map(to, -1)
+      tr.setSelection(TextSelection.create(tr.doc, mappedFrom, mappedTo))
+      view.dispatch(tr)
     }
   }
 
-  return editor.chain().focus().toggleBlockquote().run()
+  const success = wrapIn(view.state.schema.nodes.blockquote)(view.state, view.dispatch.bind(view))
+  editor.commands.focus()
+  return success
 }
