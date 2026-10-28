@@ -4,6 +4,7 @@ import { registerLoreHandlers } from './loreHandler'
 import { registerWindowHandlers } from './windowHandler'
 import { registerScratchpadHandlers } from './scratchpadHandler'
 import { registerRulesHandlers } from './rulesHandler'
+import { registerGoalsHandlers } from './goalsHandler'
 
 export function registerAllIpcHandlers(): void {
   registerProjectHandlers()
@@ -12,4 +13,5 @@ export function registerAllIpcHandlers(): void {
   registerWindowHandlers()
   registerScratchpadHandlers()
   registerRulesHandlers()
+  registerGoalsHandlers()
 }

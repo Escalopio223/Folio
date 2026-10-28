@@ -28,6 +28,8 @@ import type { Folio } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
 import { useRulesStore } from '../stores/rulesStore'
+import { useGoalsStore } from '../stores/goalsStore'
+import GoalsProgressPill from '../components/goals/GoalsProgressPill.vue'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
@@ -36,9 +38,11 @@ const uiStore = useUiStore()
 const trashStore = useTrashStore()
 const scratchpadStore = useScratchpadStore()
 const rulesStore = useRulesStore()
+const goalsStore = useGoalsStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
+const lastSavedWordsMap = new Map<string, number>()
 
 // Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
 const { width: windowWidth } = useWindowSize()
@@ -152,6 +156,9 @@ watch(
       folioStore.recordBaseline(folio.id, folio.content || '')
       const initialText = (folio.content || '').replace(/<[^>]*>/g, ' ').trim()
       const words = initialText ? initialText.split(/\s+/).length : 0
+      if (!lastSavedWordsMap.has(folio.id)) {
+        lastSavedWordsMap.set(folio.id, words)
+      }
       wordCount.value = words
       charCount.value = (folio.content || '').length
       readingTime.value = words === 0 ? 0 : Math.max(1, Math.ceil(words / 200))
@@ -189,6 +196,16 @@ async function flushSave(): Promise<void> {
       const contentToSave = tiptapEditorRef.value?.getHTML() ?? editFolioContent.value
       const synopsisToSave = editFolioSynopsis.value
       const statusToSave = editFolioStatus.value
+
+      // Balance neto de palabras añadidas para metas diarias y sistema de logros
+      const cleanText = (contentToSave || '').replace(/<[^>]*>/g, ' ').trim()
+      const currentWords = cleanText ? cleanText.split(/\s+/).length : 0
+      const prevWords = lastSavedWordsMap.get(targetId) ?? currentWords
+      const wordDelta = currentWords - prevWords
+      if (wordDelta > 0 && projectStore.activeProjectId) {
+        goalsStore.recordProgress({ wordDelta })
+      }
+      lastSavedWordsMap.set(targetId, currentWords)
 
       // Actualizar réplica reactiva en el store para zero-lag en el árbol
       const item = folioStore.folios.find((f) => f.id === targetId)
@@ -376,7 +393,8 @@ async function handleProjectChange(projectId: string): Promise<void> {
     loreStore.fetchLore(projectId),
     trashStore.fetchTrash(projectId),
     scratchpadStore.fetchNotes(projectId),
-    rulesStore.fetchRules(projectId)
+    rulesStore.fetchRules(projectId),
+    goalsStore.fetchGoals(projectId)
   ])
 }
 
@@ -414,7 +432,8 @@ onMounted(async () => {
       loreStore.fetchLore(projectStore.activeProjectId),
       trashStore.fetchTrash(projectStore.activeProjectId),
       scratchpadStore.fetchNotes(projectStore.activeProjectId),
-      rulesStore.fetchRules(projectStore.activeProjectId)
+      rulesStore.fetchRules(projectStore.activeProjectId),
+      goalsStore.fetchGoals(projectStore.activeProjectId)
     ])
   }
   // Smoothly hide splash screen after initial load
@@ -928,6 +947,9 @@ onBeforeUnmount(async () => {
               <Flame :size="12" class="text-[var(--accent)] shrink-0" />
               +{{ folioStore.sessionWordsAdded }} sesión
             </span>
+            <span>·</span>
+            <!-- Píldora de Progreso y Racha Diaria con Anillo SVG -->
+            <GoalsProgressPill />
             <span>·</span>
             <span>{{ charCount }} caracteres</span>
             <span>·</span>

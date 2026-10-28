@@ -114,3 +114,57 @@ export const worldRules = sqliteTable(
 export type WorldRuleSelect = typeof worldRules.$inferSelect
 export type WorldRuleInsert = typeof worldRules.$inferInsert
 
+export const projectGoals = sqliteTable('project_goals', {
+  projectId: text('project_id')
+    .primaryKey()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  targetTotalWords: integer('target_total_words').notNull().default(50000),
+  dailyWordGoal: integer('daily_word_goal').notNull().default(500),
+  dailySceneGoal: integer('daily_scene_goal').notNull().default(1),
+  dailyChapterGoal: integer('daily_chapter_goal').notNull().default(0),
+  deadlineDate: text('deadline_date'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+})
+
+export const dailyWritingLogs = sqliteTable(
+  'daily_writing_logs',
+  {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(), // Formato YYYY-MM-DD
+    wordsWritten: integer('words_written').notNull().default(0),
+    scenesCreated: integer('scenes_created').notNull().default(0),
+    chaptersCreated: integer('chapters_created').notNull().default(0),
+    goalMet: integer('goal_met', { mode: 'boolean' }).notNull().default(false)
+  },
+  (table) => [
+    index('idx_daily_logs_project_date').on(table.projectId, table.date)
+  ]
+)
+
+export const unlockedAchievements = sqliteTable(
+  'unlocked_achievements',
+  {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    achievementKey: text('achievement_key').notNull(),
+    unlockedAt: integer('unlocked_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('idx_unlocked_achievements_project').on(table.projectId)
+  ]
+)
+
+export type ProjectGoalsSelect = typeof projectGoals.$inferSelect
+export type ProjectGoalsInsert = typeof projectGoals.$inferInsert
+
+export type DailyWritingLogSelect = typeof dailyWritingLogs.$inferSelect
+export type DailyWritingLogInsert = typeof dailyWritingLogs.$inferInsert
+
+export type UnlockedAchievementSelect = typeof unlockedAchievements.$inferSelect
+export type UnlockedAchievementInsert = typeof unlockedAchievements.$inferInsert
+

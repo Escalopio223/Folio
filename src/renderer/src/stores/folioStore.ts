@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Folio, CreateFolioInput, UpdateFolioInput } from '@shared/types'
+import { useGoalsStore } from './goalsStore'
 
 const LAST_ACTIVE_FOLIO_KEY = 'folio:lastActiveFolio'
 
@@ -20,6 +21,13 @@ export const useFolioStore = defineStore('folio', () => {
     return folios.value
       .filter((f) => f.parentId === null)
       .sort((a, b) => a.sortOrder - b.sortOrder)
+  })
+
+  // Total words of the active manuscript (excluding trash / archived)
+  const totalManuscriptWords = computed<number>(() => {
+    return folios.value
+      .filter((f) => !f.isArchived)
+      .reduce((acc, f) => acc + countWords(f.content || ''), 0)
   })
 
   // Get scenes for a given chapter
@@ -113,6 +121,9 @@ export const useFolioStore = defineStore('folio', () => {
       sortOrder: nextOrder,
       content: ''
     })
+    if (chapter) {
+      useGoalsStore().recordProgress({ chapterDelta: 1 })
+    }
     return chapter
   }
 
@@ -127,6 +138,9 @@ export const useFolioStore = defineStore('folio', () => {
       sortOrder: nextOrder,
       content: ''
     })
+    if (scene) {
+      useGoalsStore().recordProgress({ sceneDelta: 1 })
+    }
     return scene
   }
 
@@ -176,6 +190,10 @@ export const useFolioStore = defineStore('folio', () => {
             trashedFolios.value[trashIndex] = updated
           }
         }
+      }
+
+      if (updated.status === 'completed') {
+        useGoalsStore().checkAchievements()
       }
 
       return updated
@@ -251,6 +269,7 @@ export const useFolioStore = defineStore('folio', () => {
     activeFolioId,
     activeFolio,
     chapters,
+    totalManuscriptWords,
     isLoading,
     sessionWordsAdded,
     countWords,

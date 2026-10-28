@@ -11,7 +11,9 @@ import {
   Trash2,
   Feather,
   Scale,
-  RotateCcw
+  RotateCcw,
+  Target,
+  Trophy
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -20,6 +22,7 @@ import type { useProjectStore } from '../../stores/projectStore'
 import { useTrashStore } from '../../stores/trashStore'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
 import { useRulesStore } from '../../stores/rulesStore'
+import { useGoalsStore } from '../../stores/goalsStore'
 
 export interface CommandAction {
   id: string
@@ -41,6 +44,7 @@ export interface StoreContext {
   trashStore?: ReturnType<typeof useTrashStore>
   scratchpadStore?: ReturnType<typeof useScratchpadStore>
   rulesStore?: ReturnType<typeof useRulesStore>
+  goalsStore?: ReturnType<typeof useGoalsStore>
 }
 
 /**
@@ -52,6 +56,7 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
   const trashStore = ctx.trashStore || useTrashStore()
   const scratchpadStore = ctx.scratchpadStore || useScratchpadStore()
   const rulesStore = ctx.rulesStore || useRulesStore()
+  const goalsStore = ctx.goalsStore || useGoalsStore()
 
   return [
     {
@@ -204,6 +209,30 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       keywords: ['focus', 'enfoque', 'concentracion', 'parrafo', 'atenuar', 'modo'],
       execute: () => {
         uiStore.toggleFocusMode()
+      }
+    },
+    {
+      id: 'view-goals-and-achievements',
+      title: 'Ver Metas de Escritura y Logros',
+      description: 'Abrir el panel de expectativas del libro, ritmo diario y vitrina de insignias',
+      category: 'action',
+      badge: 'Objetivos',
+      icon: Trophy,
+      keywords: ['metas', 'logros', 'objetivo', 'expectativas', 'insignias', 'racha', 'palabras', 'gamificacion'],
+      execute: () => {
+        goalsStore.openGoalsModal('expectations')
+      }
+    },
+    {
+      id: 'config-daily-words',
+      title: 'Configurar Objetivo Diario de Palabras',
+      description: 'Definir o ajustar tu meta de palabras, escenas y capítulos por jornada',
+      category: 'action',
+      badge: 'Objetivos',
+      icon: Target,
+      keywords: ['meta', 'diaria', 'palabras', 'configurar', 'objetivo', 'ritmo', 'expectativa'],
+      execute: () => {
+        goalsStore.openGoalsModal('expectations')
       }
     },
     {

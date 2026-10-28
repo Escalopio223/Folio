@@ -19,7 +19,12 @@ import type {
   ScratchpadNote,
   SaveScratchpadNoteInput,
   WorldRule,
-  SaveWorldRuleInput
+  SaveWorldRuleInput,
+  ProjectGoals,
+  DailyWritingLog,
+  UnlockedAchievement,
+  GoalsSummary,
+  RecordProgressPayload
 } from '@shared/types'
 
 let sqliteInstance: Database.Database | null = null
@@ -27,6 +32,39 @@ let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null
 let activeDbPath = ''
 
 // Mappers
+function mapProjectGoals(row: schema.ProjectGoalsSelect): ProjectGoals {
+  return {
+    projectId: row.projectId,
+    targetTotalWords: row.targetTotalWords,
+    dailyWordGoal: row.dailyWordGoal,
+    dailySceneGoal: row.dailySceneGoal,
+    dailyChapterGoal: row.dailyChapterGoal,
+    deadlineDate: row.deadlineDate,
+    updatedAt: row.updatedAt
+  }
+}
+
+function mapDailyWritingLog(row: schema.DailyWritingLogSelect): DailyWritingLog {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    date: row.date,
+    wordsWritten: row.wordsWritten,
+    scenesCreated: row.scenesCreated,
+    chaptersCreated: row.chaptersCreated,
+    goalMet: Boolean(row.goalMet)
+  }
+}
+
+function mapUnlockedAchievement(row: schema.UnlockedAchievementSelect): UnlockedAchievement {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    achievementKey: row.achievementKey,
+    unlockedAt: row.unlockedAt
+  }
+}
+
 function mapWorldRule(row: schema.WorldRuleSelect): WorldRule {
   return {
     id: row.id,
@@ -217,6 +255,40 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_rules_category ON world_rules(category);
     CREATE INDEX IF NOT EXISTS idx_rules_is_pinned ON world_rules(is_pinned);
     CREATE INDEX IF NOT EXISTS idx_rules_order ON world_rules(order_index);
+
+    CREATE TABLE IF NOT EXISTS project_goals (
+      project_id TEXT PRIMARY KEY NOT NULL,
+      target_total_words INTEGER NOT NULL DEFAULT 50000,
+      daily_word_goal INTEGER NOT NULL DEFAULT 500,
+      daily_scene_goal INTEGER NOT NULL DEFAULT 1,
+      daily_chapter_goal INTEGER NOT NULL DEFAULT 0,
+      deadline_date TEXT,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_writing_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      words_written INTEGER NOT NULL DEFAULT 0,
+      scenes_created INTEGER NOT NULL DEFAULT 0,
+      chapters_created INTEGER NOT NULL DEFAULT 0,
+      goal_met INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(project_id, date)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_logs_project_date ON daily_writing_logs(project_id, date);
+
+    CREATE TABLE IF NOT EXISTS unlocked_achievements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL,
+      achievement_key TEXT NOT NULL,
+      unlocked_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(project_id, achievement_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_unlocked_achievements_project ON unlocked_achievements(project_id);
   `)
 
   // Asegurar que la columna title existe en bases de datos ya inicializadas
@@ -933,6 +1005,284 @@ export function reorderWorldRules(ids: number[]): boolean {
 
   transaction(ids)
   return true
+}
+
+// =========================================================================
+// GESTIÓN DE METAS EDITORIALES, LOGS DIARIOS Y LOGROS (GAMIFICACIÓN)
+// =========================================================================
+
+export function getLocalDateStr(date: Date = new Date()): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function getProjectGoals(projectId: string): ProjectGoals {
+  const db = getDb()
+  const existing = db
+    .select()
+    .from(schema.projectGoals)
+    .where(eq(schema.projectGoals.projectId, projectId))
+    .get()
+
+  if (existing) {
+    return mapProjectGoals(existing)
+  }
+
+  const now = new Date()
+  const inserted = db
+    .insert(schema.projectGoals)
+    .values({
+      projectId,
+      targetTotalWords: 50000,
+      dailyWordGoal: 500,
+      dailySceneGoal: 1,
+      dailyChapterGoal: 0,
+      deadlineDate: null,
+      updatedAt: now
+    })
+    .returning()
+    .get()
+
+  return mapProjectGoals(inserted)
+}
+
+export function updateProjectGoals(projectId: string, input: Partial<ProjectGoals>): ProjectGoals {
+  const db = getDb()
+  const current = getProjectGoals(projectId)
+  const now = new Date()
+
+  const updated = db
+    .update(schema.projectGoals)
+    .set({
+      targetTotalWords: input.targetTotalWords ?? current.targetTotalWords,
+      dailyWordGoal: input.dailyWordGoal ?? current.dailyWordGoal,
+      dailySceneGoal: input.dailySceneGoal ?? current.dailySceneGoal,
+      dailyChapterGoal: input.dailyChapterGoal ?? current.dailyChapterGoal,
+      deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : current.deadlineDate,
+      updatedAt: now
+    })
+    .where(eq(schema.projectGoals.projectId, projectId))
+    .returning()
+    .get()
+
+  return mapProjectGoals(updated)
+}
+
+export function getTodayWritingLog(projectId: string, dateStr?: string): DailyWritingLog {
+  const db = getDb()
+  const targetDate = dateStr || getLocalDateStr()
+  const existing = db
+    .select()
+    .from(schema.dailyWritingLogs)
+    .where(
+      and(
+        eq(schema.dailyWritingLogs.projectId, projectId),
+        eq(schema.dailyWritingLogs.date, targetDate)
+      )
+    )
+    .get()
+
+  if (existing) {
+    return mapDailyWritingLog(existing)
+  }
+
+  return {
+    id: 0,
+    projectId,
+    date: targetDate,
+    wordsWritten: 0,
+    scenesCreated: 0,
+    chaptersCreated: 0,
+    goalMet: false
+  }
+}
+
+export function recordWritingProgress(
+  projectId: string,
+  payload: RecordProgressPayload
+): DailyWritingLog {
+  const sqlite = getSqlite()
+  const todayStr = getLocalDateStr()
+  const goals = getProjectGoals(projectId)
+
+  const wordDelta = payload.wordDelta ?? 0
+  const sceneDelta = payload.sceneDelta ?? 0
+  const chapterDelta = payload.chapterDelta ?? 0
+
+  // Atomic UPSERT usando ON CONFLICT nativo de SQLite
+  const upsertStmt = sqlite.prepare(`
+    INSERT INTO daily_writing_logs (project_id, date, words_written, scenes_created, chapters_created, goal_met)
+    VALUES (?, ?, MAX(0, ?), MAX(0, ?), MAX(0, ?), 0)
+    ON CONFLICT(project_id, date) DO UPDATE SET
+      words_written = MAX(0, daily_writing_logs.words_written + ?),
+      scenes_created = MAX(0, daily_writing_logs.scenes_created + ?),
+      chapters_created = MAX(0, daily_writing_logs.chapters_created + ?)
+    RETURNING id, project_id as projectId, date, words_written as wordsWritten,
+              scenes_created as scenesCreated, chapters_created as chaptersCreated, goal_met as goalMet
+  `)
+
+  const row = upsertStmt.get(
+    projectId,
+    todayStr,
+    wordDelta,
+    sceneDelta,
+    chapterDelta,
+    wordDelta,
+    sceneDelta,
+    chapterDelta
+  ) as schema.DailyWritingLogSelect
+
+  // Verificar si la meta diaria de palabras se ha cumplido
+  const isGoalMet = row.wordsWritten >= goals.dailyWordGoal
+  if (Boolean(row.goalMet) !== isGoalMet) {
+    sqlite
+      .prepare('UPDATE daily_writing_logs SET goal_met = ? WHERE id = ?')
+      .run(isGoalMet ? 1 : 0, row.id)
+    row.goalMet = isGoalMet
+  }
+
+  return mapDailyWritingLog(row)
+}
+
+export function getRecentWritingLogs(projectId: string, days = 30): DailyWritingLog[] {
+  const db = getDb()
+  const rows = db
+    .select()
+    .from(schema.dailyWritingLogs)
+    .where(eq(schema.dailyWritingLogs.projectId, projectId))
+    .orderBy(desc(schema.dailyWritingLogs.date))
+    .limit(days)
+    .all()
+
+  return rows.map(mapDailyWritingLog)
+}
+
+export function getUnlockedAchievements(projectId: string): UnlockedAchievement[] {
+  const db = getDb()
+  const rows = db
+    .select()
+    .from(schema.unlockedAchievements)
+    .where(eq(schema.unlockedAchievements.projectId, projectId))
+    .orderBy(desc(schema.unlockedAchievements.unlockedAt))
+    .all()
+
+  return rows.map(mapUnlockedAchievement)
+}
+
+export function unlockAchievement(
+  projectId: string,
+  achievementKey: string
+): UnlockedAchievement | null {
+  const db = getDb()
+
+  // Evitar duplicados si ya fue desbloqueado
+  const existing = db
+    .select()
+    .from(schema.unlockedAchievements)
+    .where(
+      and(
+        eq(schema.unlockedAchievements.projectId, projectId),
+        eq(schema.unlockedAchievements.achievementKey, achievementKey)
+      )
+    )
+    .get()
+
+  if (existing) {
+    return null
+  }
+
+  const now = new Date()
+  const inserted = db
+    .insert(schema.unlockedAchievements)
+    .values({
+      projectId,
+      achievementKey,
+      unlockedAt: now
+    })
+    .returning()
+    .get()
+
+  return mapUnlockedAchievement(inserted)
+}
+
+export function getTotalManuscriptWords(projectId: string): number {
+  const sqlite = getSqlite()
+  const stmt = sqlite.prepare(`
+    SELECT content FROM folios
+    WHERE project_id = ? AND is_archived = 0
+  `)
+  const rows = stmt.all(projectId) as Array<{ content: string }>
+
+  let totalWords = 0
+  for (const row of rows) {
+    const clean = (row.content || '').replace(/<[^>]*>/g, ' ').trim()
+    if (clean) {
+      totalWords += clean.split(/\s+/).length
+    }
+  }
+  return totalWords
+}
+
+export function calculateCurrentStreak(logs: DailyWritingLog[]): number {
+  if (!logs || logs.length === 0) return 0
+
+  const logMap = new Map<string, boolean>()
+  for (const log of logs) {
+    if (log.goalMet) {
+      logMap.set(log.date, true)
+    }
+  }
+
+  const today = new Date()
+  const todayStr = getLocalDateStr(today)
+
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = getLocalDateStr(yesterday)
+
+  // Si hoy ya cumplió la meta, la racha cuenta desde hoy.
+  // Si hoy aún no la cumple, pero ayer sí, la racha sigue viva desde ayer.
+  let checkDate: Date
+  if (logMap.get(todayStr)) {
+    checkDate = new Date(today)
+  } else if (logMap.get(yesterdayStr)) {
+    checkDate = new Date(yesterday)
+  } else {
+    return 0
+  }
+
+  let streak = 0
+  while (true) {
+    const dateStr = getLocalDateStr(checkDate)
+    if (logMap.get(dateStr)) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
+
+export function getGoalsSummary(projectId: string): GoalsSummary {
+  const config = getProjectGoals(projectId)
+  const todayLog = getTodayWritingLog(projectId)
+  const recentHistory = getRecentWritingLogs(projectId, 30)
+  const unlockedAchievements = getUnlockedAchievements(projectId)
+  const totalManuscriptWords = getTotalManuscriptWords(projectId)
+  const currentStreak = calculateCurrentStreak(recentHistory)
+
+  return {
+    config,
+    todayLog,
+    recentHistory,
+    unlockedAchievements,
+    totalManuscriptWords,
+    currentStreak
+  }
 }
 
 

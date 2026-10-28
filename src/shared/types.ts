@@ -148,6 +148,48 @@ export interface SaveWorldRuleInput {
   isPinned?: boolean
 }
 
+export interface ProjectGoals {
+  projectId: string
+  targetTotalWords: number
+  dailyWordGoal: number
+  dailySceneGoal: number
+  dailyChapterGoal: number
+  deadlineDate: string | null
+  updatedAt: string | Date
+}
+
+export interface DailyWritingLog {
+  id: number
+  projectId: string
+  date: string // YYYY-MM-DD
+  wordsWritten: number
+  scenesCreated: number
+  chaptersCreated: number
+  goalMet: boolean
+}
+
+export interface UnlockedAchievement {
+  id: number
+  projectId: string
+  achievementKey: string
+  unlockedAt: string | Date
+}
+
+export interface GoalsSummary {
+  config: ProjectGoals
+  todayLog: DailyWritingLog
+  recentHistory: DailyWritingLog[]
+  unlockedAchievements: UnlockedAchievement[]
+  totalManuscriptWords: number
+  currentStreak: number
+}
+
+export interface RecordProgressPayload {
+  wordDelta?: number
+  sceneDelta?: number
+  chapterDelta?: number
+}
+
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized'
 
 export interface FolioApi {
@@ -187,6 +229,12 @@ export interface FolioApi {
     save: (rule: SaveWorldRuleInput) => Promise<WorldRule>
     delete: (id: number) => Promise<boolean>
     reorder: (ids: number[]) => Promise<boolean>
+  }
+  goals: {
+    getSummary: (projectId: string) => Promise<GoalsSummary>
+    updateConfig: (projectId: string, config: Partial<ProjectGoals>) => Promise<ProjectGoals>
+    recordProgress: (projectId: string, payload: RecordProgressPayload) => Promise<DailyWritingLog>
+    unlockAchievement: (projectId: string, achievementKey: string) => Promise<UnlockedAchievement | null>
   }
   window: {
     action: (action: WindowAction) => Promise<boolean | void>
