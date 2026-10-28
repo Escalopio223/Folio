@@ -1,43 +1,43 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   color-scheme: light;
-  --bg-base: #EFEAE1;
-  --bg-surface: #F7F4EF;
-  --bg-elevated: #FCFBF9;
-  --text-primary: #261C14;
-  --text-secondary: #6E5D4F;
-  --text-muted: #9E8F80;
-  --accent: #C85A32;
-  --accent-hover: #B04822;
-  --groove-dark: #D6CFC3;
-  --groove-light: #FFFFFF;
-  --neu-raised: 5px 5px 10px #D5CEC2, -5px -5px 10px #FFFFFF;
-  --neu-raised-sm: 2px 2px 5px #D5CEC2, -2px -2px 5px #FFFFFF;
-  --neu-inset: inset 3px 3px 6px #D5CEC2, inset -3px -3px 6px #FFFFFF;
-  --neu-inset-sm: inset 2px 2px 4px #D5CEC2, inset -2px -2px 4px #FFFFFF;
-  scrollbar-color: #D6CFC3 transparent;
+  --bg-base: #efeae1;
+  --bg-surface: #f7f4ef;
+  --bg-elevated: #fcfbf9;
+  --text-primary: #261c14;
+  --text-secondary: #6e5d4f;
+  --text-muted: #9e8f80;
+  --accent: #c85a32;
+  --accent-hover: #b04822;
+  --groove-dark: #d6cfc3;
+  --groove-light: #ffffff;
+  --neu-raised: 5px 5px 10px #d5cec2, -5px -5px 10px #ffffff;
+  --neu-raised-sm: 2px 2px 5px #d5cec2, -2px -2px 5px #ffffff;
+  --neu-inset: inset 3px 3px 6px #d5cec2, inset -3px -3px 6px #ffffff;
+  --neu-inset-sm: inset 2px 2px 4px #d5cec2, inset -2px -2px 4px #ffffff;
+  scrollbar-color: #d6cfc3 transparent;
 }
 
 html.dark {
   color-scheme: dark;
   /* Negro amarronado / Café espresso tostado y profundo */
-  --bg-base: #120E0B;
-  --bg-surface: #1C1612;
-  --bg-elevated: #261E18;
-  --text-primary: #F7F4EF;
-  --text-secondary: #C2B5A8;
-  --text-muted: #7D6D5E;
-  --accent: #C85A32;
-  --accent-hover: #DF6B40;
+  --bg-base: #120e0b;
+  --bg-surface: #1c1612;
+  --bg-elevated: #261e18;
+  --text-primary: #f7f4ef;
+  --text-secondary: #c2b5a8;
+  --text-muted: #7d6d5e;
+  --accent: #c85a32;
+  --accent-hover: #df6b40;
   --groove-dark: #090706;
-  --groove-light: #2A211B;
+  --groove-light: #2a211b;
   /* Sombras calibradas para negro amarronado (luz cálida sutil + sombra profunda) */
-  --neu-raised: 6px 6px 14px #080605, -5px -5px 12px #2A221C;
-  --neu-raised-sm: 3px 3px 6px #080605, -3px -3px 6px #2A221C;
-  --neu-inset: inset 3px 3px 7px #080605, inset -3px -3px 7px #2A221C;
-  --neu-inset-sm: inset 2px 2px 4px #080605, inset -2px -2px 4px #2A221C;
-  scrollbar-color: #2A211B transparent;
+  --neu-raised: 6px 6px 14px #080605, -5px -5px 12px #2a221c;
+  --neu-raised-sm: 3px 3px 6px #080605, -3px -3px 6px #2a221c;
+  --neu-inset: inset 3px 3px 7px #080605, inset -3px -3px 7px #2a221c;
+  --neu-inset-sm: inset 2px 2px 4px #080605, inset -2px -2px 4px #2a221c;
+  scrollbar-color: #2a211b transparent;
 }
 
 body {
@@ -62,10 +62,10 @@ select {
    CURSORES GLOBALES Y COMPORTAMIENTO TÁCTIL / EDITORIAL
    ========================================================================= */
 button,
-[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"],
+[role='button'],
+input[type='button'],
+input[type='submit'],
+input[type='reset'],
 .neu-btn,
 .neu-btn-terracotta,
 .cursor-pointer {
@@ -73,9 +73,11 @@ input[type="reset"],
 }
 
 /* Áreas de redacción y campos de entrada de texto */
-input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not(
+    [type='radio']
+  ):not([type='range']),
 textarea,
-[contenteditable="true"],
+[contenteditable='true'],
 .ProseMirror,
 .ProseMirror p,
 .ProseMirror h1,
@@ -92,7 +94,7 @@ textarea,
 }
 
 /* Elementos especiales de descanso narrativo no seleccionables */
-.ProseMirror div[data-type="scene-break"],
+.ProseMirror div[data-type='scene-break'],
 .ProseMirror .scene-break {
   cursor: default !important;
   user-select: none;
@@ -150,9 +152,12 @@ textarea,
 }
 
 .neu-btn-terracotta {
-  background: linear-gradient(145deg, #D6633A, #B84E28);
-  color: #F7F4EF;
-  box-shadow: 4px 4px 10px var(--groove-dark), -2px -2px 6px var(--groove-light), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  background: linear-gradient(145deg, #d6633a, #b84e28);
+  color: #f7f4ef;
+  box-shadow:
+    4px 4px 10px var(--groove-dark),
+    -2px -2px 6px var(--groove-light),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   font-weight: 600;
   transition: all 0.15s ease;
@@ -238,11 +243,34 @@ textarea,
   background: var(--accent);
 }
 
-/* Ergonomía Modo Máquina de Escribir: Centrado al 50% exacto del viewport */
-.typewriter-active {
-  padding-top: 50vh !important;
-  padding-bottom: 50vh !important;
+/* =========================================================================
+   MODO ENFOQUE GLOBAL (FOCUS MODE): CERO DISTRACCIONES
+   ========================================================================= */
+.focus-mode-active .app-sidebar,
+.focus-mode-active .app-header,
+.focus-mode-active .editor-toolbar,
+.focus-mode-active .editor-metadata,
+.focus-mode-active .status-bar {
+  opacity: 0.12 !important;
+  filter: grayscale(80%);
+  transition:
+    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.focus-mode-active .app-sidebar:hover,
+.focus-mode-active .app-header:hover,
+.focus-mode-active .editor-toolbar:hover,
+.focus-mode-active .editor-metadata:hover,
+.focus-mode-active .status-bar:hover {
+  opacity: 1 !important;
+  filter: none;
+}
 
+/* El título del capítulo siempre permanece 100% visible */
+.chapter-title,
+.focus-mode-active .chapter-title {
+  opacity: 1 !important;
+  filter: none !important;
+}
 

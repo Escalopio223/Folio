@@ -18,14 +18,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-screen w-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden select-none">
+  <div
+    class="h-screen w-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden select-none"
+    :class="{
+      'focus-mode-active': uiStore.isFocusMode
+    }"
+  >
     <!-- App Splash Loading Screen -->
     <transition name="fade">
       <AppSplash v-if="uiStore.isSplashLoading" />
     </transition>
 
     <!-- Draggable Tactile Title Bar -->
-    <TitleBar />
+    <TitleBar class="app-header" />
 
     <!-- Main Workspace View -->
     <main class="flex-1 flex flex-col overflow-hidden">
@@ -36,7 +41,9 @@ onMounted(() => {
     <div class="neu-groove-h"></div>
 
     <!-- Bottom Warm Status Bar -->
-    <footer class="h-6 w-full px-4 flex items-center justify-between text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none">
+    <footer
+      class="status-bar h-6 w-full px-4 flex items-center justify-between text-[11px] text-[var(--text-muted)] bg-[var(--bg-base)] font-mono shrink-0 select-none"
+    >
       <div class="flex items-center gap-3">
         <button
           type="button"

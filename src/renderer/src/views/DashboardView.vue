@@ -4,11 +4,12 @@ import { useProjectStore } from '../stores/projectStore'
 import { useFolioStore } from '../stores/folioStore'
 import { useLoreStore } from '../stores/loreStore'
 import { useUiStore } from '../stores/uiStore'
-import { useDebounceFn, onClickOutside } from '@vueuse/core'
+import { useDebounceFn, onClickOutside, useWindowSize } from '@vueuse/core'
 import ProjectModal from '../components/ProjectModal.vue'
 import FolioLogo from '../components/FolioLogo.vue'
 import BookSelector from '../components/BookSelector.vue'
 import WikiInspector from '../components/WikiInspector.vue'
+import PanelResizer from '../components/PanelResizer.vue'
 import {
   ChevronDown,
   ChevronRight,
@@ -17,10 +18,8 @@ import {
   Bookmark,
   Trash2,
   Check,
-  AlignVerticalSpaceAround,
   Eye,
-  Flame,
-  Feather
+  Flame
 } from 'lucide-vue-next'
 import TiptapEditor from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
@@ -40,6 +39,31 @@ const rulesStore = useRulesStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
+
+// Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
+const { width: windowWidth } = useWindowSize()
+const isDraggingLeft = ref(false)
+const isDraggingRight = ref(false)
+
+const maxAllowedLeftWidth = computed(() => {
+  const rightWidth = uiStore.isRightSidebarOpen ? uiStore.rightSidebarWidth : 0
+  const minCenter = 380
+  const containerPadding = 48
+  return Math.max(
+    uiStore.MIN_LEFT_WIDTH,
+    Math.min(uiStore.MAX_LEFT_WIDTH, windowWidth.value - rightWidth - minCenter - containerPadding)
+  )
+})
+
+const maxAllowedRightWidth = computed(() => {
+  const leftWidth = uiStore.isLeftSidebarOpen ? uiStore.leftSidebarWidth : 0
+  const minCenter = 380
+  const containerPadding = 48
+  return Math.max(
+    uiStore.MIN_RIGHT_WIDTH,
+    Math.min(uiStore.MAX_RIGHT_WIDTH, windowWidth.value - leftWidth - minCenter - containerPadding)
+  )
+})
 
 // Manuscript Editable States
 const editFolioTitle = ref('')
@@ -223,16 +247,6 @@ function onEditorInput(): void {
   debouncedSave()
 }
 
-function onTitleFocus(): void {
-  if (uiStore.isTypewriterMode && titleInputRef.value && scrollContainerRef.value) {
-    const container = scrollContainerRef.value
-    const titleEl = titleInputRef.value
-    const containerRect = container.getBoundingClientRect()
-    const titleRect = titleEl.getBoundingClientRect()
-    const deltaY = titleRect.top + titleRect.height / 2 - (containerRect.top + container.clientHeight / 2)
-    container.scrollTo({ top: Math.max(0, container.scrollTop + deltaY), behavior: 'smooth' })
-  }
-}
 
 // Forzar guardado manual (Ctrl+S / Cmd+S)
 async function handleManualSave(): Promise<void> {
@@ -276,12 +290,6 @@ async function handleQuickNewFolio(): Promise<void> {
 function handleGlobalKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
 
-  // Ctrl+Shift+T / Cmd+Shift+T: Alternar Modo Máquina de Escribir
-  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 't') {
-    e.preventDefault()
-    uiStore.toggleTypewriterMode()
-    return
-  }
 
   // Ctrl+Shift+F / Cmd+Shift+F: Alternar Modo Enfoque
   if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'f') {
@@ -424,7 +432,7 @@ onBeforeUnmount(async () => {
 </script>
 
 <template>
-  <div class="flex h-full w-full gap-3 md:gap-4 overflow-hidden bg-[var(--bg-base)] relative p-3 md:p-4">
+  <div class="flex h-full w-full overflow-hidden bg-[var(--bg-base)] relative p-3 md:p-4">
     <!-- Modal para nuevo proyecto/libro -->
     <ProjectModal
       v-if="isProjectModalOpen"
@@ -436,8 +444,16 @@ onBeforeUnmount(async () => {
     <!-- COLUMNA 1: ÁRBOL DEL MANUSCRITO (CAPÍTULOS Y ESCENAS - COLAPSIBLE) -->
     <!-- ================================================================= -->
     <aside
-      class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-      :class="uiStore.isLeftSidebarOpen ? 'w-60 xl:w-64 p-3.5 gap-3' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+      class="app-sidebar neu-surface flex flex-col overflow-hidden shrink-0"
+      :class="[
+        isDraggingLeft ? '' : 'transition-[width,padding,opacity,margin] duration-300 ease-in-out',
+        uiStore.isLeftSidebarOpen
+          ? 'p-3.5 gap-3'
+          : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'
+      ]"
+      :style="{
+        width: uiStore.isLeftSidebarOpen ? `${uiStore.leftSidebarWidth}px` : '0px'
+      }"
     >
       <!-- Selector Personalizado de Libros -->
       <BookSelector
@@ -458,11 +474,7 @@ onBeforeUnmount(async () => {
 
       <!-- Árbol jerárquico de Capítulos y Escenas -->
       <div class="flex-1 overflow-y-auto space-y-2 pr-1 editorial-scrollbar">
-        <div
-          v-for="chap in folioStore.chapters"
-          :key="chap.id"
-          class="space-y-1"
-        >
+        <div v-for="chap in folioStore.chapters" :key="chap.id" class="space-y-1">
           <!-- Cabecera de Capítulo -->
           <div
             class="neu-btn w-full p-2.5 flex items-center justify-between group transition-all cursor-pointer"
@@ -478,7 +490,11 @@ onBeforeUnmount(async () => {
                 title="Desplegar / Replegar capítulo"
                 @click.stop="toggleChapter(chap.id)"
               >
-                <ChevronDown v-if="isChapterExpanded(chap.id)" :size="13" class="transition-transform duration-200" />
+                <ChevronDown
+                  v-if="isChapterExpanded(chap.id)"
+                  :size="13"
+                  class="transition-transform duration-200"
+                />
                 <ChevronRight v-else :size="13" class="transition-transform duration-200" />
               </button>
               <span class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate">
@@ -539,7 +555,9 @@ onBeforeUnmount(async () => {
                   >
                     <Trash2 :size="11" />
                   </button>
-                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase">
+                  <span
+                    class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase"
+                  >
                     {{ scene.status }}
                   </span>
                 </div>
@@ -609,7 +627,10 @@ onBeforeUnmount(async () => {
         @click="trashStore.openModal(projectStore.activeProjectId)"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <Trash2 :size="13" class="text-[var(--accent)] shrink-0 group-hover:scale-110 transition-transform" />
+          <Trash2
+            :size="13"
+            class="text-[var(--accent)] shrink-0 group-hover:scale-110 transition-transform"
+          />
           <span class="truncate font-editorial font-medium">Papelera de Reciclaje</span>
         </div>
         <div class="flex items-center gap-1 shrink-0">
@@ -625,24 +646,51 @@ onBeforeUnmount(async () => {
 
       <!-- Pie del Sidebar Izquierdo con atajo de teclado visible -->
       <div class="neu-groove-h"></div>
-      <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0">
+      <div
+        class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0"
+      >
         <span>{{ folioStore.chapters.length }} caps · {{ folioStore.folios.length }} docs</span>
-        <span class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-1">
+        <span
+          class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-1"
+        >
           <strong class="text-[var(--accent)]">Ctrl+B</strong>: Ocultar árbol
         </span>
       </div>
     </aside>
 
+    <!-- SEPARADOR / RESIZER REDIMENSIONABLE: MANUSCRITO (IZQUIERDA) -->
+    <Transition
+      enter-active-class="transition-[width,opacity] duration-300 ease-in-out overflow-hidden"
+      enter-from-class="!w-0 opacity-0"
+      enter-to-class="w-3 md:w-3.5 opacity-100"
+      leave-active-class="transition-[width,opacity] duration-300 ease-in-out overflow-hidden"
+      leave-from-class="w-3 md:w-3.5 opacity-100"
+      leave-to-class="!w-0 opacity-0"
+    >
+      <PanelResizer
+        v-if="uiStore.isLeftSidebarOpen"
+        class="app-sidebar"
+        side="left"
+        :current-width="uiStore.leftSidebarWidth"
+        :min-width="uiStore.MIN_LEFT_WIDTH"
+        :max-width="maxAllowedLeftWidth"
+        label="Ajustar ancho del árbol de manuscrito"
+        @update:width="uiStore.setLeftSidebarWidth"
+        @drag-start="isDraggingLeft = true"
+        @drag-end="isDraggingLeft = false"
+        @reset="uiStore.resetLeftSidebarWidth"
+      />
+    </Transition>
+
     <!-- ================================================================= -->
     <!-- COLUMNA 2: LIENZO EDITORIAL DE ESCRITURA (CENTRAL, max-w-3xl)     -->
     <!-- ================================================================= -->
-    <main class="flex-1 h-full min-w-0 flex flex-col neu-surface p-4 md:p-6 gap-4 overflow-hidden relative">
+    <main
+      class="flex-1 h-full min-w-0 flex flex-col neu-surface p-4 md:p-6 gap-4 overflow-hidden relative"
+    >
       <template v-if="folioStore.activeFolio">
         <!-- Cabecera de Herramientas del Editor -->
-        <header
-          class="flex items-center justify-between gap-3 shrink-0 transition-opacity duration-300"
-          :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
-        >
+        <header class="editor-metadata flex items-center justify-between gap-3 shrink-0">
           <div class="flex items-center gap-2 min-w-0">
             <Bookmark :size="14" class="text-[var(--accent)] shrink-0" />
             <span class="text-xs text-[var(--text-muted)] font-mono shrink-0">
@@ -662,7 +710,10 @@ onBeforeUnmount(async () => {
                 class="neu-well-sm px-2.5 py-1 text-xs text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                 @click="isStatusDropdownOpen = !isStatusDropdownOpen"
               >
-                <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="currentStatusObj.color"></span>
+                <span
+                  class="w-1.5 h-1.5 rounded-full shrink-0"
+                  :class="currentStatusObj.color"
+                ></span>
                 <span class="font-medium text-[11px]">{{ currentStatusObj.label }}</span>
                 <ChevronDown
                   :size="11"
@@ -688,68 +739,47 @@ onBeforeUnmount(async () => {
                     :key="opt.value"
                     type="button"
                     class="w-full px-2 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
-                    :class="opt.value === editFolioStatus ? 'text-[var(--accent)] font-semibold neu-well-sm' : 'text-[var(--text-primary)]'"
+                    :class="
+                      opt.value === editFolioStatus
+                        ? 'text-[var(--accent)] font-semibold neu-well-sm'
+                        : 'text-[var(--text-primary)]'
+                    "
                     @click="setFolioStatus(opt.value)"
                   >
                     <div class="flex items-center gap-2">
                       <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="opt.color"></span>
                       <span>{{ opt.label }}</span>
                     </div>
-                    <Check v-if="opt.value === editFolioStatus" :size="12" class="text-[var(--accent)] shrink-0" />
+                    <Check
+                      v-if="opt.value === editFolioStatus"
+                      :size="12"
+                      class="text-[var(--accent)] shrink-0"
+                    />
                   </button>
                 </div>
               </Transition>
             </div>
 
-            <!-- Conmutador: Modo Máquina de Escribir -->
-            <button
-              type="button"
-              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-              :class="{
-                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': uiStore.isTypewriterMode,
-                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !uiStore.isTypewriterMode
-              }"
-              :title="uiStore.isTypewriterMode ? 'Desactivar Modo Máquina de Escribir (Ctrl+Shift+T)' : 'Activar Modo Máquina de Escribir (Ctrl+Shift+T)'"
-              @click="uiStore.toggleTypewriterMode"
-            >
-              <AlignVerticalSpaceAround :size="13" />
-              <span class="text-[11px] font-medium hidden md:inline">Máquina</span>
-            </button>
 
             <!-- Conmutador: Modo Enfoque por Párrafo -->
             <button
               type="button"
               class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
               :class="{
-                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': uiStore.isFocusMode,
-                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !uiStore.isFocusMode
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40':
+                  uiStore.isFocusMode,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]':
+                  !uiStore.isFocusMode
               }"
-              :title="uiStore.isFocusMode ? 'Desactivar Modo Enfoque por Párrafo (Ctrl+Shift+F)' : 'Activar Modo Enfoque por Párrafo (Ctrl+Shift+F)'"
+              :title="
+                uiStore.isFocusMode
+                  ? 'Desactivar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
+                  : 'Activar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
+              "
               @click="uiStore.toggleFocusMode"
             >
               <Eye :size="13" />
               <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
-            </button>
-
-            <!-- Botón Scratchpad / Bloc de Captura Rápida (Ctrl+J) -->
-            <button
-              type="button"
-              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-              :class="{
-                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40': scratchpadStore.isOpen,
-                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !scratchpadStore.isOpen
-              }"
-              title="Abrir Scratchpad / Bloc Rápido (Ctrl+J)"
-              @click="scratchpadStore.toggleScratchpad()"
-            >
-              <Feather :size="13" />
-              <span class="text-[11px] font-medium hidden md:inline">Bloc</span>
-              <span
-                v-if="scratchpadStore.notes.length > 0"
-                class="neu-well-sm px-1.5 py-0.2 text-[9px] font-mono text-[var(--accent)] rounded-full font-semibold"
-              >
-                {{ scratchpadStore.notes.length }}
-              </span>
             </button>
 
             <button
@@ -768,7 +798,8 @@ onBeforeUnmount(async () => {
               :class="{
                 'neu-well border-amber-500/40 text-amber-500': saveStatus === 'pending',
                 'neu-well border-[var(--accent)]/40 text-[var(--accent)]': saveStatus === 'saving',
-                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': saveStatus === 'saved'
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]':
+                  saveStatus === 'saved'
               }"
               title="Forzar guardado manual inmediato (Ctrl+S)"
               @click="handleManualSave"
@@ -793,10 +824,14 @@ onBeforeUnmount(async () => {
                 <template v-if="saveStatus === 'saving'">Guardando...</template>
                 <template v-else-if="saveStatus === 'pending'">Sin guardar...</template>
                 <template v-else-if="saveStatus === 'error'">Error en SQLite</template>
-                <template v-else>Guardado local {{ lastSavedTime ? `· ${lastSavedTime}` : '' }}</template>
+                <template v-else
+                  >Guardado local {{ lastSavedTime ? `· ${lastSavedTime}` : '' }}</template
+                >
               </span>
 
-              <span class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75">
+              <span
+                class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75"
+              >
                 Ctrl+S
               </span>
             </button>
@@ -806,60 +841,64 @@ onBeforeUnmount(async () => {
         <div class="neu-groove-h"></div>
 
         <!-- Barra de Herramientas Editorial Superior -->
-        <EditorToolbar :editor="activeEditor" />
+        <EditorToolbar class="editor-toolbar" :editor="activeEditor" />
 
         <div class="neu-groove-h"></div>
 
-        <!-- Papel / Lienzo Hundido con scrollbar editorial delgado y centrado en Modo Máquina -->
-        <div
-          ref="scrollContainerRef"
-          class="flex-1 flex flex-col neu-well p-6 md:p-8 overflow-y-auto editorial-scrollbar transition-all duration-300"
-          :class="{ 'typewriter-active': uiStore.isTypewriterMode }"
-        >
-          <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col transition-all duration-300 relative">
-            <!-- Insignia flotante sutil de Modo Enfoque -->
-            <Transition
-              enter-active-class="transition duration-200 ease-out"
-              enter-from-class="opacity-0 translate-y-[-4px]"
-              enter-to-class="opacity-100 translate-y-0"
-              leave-active-class="transition duration-150 ease-in"
-              leave-from-class="opacity-100 translate-y-0"
-              leave-to-class="opacity-0 translate-y-[-4px]"
-            >
-              <div
-                v-if="uiStore.isFocusMode"
-                class="absolute -top-3 right-0 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full neu-well-sm text-[10px] font-mono text-[var(--accent)] tracking-wide shadow-sm"
+        <!-- Papel / Lienzo Hundido Editorial -->
+        <div class="flex-1 flex flex-col neu-well overflow-hidden relative min-h-0">
+          <!-- Cabecera de Capítulo Fija: Siempre visible arriba sin scroll -->
+          <div
+            class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3 border-b border-[var(--groove-dark)]/40 bg-[var(--bg-base)]"
+          >
+            <div class="max-w-3xl mx-auto w-full relative">
+              <!-- Insignia flotante sutil de Modo Enfoque -->
+              <Transition
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0 translate-y-[-4px]"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 translate-y-[-4px]"
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-                <span>Enfoque en párrafo</span>
-              </div>
-            </Transition>
+                <div
+                  v-if="uiStore.isFocusMode"
+                  class="absolute -top-2 right-0 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full neu-well-sm text-[10px] font-mono text-[var(--accent)] tracking-wide shadow-sm"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+                  <span>Enfoque en párrafo</span>
+                </div>
+              </Transition>
 
-            <!-- Título de la escena / capítulo -->
-            <input
-              ref="titleInputRef"
-              v-model="editFolioTitle"
-              type="text"
-              placeholder="Título del capítulo o escena..."
-              class="font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-2 placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
-              @input="onEditorInput"
-              @focus="onTitleFocus"
-            />
+              <!-- Título de la escena / capítulo -->
+              <input
+                ref="titleInputRef"
+                v-model="editFolioTitle"
+                type="text"
+                placeholder="Título del capítulo o escena..."
+                class="chapter-title font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-1.5 placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
+                @input="onEditorInput"
+                @keydown.enter.prevent="tiptapEditorRef?.focus()"
+                @keydown.down="tiptapEditorRef?.focus()"
+              />
 
-            <!-- Sinopsis o nota de la escena (opcional) -->
-            <input
-              v-model="editFolioSynopsis"
-              type="text"
-              placeholder="Sinopsis o nota de la escena..."
-              class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none mb-4 placeholder:text-[var(--text-muted)]/50 w-full italic transition-opacity duration-300"
-              :class="{ 'opacity-25 focus:opacity-100': uiStore.isFocusMode }"
-              @input="onEditorInput"
-            />
+              <!-- Sinopsis o nota de la escena (opcional) -->
+              <input
+                v-model="editFolioSynopsis"
+                type="text"
+                placeholder="Sinopsis o nota de la escena..."
+                class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50 w-full italic"
+                @input="onEditorInput"
+              />
+            </div>
+          </div>
 
-            <div class="neu-groove-h mb-6 opacity-60"></div>
-
-            <!-- Contenedor de Prosa con Editor Enriquecido TipTap -->
-            <div class="relative w-full flex-1 flex flex-col">
+          <!-- Contenedor con Scroll SÓLO para el texto del editor -->
+          <div
+            ref="scrollContainerRef"
+            class="flex-1 overflow-y-auto editorial-scrollbar px-6 md:px-8 py-5 md:py-6"
+          >
+            <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col relative">
               <TiptapEditor
                 ref="tiptapEditorRef"
                 v-model:content="editFolioContent"
@@ -877,8 +916,7 @@ onBeforeUnmount(async () => {
         <!-- Barra de Estado Inferior ANCLADA AL BOTTOM DE LA CAJA CENTRAL -->
         <div class="neu-groove-h"></div>
         <footer
-          class="shrink-0 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none pt-0.5 transition-opacity duration-300"
-          :class="{ 'opacity-25 hover:opacity-100': uiStore.isFocusMode }"
+          class="status-bar editor-metadata shrink-0 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none pt-0.5"
         >
           <div class="flex items-center gap-3">
             <span>{{ wordCount }} palabras</span>
@@ -897,13 +935,15 @@ onBeforeUnmount(async () => {
           </div>
 
           <div class="flex items-center gap-2">
-            <span class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] uppercase">
+            <span
+              class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] uppercase"
+            >
               {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
             </span>
-            <span class="neu-well-sm px-2 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-2">
+            <span
+              class="neu-well-sm px-2 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-2"
+            >
               <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
-              <span>·</span>
-              <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
               <span>·</span>
               <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Enfoque</span>
             </span>
@@ -912,10 +952,7 @@ onBeforeUnmount(async () => {
       </template>
 
       <!-- Estado Vacío cuando no hay folio activo -->
-      <div
-        v-else
-        class="flex-1 flex flex-col items-center justify-center neu-well p-8 text-center"
-      >
+      <div v-else class="flex-1 flex flex-col items-center justify-center neu-well p-8 text-center">
         <div class="w-24 h-24 mb-4 flex items-center justify-center shrink-0 drop-shadow-xl">
           <FolioLogo />
         </div>
@@ -923,7 +960,8 @@ onBeforeUnmount(async () => {
           {{ projectStore.activeProject?.title || 'Bienvenido a Folio' }}
         </h3>
         <p class="text-xs text-[var(--text-muted)] max-w-sm mb-6">
-          Selecciona un capítulo o escena en el árbol del manuscrito a la izquierda para comenzar a escribir.
+          Selecciona un capítulo o escena en el árbol del manuscrito a la izquierda para comenzar a
+          escribir.
         </p>
 
         <button
@@ -937,12 +975,44 @@ onBeforeUnmount(async () => {
       </div>
     </main>
 
+    <!-- SEPARADOR / RESIZER REDIMENSIONABLE: WIKI (DERECHA) -->
+    <Transition
+      enter-active-class="transition-[width,opacity] duration-300 ease-in-out overflow-hidden"
+      enter-from-class="!w-0 opacity-0"
+      enter-to-class="w-3 md:w-3.5 opacity-100"
+      leave-active-class="transition-[width,opacity] duration-300 ease-in-out overflow-hidden"
+      leave-from-class="w-3 md:w-3.5 opacity-100"
+      leave-to-class="!w-0 opacity-0"
+    >
+      <PanelResizer
+        v-if="uiStore.isRightSidebarOpen"
+        class="app-sidebar"
+        side="right"
+        :current-width="uiStore.rightSidebarWidth"
+        :min-width="uiStore.MIN_RIGHT_WIDTH"
+        :max-width="maxAllowedRightWidth"
+        label="Ajustar ancho de la wiki de lore y reglas"
+        @update:width="uiStore.setRightSidebarWidth"
+        @drag-start="isDraggingRight = true"
+        @drag-end="isDraggingRight = false"
+        @reset="uiStore.resetRightSidebarWidth"
+      />
+    </Transition>
+
     <!-- ================================================================= -->
     <!-- COLUMNA 3: WIKI / LORE INSPECTOR (COLAPSIBLE)                     -->
     <!-- ================================================================= -->
     <aside
-      class="neu-surface flex flex-col overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-      :class="uiStore.isRightSidebarOpen ? 'w-72 lg:w-76 xl:w-80 p-3.5 gap-3' : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'"
+      class="app-sidebar neu-surface flex flex-col overflow-hidden shrink-0"
+      :class="[
+        isDraggingRight ? '' : 'transition-[width,padding,opacity,margin] duration-300 ease-in-out',
+        uiStore.isRightSidebarOpen
+          ? 'p-3.5 gap-3'
+          : 'w-0 p-0 m-0 border-0 opacity-0 pointer-events-none'
+      ]"
+      :style="{
+        width: uiStore.isRightSidebarOpen ? `${uiStore.rightSidebarWidth}px` : '0px'
+      }"
     >
       <WikiInspector />
     </aside>

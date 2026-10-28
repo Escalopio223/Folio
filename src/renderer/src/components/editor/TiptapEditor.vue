@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
+import { watch, onBeforeUnmount, onMounted } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import type { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -55,36 +55,6 @@ function calculateStats(text: string): {
   return { wordCount, charCount, readingTime, plainText: text }
 }
 
-// =========================================================================
-// MODO MÁQUINA DE ESCRIBIR: CENTRADO EXACTO DE LA LÍNEA ACTIVA AL 50%
-// =========================================================================
-function syncTypewriterCenter(instant = false): void {
-  if (!uiStore.isTypewriterMode || !editor.value || !props.scrollContainer) return
-
-  const container = props.scrollContainer
-  const { from } = editor.value.state.selection
-
-  try {
-    const coords = editor.value.view.coordsAtPos(from)
-    const containerRect = container.getBoundingClientRect()
-
-    const caretCenterY = (coords.top + coords.bottom) / 2
-    const containerCenterY = containerRect.top + containerRect.height / 2
-    const deltaY = caretCenterY - containerCenterY
-
-    // Si el cursor se ha desplazado más de 1.5px del centro exacto, corregir el scroll
-    if (Math.abs(deltaY) > 1.5) {
-      const targetScrollTop = Math.max(0, container.scrollTop + deltaY)
-      if (instant) {
-        container.scrollTop = targetScrollTop
-      } else {
-        container.scrollTop = targetScrollTop
-      }
-    }
-  } catch {
-    // Protección en caso de cálculo de coordenadas durante desmontaje o re-renderizado
-  }
-}
 
 const editor = useEditor({
   content: normalizeHtml(props.content),
@@ -112,7 +82,19 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      class: 'ProseMirror font-editorial text-lg md:text-[19px] leading-relaxed md:leading-loose text-[var(--text-primary)] focus:outline-none min-h-[350px] w-full select-text caret-[var(--accent)]'
+      class:
+        'ProseMirror font-editorial text-lg md:text-[19px] leading-relaxed md:leading-loose text-[var(--text-primary)] focus:outline-none min-h-[350px] w-full select-text caret-[var(--accent)]'
+    },
+    handleKeyDown(_view, event) {
+      const isCtrlOrCmd = event.ctrlKey || event.metaKey
+
+      // Atajo de Modo Enfoque dentro del editor
+      if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        uiStore.toggleFocusMode()
+        return true
+      }
+      return false
     }
   },
   onUpdate: ({ editor: ed }) => {
@@ -125,12 +107,6 @@ const editor = useEditor({
     // 2. Emitir contenido actualizado para persistencia reactiva
     emit('update:content', html)
     emit('change')
-
-    // 3. Mantener centrado de máquina de escribir
-    syncTypewriterCenter(true)
-  },
-  onSelectionUpdate: () => {
-    syncTypewriterCenter(false)
   }
 })
 
@@ -145,21 +121,6 @@ watch(
       editor.value.commands.setContent(normalizeHtml(newContent || ''), { emitUpdate: false })
       const text = editor.value.getText()
       emit('stats', calculateStats(text))
-      nextTick(() => {
-        syncTypewriterCenter(true)
-      })
-    }
-  }
-)
-
-// Reaccionar inmediatamente cuando se active el modo máquina de escribir
-watch(
-  () => uiStore.isTypewriterMode,
-  (active) => {
-    if (active) {
-      nextTick(() => {
-        syncTypewriterCenter(false)
-      })
     }
   }
 )
@@ -188,24 +149,22 @@ defineExpose({
   editor,
   getHTML: () => editor.value?.getHTML() || '',
   getText: () => editor.value?.getText() || '',
-  focus: () => editor.value?.commands.focus(),
-  syncTypewriterCenter
+  focus: () => editor.value?.commands.focus()
 })
 </script>
 
 <template>
   <div
     class="tiptap-wrapper w-full flex-1 flex flex-col relative"
-    :class="{ 'focus-mode-active': uiStore.isFocusMode }"
+    :class="{
+      'focus-mode-active': uiStore.isFocusMode
+    }"
   >
     <!-- Menú flotante contextual neumórfico -->
     <EditorBubbleMenu :editor="editor" />
 
     <!-- Contenedor del Editor TipTap / ProseMirror -->
-    <EditorContent
-      :editor="editor"
-      class="tiptap-editor-content w-full flex-1"
-    />
+    <EditorContent :editor="editor" class="tiptap-editor-content w-full flex-1" />
   </div>
 </template>
 
@@ -282,7 +241,7 @@ defineExpose({
 }
 
 /* Florón de descanso de escena narrativo (* * *) */
-.ProseMirror div[data-type="scene-break"],
+.ProseMirror div[data-type='scene-break'],
 .ProseMirror .scene-break {
   display: block;
   text-align: center;
@@ -333,30 +292,32 @@ defineExpose({
 }
 
 /* Alineaciones de texto */
-.ProseMirror [style*="text-align: right"],
-.ProseMirror [data-text-align="right"] {
+.ProseMirror [style*='text-align: right'],
+.ProseMirror [data-text-align='right'] {
   text-align: right;
 }
-.ProseMirror [style*="text-align: center"],
-.ProseMirror [data-text-align="center"] {
+.ProseMirror [style*='text-align: center'],
+.ProseMirror [data-text-align='center'] {
   text-align: center;
 }
-.ProseMirror [style*="text-align: justify"],
-.ProseMirror [data-text-align="justify"] {
+.ProseMirror [style*='text-align: justify'],
+.ProseMirror [data-text-align='justify'] {
   text-align: justify;
 }
-.ProseMirror [style*="text-align: left"],
-.ProseMirror [data-text-align="left"] {
+.ProseMirror [style*='text-align: left'],
+.ProseMirror [data-text-align='left'] {
   text-align: left;
 }
 
+
 /* Modo Enfoque en Párrafo (Focus Mode) */
 .focus-mode-active .ProseMirror > * {
-  opacity: 0.18;
-  transition: opacity 0.2s ease-in-out;
+  opacity: 0.22;
+  transition: opacity 0.25s ease;
 }
 
-.focus-mode-active .ProseMirror > *.is-active-paragraph {
+.focus-mode-active .ProseMirror > .is-active-node,
+.focus-mode-active .ProseMirror > .is-active-paragraph {
   opacity: 1 !important;
 }
 </style>

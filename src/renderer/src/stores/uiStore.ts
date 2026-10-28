@@ -1,14 +1,36 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+export const DEFAULT_LEFT_WIDTH = 260
+export const MIN_LEFT_WIDTH = 200
+export const MAX_LEFT_WIDTH = 480
+
+export const DEFAULT_RIGHT_WIDTH = 340
+export const MIN_RIGHT_WIDTH = 260
+export const MAX_RIGHT_WIDTH = 640
+
 export const useUiStore = defineStore('ui', () => {
   // Panel Izquierdo: Árbol del Manuscrito
   const savedLeft = localStorage.getItem('folio:left_sidebar')
   const isLeftSidebarOpen = ref(savedLeft !== 'false')
 
+  const savedLeftWidth = Number(localStorage.getItem('folio:left_sidebar_width'))
+  const leftSidebarWidth = ref(
+    savedLeftWidth && !isNaN(savedLeftWidth) && savedLeftWidth >= MIN_LEFT_WIDTH
+      ? Math.min(MAX_LEFT_WIDTH, savedLeftWidth)
+      : DEFAULT_LEFT_WIDTH
+  )
+
   // Panel Derecho: Wiki / Lore Inspector
   const savedRight = localStorage.getItem('folio:right_sidebar')
   const isRightSidebarOpen = ref(savedRight !== 'false')
+
+  const savedRightWidth = Number(localStorage.getItem('folio:right_sidebar_width'))
+  const rightSidebarWidth = ref(
+    savedRightWidth && !isNaN(savedRightWidth) && savedRightWidth >= MIN_RIGHT_WIDTH
+      ? Math.min(MAX_RIGHT_WIDTH, savedRightWidth)
+      : DEFAULT_RIGHT_WIDTH
+  )
 
   // Modo Oscuro / Espresso
   const isDark = ref(false)
@@ -52,7 +74,6 @@ export const useUiStore = defineStore('ui', () => {
   const isSplashLoading = ref(true)
 
   // Modos de Escritura
-  const isTypewriterMode = ref(false)
   const isFocusMode = ref(false)
 
   function toggleLeftSidebar(): void {
@@ -87,9 +108,6 @@ export const useUiStore = defineStore('ui', () => {
     isSplashLoading.value = val
   }
 
-  function toggleTypewriterMode(): void {
-    isTypewriterMode.value = !isTypewriterMode.value
-  }
 
   function toggleFocusMode(): void {
     isFocusMode.value = !isFocusMode.value
@@ -112,14 +130,51 @@ export const useUiStore = defineStore('ui', () => {
     setRightSidebar(true)
   }
 
+  function setLeftSidebarWidth(width: number): void {
+    const clamped = Math.max(MIN_LEFT_WIDTH, Math.min(MAX_LEFT_WIDTH, Math.round(width)))
+    leftSidebarWidth.value = clamped
+    localStorage.setItem('folio:left_sidebar_width', String(clamped))
+  }
+
+  function setRightSidebarWidth(width: number): void {
+    const clamped = Math.max(MIN_RIGHT_WIDTH, Math.min(MAX_RIGHT_WIDTH, Math.round(width)))
+    rightSidebarWidth.value = clamped
+    localStorage.setItem('folio:right_sidebar_width', String(clamped))
+  }
+
+  function resetLeftSidebarWidth(): void {
+    setLeftSidebarWidth(DEFAULT_LEFT_WIDTH)
+  }
+
+  function resetRightSidebarWidth(): void {
+    setRightSidebarWidth(DEFAULT_RIGHT_WIDTH)
+  }
+
+  function resetSidebarWidths(): void {
+    resetLeftSidebarWidth()
+    resetRightSidebarWidth()
+  }
+
   return {
+    DEFAULT_LEFT_WIDTH,
+    MIN_LEFT_WIDTH,
+    MAX_LEFT_WIDTH,
+    DEFAULT_RIGHT_WIDTH,
+    MIN_RIGHT_WIDTH,
+    MAX_RIGHT_WIDTH,
+    leftSidebarWidth,
+    rightSidebarWidth,
+    setLeftSidebarWidth,
+    setRightSidebarWidth,
+    resetLeftSidebarWidth,
+    resetRightSidebarWidth,
+    resetSidebarWidths,
     isLeftSidebarOpen,
     isRightSidebarOpen,
     isSidebarOpen,
     isWikiOpen,
     activeWikiTab,
     isSplashLoading,
-    isTypewriterMode,
     isFocusMode,
     isDark,
     initTheme,
@@ -134,7 +189,6 @@ export const useUiStore = defineStore('ui', () => {
     openWikiRules,
     openWikiLore,
     setSplashLoading,
-    toggleTypewriterMode,
     toggleFocusMode
   }
 })

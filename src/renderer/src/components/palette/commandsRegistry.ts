@@ -6,12 +6,12 @@ import {
   SunMoon,
   PanelLeft,
   PanelRight,
-  AlignVerticalSpaceAround,
   Eye,
   Save,
   Trash2,
   Feather,
-  Scale
+  Scale,
+  RotateCcw
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -169,18 +169,26 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
-      id: 'toggle-typewriter',
-      title: 'Alternar Modo Máquina de Escribir',
-      description: uiStore.isTypewriterMode
-        ? 'Desactivar scroll vertical fijo de línea activa'
-        : 'Fijar la línea activa de escritura al 50vh de la pantalla',
+      id: 'reset-sidebar-sizes',
+      title: 'Restablecer Tamaño de Paneles (Manuscrito y Wiki)',
+      description: 'Restablece el ancho predeterminado de los paneles de manuscrito y wiki',
       category: 'action',
-      badge: 'Editor',
-      icon: AlignVerticalSpaceAround,
-      shortcut: 'Ctrl+Shift+T',
-      keywords: ['typewriter', 'maquina', 'escribir', 'centrado', 'scroll', 'modo'],
+      badge: 'Vista',
+      icon: RotateCcw,
+      keywords: [
+        'tamaño',
+        'paneles',
+        'ancho',
+        'sidebar',
+        'manuscrito',
+        'wiki',
+        'restablecer',
+        'redimensionar',
+        'defecto',
+        'arrastrar'
+      ],
       execute: () => {
-        uiStore.toggleTypewriterMode()
+        uiStore.resetSidebarWidths()
       }
     },
     {
@@ -245,7 +253,16 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       badge: 'Herramienta',
       icon: Feather,
       shortcut: 'Ctrl+J',
-      keywords: ['scratchpad', 'bloc', 'rapido', 'ideas', 'notas', 'anotaciones', 'apunte', 'borrador'],
+      keywords: [
+        'scratchpad',
+        'bloc',
+        'rapido',
+        'ideas',
+        'notas',
+        'anotaciones',
+        'apunte',
+        'borrador'
+      ],
       execute: () => {
         scratchpadStore.toggleScratchpad()
       }
@@ -270,7 +287,19 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       category: 'action',
       badge: 'Reglas',
       icon: Scale,
-      keywords: ['regla', 'ley', 'mundo', 'axioma', 'codigo', 'limite', 'sistema', 'magia', 'tecnologia', 'nueva', 'norma'],
+      keywords: [
+        'regla',
+        'ley',
+        'mundo',
+        'axioma',
+        'codigo',
+        'limite',
+        'sistema',
+        'magia',
+        'tecnologia',
+        'nueva',
+        'norma'
+      ],
       execute: () => {
         uiStore.openWikiRules()
         rulesStore.openCreateModal()
@@ -279,11 +308,22 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     {
       id: 'view-world-rules',
       title: 'Ver Reglas del Mundo',
-      description: 'Consultar las leyes, códigos y sistemas del universo narrativo en el panel lateral',
+      description:
+        'Consultar las leyes, códigos y sistemas del universo narrativo en el panel lateral',
       category: 'action',
       badge: 'Vista',
       icon: Scale,
-      keywords: ['reglas', 'leyes', 'mundo', 'axiomas', 'codigos', 'sistemas', 'normas', 'ver', 'consultar'],
+      keywords: [
+        'reglas',
+        'leyes',
+        'mundo',
+        'axiomas',
+        'codigos',
+        'sistemas',
+        'normas',
+        'ver',
+        'consultar'
+      ],
       execute: () => {
         uiStore.openWikiRules()
       }

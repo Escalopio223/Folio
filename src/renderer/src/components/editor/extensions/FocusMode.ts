@@ -13,7 +13,7 @@ export const FocusMode = Extension.create<FocusModeOptions>({
 
   addOptions() {
     return {
-      className: 'is-active-paragraph'
+      className: 'is-active-node is-active-paragraph'
     }
   },
 
@@ -26,25 +26,50 @@ export const FocusMode = Extension.create<FocusModeOptions>({
         props: {
           decorations(state) {
             const { selection, doc } = state
-            const { from } = selection
-            const resolved = doc.resolve(from)
+            if (!doc || doc.childCount === 0) {
+              return DecorationSet.empty
+            }
 
-            // Identificar el bloque de nivel superior (depth 1) que contiene el cursor
-            const depth = Math.min(1, resolved.depth)
-            if (depth === 0) return DecorationSet.empty
+            const { $from, $to } = selection
+            const decorations: Decoration[] = []
 
-            const startPos = resolved.before(depth)
-            const node = doc.nodeAt(startPos)
-            if (!node) return DecorationSet.empty
+            // Identificar el bloque de nivel superior (depth 1) que contiene el cursor o la selección
+            if ($from.depth >= 1) {
+              const startBlockPos = $from.before(1)
+              const endBlockPos = $to.depth >= 1 ? $to.after(1) : $from.after(1)
 
-            const decoration = Decoration.node(startPos, startPos + node.nodeSize, {
-              class: className
-            })
+              // Decorar todos los bloques de nivel superior entre startBlockPos y endBlockPos
+              doc.nodesBetween(startBlockPos, endBlockPos, (node, pos) => {
+                if (pos >= startBlockPos && pos < endBlockPos) {
+                  const $pos = doc.resolve(pos + 1)
+                  if ($pos.depth === 1) {
+                    decorations.push(
+                      Decoration.node(pos, pos + node.nodeSize, {
+                        class: className
+                      })
+                    )
+                    return false
+                  }
+                }
+                return true
+              })
+            }
 
-            return DecorationSet.create(doc, [decoration])
+            // Fallback: si la selección es depth 0 (ej. inicio absoluto), decorar el primer bloque
+            if (decorations.length === 0 && doc.firstChild) {
+              decorations.push(
+                Decoration.node(0, doc.firstChild.nodeSize, {
+                  class: className
+                })
+              )
+            }
+
+            return DecorationSet.create(doc, decorations)
           }
         }
       })
     ]
   }
 })
+
+export const FocusParagraphExtension = FocusMode
