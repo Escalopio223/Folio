@@ -40,6 +40,8 @@ function mapProjectGoals(row: schema.ProjectGoalsSelect): ProjectGoals {
     dailySceneGoal: row.dailySceneGoal,
     dailyChapterGoal: row.dailyChapterGoal,
     deadlineDate: row.deadlineDate,
+    askSessionGoalOnStartup:
+      row.askSessionGoalOnStartup === undefined ? true : Boolean(row.askSessionGoalOnStartup),
     updatedAt: row.updatedAt
   }
 }
@@ -49,9 +51,10 @@ function mapDailyWritingLog(row: schema.DailyWritingLogSelect): DailyWritingLog 
     id: row.id,
     projectId: row.projectId,
     date: row.date,
-    wordsWritten: row.wordsWritten,
-    scenesCreated: row.scenesCreated,
-    chaptersCreated: row.chaptersCreated,
+    wordsWritten: row.wordsWritten ?? 0,
+    scenesCompleted: row.scenesCompleted ?? 0,
+    chaptersCompleted: row.chaptersCompleted ?? 0,
+    sessionGoalsHit: row.sessionGoalsHit ?? 0,
     goalMet: Boolean(row.goalMet)
   }
 }
@@ -61,6 +64,7 @@ function mapUnlockedAchievement(row: schema.UnlockedAchievementSelect): Unlocked
     id: row.id,
     projectId: row.projectId,
     achievementKey: row.achievementKey,
+    customLabel: row.customLabel ?? null,
     unlockedAt: row.unlockedAt
   }
 }
@@ -93,6 +97,7 @@ function mapScratchpadNote(row: schema.ScratchpadNoteSelect): ScratchpadNote {
     updatedAt: row.updatedAt
   }
 }
+
 function mapProject(row: schema.ProjectSelect): Project {
   return {
     id: row.id,
@@ -263,6 +268,7 @@ export function initDatabase(): {
       daily_scene_goal INTEGER NOT NULL DEFAULT 1,
       daily_chapter_goal INTEGER NOT NULL DEFAULT 0,
       deadline_date TEXT,
+      ask_session_goal_on_startup INTEGER NOT NULL DEFAULT 1,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
@@ -272,8 +278,9 @@ export function initDatabase(): {
       project_id TEXT NOT NULL,
       date TEXT NOT NULL,
       words_written INTEGER NOT NULL DEFAULT 0,
-      scenes_created INTEGER NOT NULL DEFAULT 0,
-      chapters_created INTEGER NOT NULL DEFAULT 0,
+      scenes_completed INTEGER NOT NULL DEFAULT 0,
+      chapters_completed INTEGER NOT NULL DEFAULT 0,
+      session_goals_hit INTEGER NOT NULL DEFAULT 0,
       goal_met INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, date)
@@ -284,6 +291,7 @@ export function initDatabase(): {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id TEXT NOT NULL,
       achievement_key TEXT NOT NULL,
+      custom_label TEXT,
       unlocked_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, achievement_key)
@@ -291,191 +299,279 @@ export function initDatabase(): {
     CREATE INDEX IF NOT EXISTS idx_unlocked_achievements_project ON unlocked_achievements(project_id);
   `)
 
-  // Asegurar que la columna title existe en bases de datos ya inicializadas
+  // Migraciones ligeras y seguras para bases de datos ya inicializadas
   try {
-    const tableColumns = sqliteInstance.prepare("PRAGMA table_info(scratchpad_notes)").all() as Array<{ name: string }>
-    const hasTitle = tableColumns.some((col) => col.name === 'title')
-    if (!hasTitle) {
+    const scratchpadCols = sqliteInstance
+      .prepare('PRAGMA table_info(scratchpad_notes)')
+      .all() as Array<{ name: string }>
+    if (!scratchpadCols.some((c) => c.name === 'title')) {
       sqliteInstance.exec('ALTER TABLE scratchpad_notes ADD COLUMN title TEXT NOT NULL DEFAULT "";')
     }
+
+    const goalsCols = sqliteInstance.prepare('PRAGMA table_info(project_goals)').all() as Array<{
+      name: string
+    }>
+    if (!goalsCols.some((c) => c.name === 'ask_session_goal_on_startup')) {
+      sqliteInstance.exec(
+        'ALTER TABLE project_goals ADD COLUMN ask_session_goal_on_startup INTEGER NOT NULL DEFAULT 1;'
+      )
+    }
+
+    const logsCols = sqliteInstance
+      .prepare('PRAGMA table_info(daily_writing_logs)')
+      .all() as Array<{ name: string }>
+    if (!logsCols.some((c) => c.name === 'scenes_completed')) {
+      sqliteInstance.exec(
+        'ALTER TABLE daily_writing_logs ADD COLUMN scenes_completed INTEGER NOT NULL DEFAULT 0;'
+      )
+      if (logsCols.some((c) => c.name === 'scenes_created')) {
+        sqliteInstance.exec('UPDATE daily_writing_logs SET scenes_completed = scenes_created;')
+      }
+    }
+    if (!logsCols.some((c) => c.name === 'chapters_completed')) {
+      sqliteInstance.exec(
+        'ALTER TABLE daily_writing_logs ADD COLUMN chapters_completed INTEGER NOT NULL DEFAULT 0;'
+      )
+      if (logsCols.some((c) => c.name === 'chapters_created')) {
+        sqliteInstance.exec('UPDATE daily_writing_logs SET chapters_completed = chapters_created;')
+      }
+    }
+    if (!logsCols.some((c) => c.name === 'session_goals_hit')) {
+      sqliteInstance.exec(
+        'ALTER TABLE daily_writing_logs ADD COLUMN session_goals_hit INTEGER NOT NULL DEFAULT 0;'
+      )
+    }
+
+    const achCols = sqliteInstance
+      .prepare('PRAGMA table_info(unlocked_achievements)')
+      .all() as Array<{ name: string }>
+    if (!achCols.some((c) => c.name === 'custom_label')) {
+      sqliteInstance.exec('ALTER TABLE unlocked_achievements ADD COLUMN custom_label TEXT;')
+    }
   } catch (err) {
-    console.warn('[Folio DB] scratchpad title column migration check:', err)
+    console.warn('[Folio DB] column migration check:', err)
   }
 
   drizzleInstance = drizzle(sqliteInstance, { schema })
 
   // Seed default Project, Chapters/Scenes, and Lore Wiki if empty
-  const projectCount = sqliteInstance.prepare('SELECT count(*) as count FROM projects').get() as { count: number }
+  const projectCount = sqliteInstance
+    .prepare('SELECT count(*) as count FROM projects')
+    .get() as { count: number }
   if (projectCount.count === 0) {
     const now = new Date()
     const defaultProjectId = crypto.randomUUID()
 
     // 1. Project
-    drizzleInstance.insert(schema.projects).values({
-      id: defaultProjectId,
-      title: 'El Archivo de las Sombras',
-      synopsis: 'Un manuscrito de intriga y fantasía sobre bibliotecas perdidas y códices olvidados.',
-      genre: 'Fantasía / Misterio',
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.projects)
+      .values({
+        id: defaultProjectId,
+        title: 'El Archivo de las Sombras',
+        synopsis:
+          'Un manuscrito de intriga y fantasía sobre bibliotecas perdidas y códices olvidados.',
+        genre: 'Fantasía / Misterio',
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
     // 2. Chapters & Scenes
     const chapter1Id = crypto.randomUUID()
-    drizzleInstance.insert(schema.folios).values({
-      id: chapter1Id,
-      projectId: defaultProjectId,
-      parentId: null,
-      type: 'chapter',
-      title: 'Capítulo I: El Despertar de la Cera',
-      content: '',
-      synopsis: 'Aria encuentra el primer sello terracota en la torre este.',
-      sortOrder: 1,
-      status: 'in_progress',
-      isFavorite: true,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: chapter1Id,
+        projectId: defaultProjectId,
+        parentId: null,
+        type: 'chapter',
+        title: 'Capítulo I: El Despertar de la Cera',
+        content: '',
+        synopsis: 'Aria encuentra el primer sello terracota en la torre este.',
+        sortOrder: 1,
+        status: 'in_progress',
+        isFavorite: true,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
-    drizzleInstance.insert(schema.folios).values({
-      id: crypto.randomUUID(),
-      projectId: defaultProjectId,
-      parentId: chapter1Id,
-      type: 'scene',
-      title: 'Escena 1: La Torre del Alba',
-      content: 'La tenue luz del amanecer se filtraba entre los vitrales polvorientos del archivo central. Aria sostenía una pluma gastada mientras observaba la inscripción grabada en la mesa de roble.',
-      synopsis: 'Aria examina los archivos al amanecer.',
-      sortOrder: 1,
-      status: 'in_progress',
-      isFavorite: false,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: crypto.randomUUID(),
+        projectId: defaultProjectId,
+        parentId: chapter1Id,
+        type: 'scene',
+        title: 'Escena 1: La Torre del Alba',
+        content:
+          'La tenue luz del amanecer se filtraba entre los vitrales polvorientos del archivo central. Aria sostenía una pluma gastada mientras observaba la inscripción grabada en la mesa de roble.',
+        synopsis: 'Aria examina los archivos al amanecer.',
+        sortOrder: 1,
+        status: 'in_progress',
+        isFavorite: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
-    drizzleInstance.insert(schema.folios).values({
-      id: crypto.randomUUID(),
-      projectId: defaultProjectId,
-      parentId: chapter1Id,
-      type: 'scene',
-      title: 'Escena 2: El Mensajero Silencioso',
-      content: 'Un crujido lejano en el pasillo interrumpió la lectura. No era el viento; alguien había burlado las cerraduras de bronce.',
-      synopsis: 'Alguien irrumpe en el santuario.',
-      sortOrder: 2,
-      status: 'draft',
-      isFavorite: false,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: crypto.randomUUID(),
+        projectId: defaultProjectId,
+        parentId: chapter1Id,
+        type: 'scene',
+        title: 'Escena 2: El Mensajero Silencioso',
+        content:
+          'Un crujido lejano en el pasillo interrumpió la lectura. No era el viento; alguien había burlado las cerraduras de bronce.',
+        synopsis: 'Alguien irrumpe en el santuario.',
+        sortOrder: 2,
+        status: 'draft',
+        isFavorite: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
     const chapter2Id = crypto.randomUUID()
-    drizzleInstance.insert(schema.folios).values({
-      id: chapter2Id,
-      projectId: defaultProjectId,
-      parentId: null,
-      type: 'chapter',
-      title: 'Capítulo II: La Ciudad Sumergida',
-      content: '',
-      synopsis: 'La expedición hacia las antiguas ruinas lacustres.',
-      sortOrder: 2,
-      status: 'draft',
-      isFavorite: false,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: chapter2Id,
+        projectId: defaultProjectId,
+        parentId: null,
+        type: 'chapter',
+        title: 'Capítulo II: La Ciudad Sumergida',
+        content: '',
+        synopsis: 'La expedición hacia las antiguas ruinas lacustres.',
+        sortOrder: 2,
+        status: 'draft',
+        isFavorite: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
-    drizzleInstance.insert(schema.folios).values({
-      id: crypto.randomUUID(),
-      projectId: defaultProjectId,
-      parentId: chapter2Id,
-      type: 'scene',
-      title: 'Escena 1: Orillas de Niebla',
-      content: 'Las aguas del lago permanecían inmóviles como un espejo de obsidiana.',
-      synopsis: 'Llegada a las costas del lago.',
-      sortOrder: 1,
-      status: 'draft',
-      isFavorite: false,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    }).run()
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: crypto.randomUUID(),
+        projectId: defaultProjectId,
+        parentId: chapter2Id,
+        type: 'scene',
+        title: 'Escena 1: Orillas de Niebla',
+        content: 'Las aguas del lago permanecían inmóviles como un espejo de obsidiana.',
+        synopsis: 'Llegada a las costas del lago.',
+        sortOrder: 1,
+        status: 'draft',
+        isFavorite: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
 
     // 3. Lore Wiki Items (Characters, Places, Items, Concepts)
-    drizzleInstance.insert(schema.loreItems).values([
-      {
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        category: 'personaje',
-        name: 'Aria Thorne',
-        summary: 'Joven archivista con talento para la criptografía antigua.',
-        content: 'Nacida en el distrito de los encuadernadores, Aria descubrió a temprana edad que podía descifrar inscripciones que volvían locos a los eruditos del consejo.',
-        attributes: JSON.stringify({ Rol: 'Protagonista', Edad: '24', Rango: 'Archivista Tercera Clase' }),
-        icon: 'User',
-        isFavorite: true,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        category: 'personaje',
-        name: 'Maestro Kaelen',
-        summary: 'Custodio mayor del archivo de bronce.',
-        content: 'Un anciano de pocas palabras y mirada penetrante. Guarda las llaves maestras de las bóvedas inferiores.',
-        attributes: JSON.stringify({ Rol: 'Mentor', Estado: 'Desaparecido', Afiliación: 'Orden de la Cera' }),
-        icon: 'User',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        category: 'lugar',
-        name: 'El Archivo Central de Oakhaven',
-        summary: 'Fortaleza de piedra caliza donde se guardan siglos de códices.',
-        content: 'Construido en lo alto del acantilado, cuenta con siete niveles de galerías circulares iluminadas por lámparas de aceite perpetuas.',
-        attributes: JSON.stringify({ Región: 'Meseta Central', Clima: 'Templado y brumoso', Acceso: 'Restringido' }),
-        icon: 'MapPin',
-        isFavorite: true,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        category: 'objeto',
-        name: 'El Sello de Cera Terracota',
-        summary: 'Amuleto ancestral que protege documentos contra el desgaste y ojos profanos.',
-        content: 'Un disco cerámico grabado a fuego que emite un calor imperceptible al entrar en contacto con su legítimo dueño.',
-        attributes: JSON.stringify({ Rareza: 'Artefacto Único', Material: 'Cera alquímica y bronce' }),
-        icon: 'Key',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        category: 'idea',
-        name: 'El Dogma del Silencio',
-        summary: 'Ideal filosófico que rige el comportamiento de los escribas.',
-        content: '“Aquel que transcribe la memoria de los reyes renuncia a escribir la suya propia.”',
-        attributes: JSON.stringify({ Tipo: 'Filosofía / Juramento', Origen: 'Primera Era' }),
-        icon: 'Lightbulb',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      }
-    ]).run()
+    drizzleInstance
+      .insert(schema.loreItems)
+      .values([
+        {
+          id: crypto.randomUUID(),
+          projectId: defaultProjectId,
+          category: 'personaje',
+          name: 'Aria Thorne',
+          summary: 'Joven archivista con talento para la criptografía antigua.',
+          content:
+            'Nacida en el distrito de los encuadernadores, Aria descubrió a temprana edad que podía descifrar inscripciones que volvían locos a los eruditos del consejo.',
+          attributes: JSON.stringify({
+            Rol: 'Protagonista',
+            Edad: '24',
+            Rango: 'Archivista Tercera Clase'
+          }),
+          icon: 'User',
+          isFavorite: true,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: crypto.randomUUID(),
+          projectId: defaultProjectId,
+          category: 'personaje',
+          name: 'Maestro Kaelen',
+          summary: 'Custodio mayor del archivo de bronce.',
+          content:
+            'Un anciano de pocas palabras y mirada penetrante. Guarda las llaves maestras de las bóvedas inferiores.',
+          attributes: JSON.stringify({
+            Rol: 'Mentor',
+            Estado: 'Desaparecido',
+            Afiliación: 'Orden de la Cera'
+          }),
+          icon: 'User',
+          isFavorite: false,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: crypto.randomUUID(),
+          projectId: defaultProjectId,
+          category: 'lugar',
+          name: 'El Archivo Central de Oakhaven',
+          summary: 'Fortaleza de piedra caliza donde se guardan siglos de códices.',
+          content:
+            'Construido en lo alto del acantilado, cuenta con siete niveles de galerías circulares iluminadas por lámparas de aceite perpetuas.',
+          attributes: JSON.stringify({
+            Región: 'Meseta Central',
+            Clima: 'Templado y brumoso',
+            Acceso: 'Restringido'
+          }),
+          icon: 'MapPin',
+          isFavorite: true,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: crypto.randomUUID(),
+          projectId: defaultProjectId,
+          category: 'objeto',
+          name: 'El Sello de Cera Terracota',
+          summary: 'Amuleto ancestral que protege documentos contra el desgaste y ojos profanos.',
+          content:
+            'Un disco cerámico grabado a fuego que emite un calor imperceptible al entrar en contacto con su legítimo dueño.',
+          attributes: JSON.stringify({
+            Rareza: 'Artefacto Único',
+            Material: 'Cera alquímica y bronce'
+          }),
+          icon: 'Key',
+          isFavorite: false,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: crypto.randomUUID(),
+          projectId: defaultProjectId,
+          category: 'idea',
+          name: 'El Dogma del Silencio',
+          summary: 'Ideal filosófico que rige el comportamiento de los escribas.',
+          content:
+            '“Aquel que transcribe la memoria de los reyes renuncia a escribir la suya propia.”',
+          attributes: JSON.stringify({ Tipo: 'Filosofía / Juramento', Origen: 'Primera Era' }),
+          icon: 'Lightbulb',
+          isFavorite: false,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now
+        }
+      ])
+      .run()
 
     console.log(`[Folio DB] Seeded initial novel project with chapters, scenes and lore wiki.`)
   }
@@ -522,14 +618,18 @@ export function createProject(input: CreateProjectInput): Project {
   const now = new Date()
   const newId = crypto.randomUUID()
 
-  const inserted = db.insert(schema.projects).values({
-    id: newId,
-    title: input.title.trim() || 'Nuevo Libro',
-    synopsis: input.synopsis?.trim() || '',
-    genre: input.genre?.trim() || '',
-    createdAt: now,
-    updatedAt: now
-  }).returning().get()
+  const inserted = db
+    .insert(schema.projects)
+    .values({
+      id: newId,
+      title: input.title.trim() || 'Nuevo Libro',
+      synopsis: input.synopsis?.trim() || '',
+      genre: input.genre?.trim() || '',
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get()
 
   // Create an initial chapter for zero-friction writing
   createFolio({
@@ -554,7 +654,8 @@ export function updateProject(input: UpdateProjectInput): Project {
   if (input.synopsis !== undefined) values.synopsis = input.synopsis
   if (input.genre !== undefined) values.genre = input.genre
 
-  const updated = db.update(schema.projects)
+  const updated = db
+    .update(schema.projects)
     .set(values)
     .where(eq(schema.projects.id, input.id))
     .returning()
@@ -580,15 +681,17 @@ export function deleteProject(id: string): boolean {
 export function getAllFolios(projectId?: string): Folio[] {
   const db = getDb()
   const query = db.select().from(schema.folios)
-  
+
   if (projectId) {
-    const rows = query.where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, false)))
+    const rows = query
+      .where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, false)))
       .orderBy(asc(schema.folios.sortOrder), desc(schema.folios.updatedAt))
       .all()
     return rows.map(mapFolio)
   }
 
-  const rows = query.where(eq(schema.folios.isArchived, false))
+  const rows = query
+    .where(eq(schema.folios.isArchived, false))
     .orderBy(asc(schema.folios.sortOrder), desc(schema.folios.updatedAt))
     .all()
   return rows.map(mapFolio)
@@ -599,7 +702,9 @@ export function getTrashFolios(projectId?: string): Folio[] {
   const conditions = [eq(schema.folios.isArchived, true)]
   if (projectId) conditions.push(eq(schema.folios.projectId, projectId))
 
-  const rows = db.select().from(schema.folios)
+  const rows = db
+    .select()
+    .from(schema.folios)
     .where(and(...conditions))
     .orderBy(desc(schema.folios.updatedAt))
     .all()
@@ -617,22 +722,26 @@ export function createFolio(input: CreateFolioInput): Folio {
   const now = new Date()
   const newId = crypto.randomUUID()
 
-  const inserted = db.insert(schema.folios).values({
-    id: newId,
-    projectId: input.projectId,
-    parentId: input.parentId ?? null,
-    type: input.type || (input.parentId ? 'scene' : 'chapter'),
-    title: input.title?.trim() || (input.parentId ? 'Nueva Escena' : 'Nuevo Capítulo'),
-    content: input.content ?? '',
-    synopsis: input.synopsis ?? '',
-    icon: input.icon || 'FileText',
-    sortOrder: input.sortOrder ?? 0,
-    status: input.status || 'draft',
-    isFavorite: false,
-    isArchived: false,
-    createdAt: now,
-    updatedAt: now
-  }).returning().get()
+  const inserted = db
+    .insert(schema.folios)
+    .values({
+      id: newId,
+      projectId: input.projectId,
+      parentId: input.parentId ?? null,
+      type: input.type || (input.parentId ? 'scene' : 'chapter'),
+      title: input.title?.trim() || (input.parentId ? 'Nueva Escena' : 'Nuevo Capítulo'),
+      content: input.content ?? '',
+      synopsis: input.synopsis ?? '',
+      icon: input.icon || 'FileText',
+      sortOrder: input.sortOrder ?? 0,
+      status: input.status || 'draft',
+      isFavorite: false,
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get()
 
   return mapFolio(inserted)
 }
@@ -655,7 +764,8 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
 
-  const updated = db.update(schema.folios)
+  const updated = db
+    .update(schema.folios)
     .set(values)
     .where(eq(schema.folios.id, input.id))
     .returning()
@@ -683,7 +793,8 @@ export function restoreFolio(id: string): Folio {
     }
   }
 
-  const updated = db.update(schema.folios)
+  const updated = db
+    .update(schema.folios)
     .set({
       isArchived: false,
       parentId,
@@ -714,7 +825,9 @@ export function getAllLore(projectId?: string, category?: string): LoreItem[] {
   if (projectId) conditions.push(eq(schema.loreItems.projectId, projectId))
   if (category && category !== 'todos') conditions.push(eq(schema.loreItems.category, category))
 
-  const rows = db.select().from(schema.loreItems)
+  const rows = db
+    .select()
+    .from(schema.loreItems)
     .where(and(...conditions))
     .orderBy(desc(schema.loreItems.updatedAt))
     .all()
@@ -727,7 +840,9 @@ export function getTrashLore(projectId?: string): LoreItem[] {
   const conditions = [eq(schema.loreItems.isArchived, true)]
   if (projectId) conditions.push(eq(schema.loreItems.projectId, projectId))
 
-  const rows = db.select().from(schema.loreItems)
+  const rows = db
+    .select()
+    .from(schema.loreItems)
     .where(and(...conditions))
     .orderBy(desc(schema.loreItems.updatedAt))
     .all()
@@ -746,20 +861,24 @@ export function createLore(input: CreateLoreInput): LoreItem {
   const now = new Date()
   const newId = crypto.randomUUID()
 
-  const inserted = db.insert(schema.loreItems).values({
-    id: newId,
-    projectId: input.projectId,
-    category: input.category.toLowerCase().trim() || 'personaje',
-    name: input.name.trim() || 'Nuevo Registro',
-    summary: input.summary?.trim() || '',
-    content: input.content ?? '',
-    attributes: JSON.stringify(input.attributes || {}),
-    icon: input.icon || 'User',
-    isFavorite: false,
-    isArchived: false,
-    createdAt: now,
-    updatedAt: now
-  }).returning().get()
+  const inserted = db
+    .insert(schema.loreItems)
+    .values({
+      id: newId,
+      projectId: input.projectId,
+      category: input.category.toLowerCase().trim() || 'personaje',
+      name: input.name.trim() || 'Nuevo Registro',
+      summary: input.summary?.trim() || '',
+      content: input.content ?? '',
+      attributes: JSON.stringify(input.attributes || {}),
+      icon: input.icon || 'User',
+      isFavorite: false,
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get()
 
   return mapLoreItem(inserted)
 }
@@ -780,7 +899,8 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
 
-  const updated = db.update(schema.loreItems)
+  const updated = db
+    .update(schema.loreItems)
     .set(values)
     .where(eq(schema.loreItems.id, input.id))
     .returning()
@@ -799,7 +919,8 @@ export function deleteLorePermanent(id: string): boolean {
 export function restoreLore(id: string): LoreItem {
   const db = getDb()
   const now = new Date()
-  const updated = db.update(schema.loreItems)
+  const updated = db
+    .update(schema.loreItems)
     .set({
       isArchived: false,
       updatedAt: now
@@ -819,18 +940,14 @@ export function restoreLore(id: string): LoreItem {
 export function emptyTrash(projectId: string): { purgedFolios: number; purgedLore: number } {
   const db = getDb()
 
-  const foliosRes = db.delete(schema.folios)
-    .where(and(
-      eq(schema.folios.projectId, projectId),
-      eq(schema.folios.isArchived, true)
-    ))
+  const foliosRes = db
+    .delete(schema.folios)
+    .where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, true)))
     .run()
 
-  const loreRes = db.delete(schema.loreItems)
-    .where(and(
-      eq(schema.loreItems.projectId, projectId),
-      eq(schema.loreItems.isArchived, true)
-    ))
+  const loreRes = db
+    .delete(schema.loreItems)
+    .where(and(eq(schema.loreItems.projectId, projectId), eq(schema.loreItems.isArchived, true)))
     .run()
 
   return {
@@ -845,7 +962,8 @@ export function emptyTrash(projectId: string): { purgedFolios: number; purgedLor
 
 export function getScratchpadNotes(projectId: string): ScratchpadNote[] {
   const db = getDb()
-  const rows = db.select()
+  const rows = db
+    .select()
     .from(schema.scratchpadNotes)
     .where(eq(schema.scratchpadNotes.projectId, projectId))
     .orderBy(desc(schema.scratchpadNotes.isPinned), desc(schema.scratchpadNotes.updatedAt))
@@ -859,7 +977,8 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
   const now = new Date()
 
   if (input.id) {
-    const existing = db.select()
+    const existing = db
+      .select()
       .from(schema.scratchpadNotes)
       .where(eq(schema.scratchpadNotes.id, input.id))
       .get()
@@ -873,7 +992,8 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
       if (input.isPinned !== undefined) values.isPinned = input.isPinned
       if (input.colorTag !== undefined) values.colorTag = input.colorTag
 
-      const updated = db.update(schema.scratchpadNotes)
+      const updated = db
+        .update(schema.scratchpadNotes)
         .set(values)
         .where(eq(schema.scratchpadNotes.id, input.id))
         .returning()
@@ -885,15 +1005,19 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
   }
 
   // Crear nueva nota rápida
-  const inserted = db.insert(schema.scratchpadNotes).values({
-    projectId: input.projectId,
-    title: input.title ?? '',
-    content: input.content ?? '',
-    isPinned: input.isPinned ?? false,
-    colorTag: input.colorTag ?? null,
-    createdAt: now,
-    updatedAt: now
-  }).returning().get()
+  const inserted = db
+    .insert(schema.scratchpadNotes)
+    .values({
+      projectId: input.projectId,
+      title: input.title ?? '',
+      content: input.content ?? '',
+      isPinned: input.isPinned ?? false,
+      colorTag: input.colorTag ?? null,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get()
 
   return mapScratchpadNote(inserted)
 }
@@ -910,7 +1034,8 @@ export function deleteScratchpadNote(id: number): boolean {
 
 export function getWorldRules(projectId: string): WorldRule[] {
   const db = getDb()
-  const rows = db.select()
+  const rows = db
+    .select()
     .from(schema.worldRules)
     .where(eq(schema.worldRules.projectId, projectId))
     .orderBy(
@@ -929,7 +1054,8 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
   const now = new Date()
 
   if (input.id) {
-    const existing = db.select()
+    const existing = db
+      .select()
       .from(schema.worldRules)
       .where(eq(schema.worldRules.id, input.id))
       .get()
@@ -946,7 +1072,8 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
       if (input.orderIndex !== undefined) values.orderIndex = input.orderIndex
       if (input.isPinned !== undefined) values.isPinned = input.isPinned
 
-      const updated = db.update(schema.worldRules)
+      const updated = db
+        .update(schema.worldRules)
         .set(values)
         .where(eq(schema.worldRules.id, input.id))
         .returning()
@@ -960,7 +1087,8 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
   // Si no se especifica orderIndex, calculamos el siguiente
   let nextOrderIndex = input.orderIndex ?? 0
   if (input.orderIndex === undefined) {
-    const highest = db.select({ maxOrder: schema.worldRules.orderIndex })
+    const highest = db
+      .select({ maxOrder: schema.worldRules.orderIndex })
       .from(schema.worldRules)
       .where(eq(schema.worldRules.projectId, input.projectId))
       .orderBy(desc(schema.worldRules.orderIndex))
@@ -970,18 +1098,22 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
   }
 
   // Insertar nueva regla del mundo
-  const inserted = db.insert(schema.worldRules).values({
-    projectId: input.projectId,
-    category: input.category,
-    title: input.title,
-    axiom: input.axiom,
-    details: input.details ?? null,
-    limitations: input.limitations ?? null,
-    orderIndex: nextOrderIndex,
-    isPinned: input.isPinned ?? false,
-    createdAt: now,
-    updatedAt: now
-  }).returning().get()
+  const inserted = db
+    .insert(schema.worldRules)
+    .values({
+      projectId: input.projectId,
+      category: input.category,
+      title: input.title,
+      axiom: input.axiom,
+      details: input.details ?? null,
+      limitations: input.limitations ?? null,
+      orderIndex: nextOrderIndex,
+      isPinned: input.isPinned ?? false,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get()
 
   return mapWorldRule(inserted)
 }
@@ -994,7 +1126,9 @@ export function deleteWorldRule(id: number): boolean {
 
 export function reorderWorldRules(ids: number[]): boolean {
   const sqlite = getSqlite()
-  const updateStmt = sqlite.prepare('UPDATE world_rules SET order_index = ?, updated_at = ? WHERE id = ?')
+  const updateStmt = sqlite.prepare(
+    'UPDATE world_rules SET order_index = ?, updated_at = ? WHERE id = ?'
+  )
 
   const now = Date.now()
   const transaction = sqlite.transaction((ruleIds: number[]) => {
@@ -1040,6 +1174,7 @@ export function getProjectGoals(projectId: string): ProjectGoals {
       dailySceneGoal: 1,
       dailyChapterGoal: 0,
       deadlineDate: null,
+      askSessionGoalOnStartup: true,
       updatedAt: now
     })
     .returning()
@@ -1048,8 +1183,25 @@ export function getProjectGoals(projectId: string): ProjectGoals {
   return mapProjectGoals(inserted)
 }
 
+function evaluateDailyGoalMet(
+  log: {
+    wordsWritten: number
+    scenesCompleted: number
+    chaptersCompleted: number
+    sessionGoalsHit: number
+  },
+  goals: ProjectGoals
+): boolean {
+  if (log.sessionGoalsHit > 0) return true
+  if (goals.dailyWordGoal > 0 && log.wordsWritten >= goals.dailyWordGoal) return true
+  if (goals.dailySceneGoal > 0 && log.scenesCompleted >= goals.dailySceneGoal) return true
+  if (goals.dailyChapterGoal > 0 && log.chaptersCompleted >= goals.dailyChapterGoal) return true
+  return false
+}
+
 export function updateProjectGoals(projectId: string, input: Partial<ProjectGoals>): ProjectGoals {
   const db = getDb()
+  const sqlite = getSqlite()
   const current = getProjectGoals(projectId)
   const now = new Date()
 
@@ -1061,13 +1213,49 @@ export function updateProjectGoals(projectId: string, input: Partial<ProjectGoal
       dailySceneGoal: input.dailySceneGoal ?? current.dailySceneGoal,
       dailyChapterGoal: input.dailyChapterGoal ?? current.dailyChapterGoal,
       deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : current.deadlineDate,
+      askSessionGoalOnStartup:
+        input.askSessionGoalOnStartup !== undefined
+          ? input.askSessionGoalOnStartup
+          : current.askSessionGoalOnStartup,
       updatedAt: now
     })
     .where(eq(schema.projectGoals.projectId, projectId))
     .returning()
     .get()
 
-  return mapProjectGoals(updated)
+  const mappedGoals = mapProjectGoals(updated)
+
+  // Re-evaluar si el log de hoy cumple la nueva meta configurada
+  const todayStr = getLocalDateStr()
+  const todayRow = db
+    .select()
+    .from(schema.dailyWritingLogs)
+    .where(
+      and(
+        eq(schema.dailyWritingLogs.projectId, projectId),
+        eq(schema.dailyWritingLogs.date, todayStr)
+      )
+    )
+    .get()
+
+  if (todayRow) {
+    const newGoalMet = evaluateDailyGoalMet(
+      {
+        wordsWritten: todayRow.wordsWritten,
+        scenesCompleted: todayRow.scenesCompleted,
+        chaptersCompleted: todayRow.chaptersCompleted,
+        sessionGoalsHit: todayRow.sessionGoalsHit
+      },
+      mappedGoals
+    )
+    if (Boolean(todayRow.goalMet) !== newGoalMet) {
+      sqlite
+        .prepare('UPDATE daily_writing_logs SET goal_met = ? WHERE id = ?')
+        .run(newGoalMet ? 1 : 0, todayRow.id)
+    }
+  }
+
+  return mappedGoals
 }
 
 export function getTodayWritingLog(projectId: string, dateStr?: string): DailyWritingLog {
@@ -1093,8 +1281,9 @@ export function getTodayWritingLog(projectId: string, dateStr?: string): DailyWr
     projectId,
     date: targetDate,
     wordsWritten: 0,
-    scenesCreated: 0,
-    chaptersCreated: 0,
+    scenesCompleted: 0,
+    chaptersCompleted: 0,
+    sessionGoalsHit: 0,
     goalMet: false
   }
 }
@@ -1110,17 +1299,25 @@ export function recordWritingProgress(
   const wordDelta = payload.wordDelta ?? 0
   const sceneDelta = payload.sceneDelta ?? 0
   const chapterDelta = payload.chapterDelta ?? 0
+  const sessionGoalHitDelta = payload.sessionGoalHitDelta ?? 0
 
   // Atomic UPSERT usando ON CONFLICT nativo de SQLite
   const upsertStmt = sqlite.prepare(`
-    INSERT INTO daily_writing_logs (project_id, date, words_written, scenes_created, chapters_created, goal_met)
-    VALUES (?, ?, MAX(0, ?), MAX(0, ?), MAX(0, ?), 0)
+    INSERT INTO daily_writing_logs (
+      project_id, date, words_written, scenes_completed, chapters_completed, session_goals_hit, goal_met
+    )
+    VALUES (?, ?, MAX(0, ?), MAX(0, ?), MAX(0, ?), MAX(0, ?), 0)
     ON CONFLICT(project_id, date) DO UPDATE SET
       words_written = MAX(0, daily_writing_logs.words_written + ?),
-      scenes_created = MAX(0, daily_writing_logs.scenes_created + ?),
-      chapters_created = MAX(0, daily_writing_logs.chapters_created + ?)
-    RETURNING id, project_id as projectId, date, words_written as wordsWritten,
-              scenes_created as scenesCreated, chapters_created as chaptersCreated, goal_met as goalMet
+      scenes_completed = MAX(0, daily_writing_logs.scenes_completed + ?),
+      chapters_completed = MAX(0, daily_writing_logs.chapters_completed + ?),
+      session_goals_hit = MAX(0, daily_writing_logs.session_goals_hit + ?)
+    RETURNING id, project_id as projectId, date,
+              words_written as wordsWritten,
+              scenes_completed as scenesCompleted,
+              chapters_completed as chaptersCompleted,
+              session_goals_hit as sessionGoalsHit,
+              goal_met as goalMet
   `)
 
   const row = upsertStmt.get(
@@ -1129,13 +1326,23 @@ export function recordWritingProgress(
     wordDelta,
     sceneDelta,
     chapterDelta,
+    sessionGoalHitDelta,
     wordDelta,
     sceneDelta,
-    chapterDelta
+    chapterDelta,
+    sessionGoalHitDelta
   ) as schema.DailyWritingLogSelect
 
-  // Verificar si la meta diaria de palabras se ha cumplido
-  const isGoalMet = row.wordsWritten >= goals.dailyWordGoal
+  const isGoalMet = evaluateDailyGoalMet(
+    {
+      wordsWritten: row.wordsWritten,
+      scenesCompleted: row.scenesCompleted,
+      chaptersCompleted: row.chaptersCompleted,
+      sessionGoalsHit: row.sessionGoalsHit
+    },
+    goals
+  )
+
   if (Boolean(row.goalMet) !== isGoalMet) {
     sqlite
       .prepare('UPDATE daily_writing_logs SET goal_met = ? WHERE id = ?')
@@ -1173,7 +1380,8 @@ export function getUnlockedAchievements(projectId: string): UnlockedAchievement[
 
 export function unlockAchievement(
   projectId: string,
-  achievementKey: string
+  achievementKey: string,
+  customLabel?: string | null
 ): UnlockedAchievement | null {
   const db = getDb()
 
@@ -1190,6 +1398,12 @@ export function unlockAchievement(
     .get()
 
   if (existing) {
+    if (customLabel && !existing.customLabel) {
+      db.update(schema.unlockedAchievements)
+        .set({ customLabel })
+        .where(eq(schema.unlockedAchievements.id, existing.id))
+        .run()
+    }
     return null
   }
 
@@ -1199,6 +1413,7 @@ export function unlockAchievement(
     .values({
       projectId,
       achievementKey,
+      customLabel: customLabel ?? null,
       unlockedAt: now
     })
     .returning()
@@ -1209,9 +1424,13 @@ export function unlockAchievement(
 
 export function getTotalManuscriptWords(projectId: string): number {
   const sqlite = getSqlite()
+  // Excluye folios en papelera y escenas cuyo capítulo padre esté en papelera
   const stmt = sqlite.prepare(`
-    SELECT content FROM folios
-    WHERE project_id = ? AND is_archived = 0
+    SELECT f.content FROM folios f
+    LEFT JOIN folios p ON f.parent_id = p.id
+    WHERE f.project_id = ?
+      AND f.is_archived = 0
+      AND (f.parent_id IS NULL OR p.is_archived = 0)
   `)
   const rows = stmt.all(projectId) as Array<{ content: string }>
 
@@ -1284,5 +1503,3 @@ export function getGoalsSummary(projectId: string): GoalsSummary {
     currentStreak
   }
 }
-
-

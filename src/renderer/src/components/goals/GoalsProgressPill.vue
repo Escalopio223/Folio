@@ -1,112 +1,137 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Flame, Trophy } from 'lucide-vue-next'
+import { Flame, Trophy, Target } from 'lucide-vue-next'
 import { useGoalsStore } from '../../stores/goalsStore'
 import { useUiStore } from '../../stores/uiStore'
 
 const goalsStore = useGoalsStore()
 const uiStore = useUiStore()
 
-const radius = 7
-const circumference = 2 * Math.PI * radius
-
-const strokeDashoffset = computed(() => {
-  const percent = Math.min(100, Math.max(0, goalsStore.todayWordPercentage))
-  return circumference - (percent / 100) * circumference
+const hasActiveSessionTarget = computed(() => {
+  return (
+    goalsStore.activeSessionGoal !== null && goalsStore.activeSessionGoal.type !== 'free'
+  )
 })
 
-const isGoalCompleted = computed(() => goalsStore.isTodayGoalMet)
+const activePercent = computed(() => {
+  if (hasActiveSessionTarget.value) {
+    return goalsStore.sessionGoalPercentage
+  }
+  return goalsStore.todayWordPercentage
+})
 
-const ringColor = computed(() => {
-  return isGoalCompleted.value ? '#2E7D32' : '#C85A32'
+const activeExactPercent = computed(() => {
+  if (hasActiveSessionTarget.value) {
+    return goalsStore.sessionGoalExactPercentage
+  }
+  return goalsStore.todayWordExactPercentage
+})
+
+const isCompleted = computed(() => {
+  if (hasActiveSessionTarget.value) {
+    return Boolean(goalsStore.activeSessionGoal?.completed) || activePercent.value >= 100
+  }
+  return goalsStore.isTodayGoalMet
+})
+
+const progressLabel = computed(() => {
+  if (hasActiveSessionTarget.value && goalsStore.activeSessionGoal) {
+    const g = goalsStore.activeSessionGoal
+    if (g.type === 'words') {
+      return `${g.current.toLocaleString('es-ES')} / ${g.target.toLocaleString('es-ES')} pal.`
+    }
+    if (g.type === 'scenes') {
+      const unit = g.target === 1 ? 'escena' : 'escenas'
+      return `${g.current} / ${g.target} ${unit}`
+    }
+    const unit = g.target === 1 ? 'capítulo' : 'capítulos'
+    return `${g.current} / ${g.target} ${unit}`
+  }
+  return `${goalsStore.liveTodayWords.toLocaleString('es-ES')} / ${goalsStore.config.dailyWordGoal.toLocaleString('es-ES')} pal.`
+})
+
+const barColor = computed(() => {
+  return isCompleted.value ? '#2E7D32' : 'var(--accent)'
 })
 </script>
 
 <template>
   <button
     type="button"
-    class="goals-progress-pill neu-btn px-2.5 py-1 text-xs flex items-center gap-2 transition-all duration-200 cursor-pointer group select-none"
+    class="goals-progress-pill neu-btn px-2.5 py-1 text-xs flex items-center gap-2 transition-all duration-300 cursor-pointer group select-none"
     :class="[
-      isGoalCompleted
-        ? 'neu-well-sm border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
+      isCompleted
+        ? 'neu-well-sm border-emerald-600/40 text-emerald-700 dark:text-emerald-400'
         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-      { 'opacity-20 hover:opacity-100': uiStore.isFocusMode }
+      { 'opacity-[0.12] hover:opacity-100': uiStore.isFocusMode }
     ]"
-    :title="`Meta diaria: ${goalsStore.todayLog.wordsWritten} de ${goalsStore.config.dailyWordGoal} palabras (${goalsStore.todayWordExactPercentage}%). Clic para ver expectativas y logros.`"
+    :title="
+      hasActiveSessionTarget
+        ? `Meta de sesión activa: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
+        : `Meta diaria: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
+    "
     @click="goalsStore.openGoalsModal('expectations')"
   >
-    <!-- Racha Diaria con Llama -->
+    <!-- Racha Diaria con Llama (🔥 X días) -->
     <div
       v-if="goalsStore.currentStreak > 0"
       class="flex items-center gap-1 font-mono text-[11px] font-semibold text-orange-500 shrink-0"
-      title="Racha de días consecutivos cumpliendo tu objetivo diario"
+      title="Racha de días consecutivos cumpliendo tu meta"
     >
-      <Flame :size="13" class="text-orange-500 animate-pulse shrink-0" />
-      <span>{{ goalsStore.currentStreak }}d</span>
+      <Flame :size="13" class="text-orange-500 shrink-0" />
+      <span>{{ goalsStore.currentStreak }} {{ goalsStore.currentStreak === 1 ? 'día' : 'días' }}</span>
     </div>
 
-    <!-- Separador sutil si hay racha -->
     <div
       v-if="goalsStore.currentStreak > 0"
       class="w-[1px] h-3 bg-[var(--groove-dark)]/60 shrink-0"
     ></div>
 
-    <!-- Anillo SVG de progreso circular compacto -->
-    <div class="relative w-4.5 h-4.5 flex items-center justify-center shrink-0">
-      <svg class="w-full h-full -rotate-90" viewBox="0 0 18 18">
-        <!-- Círculo de fondo / pista -->
-        <circle
-          cx="9"
-          cy="9"
-          :r="radius"
-          fill="none"
-          stroke="currentColor"
-          class="text-[var(--groove-dark)]/50"
-          stroke-width="2.2"
-        />
-        <!-- Círculo de progreso animado -->
-        <circle
-          cx="9"
-          cy="9"
-          :r="radius"
-          fill="none"
-          :stroke="ringColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          :stroke-dasharray="circumference"
-          :stroke-dashoffset="strokeDashoffset"
-          class="transition-[stroke-dashoffset,stroke] duration-500 ease-out"
-        />
-      </svg>
-    </div>
-
-    <!-- Métricas en texto legible -->
+    <!-- Etiqueta de Modo (Sesión vs Día) y Progreso -->
     <div class="flex items-center gap-1.5 font-mono text-[11px]">
-      <span class="font-medium text-[var(--text-primary)]">
-        {{ goalsStore.todayLog.wordsWritten }}
+      <Target
+        :size="12"
+        class="shrink-0 transition-colors duration-300"
+        :style="{ color: barColor }"
+      />
+      <span
+        v-if="hasActiveSessionTarget"
+        class="font-semibold text-[var(--text-secondary)]"
+      >
+        Sesión:
       </span>
-      <span class="text-[var(--text-muted)] opacity-70">/</span>
-      <span class="text-[var(--text-muted)]">
-        {{ goalsStore.config.dailyWordGoal }}
+      <span class="font-medium text-[var(--text-primary)]">
+        {{ progressLabel }}
       </span>
       <span
-        class="text-[10px] font-semibold px-1 py-0.2 rounded"
+        class="text-[10px] font-semibold px-1.5 py-0.2 rounded transition-colors duration-300"
         :class="
-          isGoalCompleted
-            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+          isCompleted
+            ? 'bg-[#2E7D32]/15 text-[#2E7D32] dark:text-emerald-400'
             : 'neu-well-sm text-[var(--accent)]'
         "
       >
-        {{ goalsStore.todayWordExactPercentage }}%
+        ({{ activeExactPercent }}%)
       </span>
     </div>
 
-    <!-- Indicador de Logros Totales Desbloqueados -->
+    <!-- Barra de progreso fina con transición suave #C85A32 -> #2E7D32 -->
+    <div class="w-12 h-1.5 rounded-full neu-well-sm overflow-hidden shrink-0 hidden sm:block">
+      <div
+        class="h-full rounded-full transition-all duration-500 ease-out"
+        :style="{
+          width: `${activePercent}%`,
+          backgroundColor: barColor
+        }"
+      ></div>
+    </div>
+
+    <!-- Indicador de Logros Desbloqueados -->
     <div
-      class="hidden lg:flex items-center gap-1 text-[10px] text-[var(--text-muted)] pl-1 border-l border-[var(--groove-dark)]/40 group-hover:text-[var(--text-secondary)] transition-colors"
-      title="Logros literarios desbloqueados"
+      class="hidden lg:flex items-center gap-1 text-[10px] text-[var(--text-muted)] pl-1.5 border-l border-[var(--groove-dark)]/40 group-hover:text-[var(--text-secondary)] transition-colors"
+      title="Logros editoriales desbloqueados"
     >
-      <Trophy :size="11" class="text-amber-500/80 shrink-0" />
+      <Trophy :size="11" class="text-amber-500/85 shrink-0" />
       <span>{{ goalsStore.unlockedCount }}/{{ goalsStore.totalAchievementsCount }}</span>
     </div>
   </button>

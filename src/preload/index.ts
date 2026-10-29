@@ -62,8 +62,8 @@ const api: FolioApi = {
     getSummary: (projectId: string) => ipcRenderer.invoke('goals:getSummary', projectId),
     updateConfig: (projectId: string, config) => ipcRenderer.invoke('goals:updateConfig', projectId, config),
     recordProgress: (projectId: string, payload) => ipcRenderer.invoke('goals:recordProgress', projectId, payload),
-    unlockAchievement: (projectId: string, achievementKey: string) =>
-      ipcRenderer.invoke('goals:unlockAchievement', projectId, achievementKey)
+    unlockAchievement: (projectId: string, achievementKey: string, customLabel?: string | null) =>
+      ipcRenderer.invoke('goals:unlockAchievement', projectId, achievementKey, customLabel)
   },
   window: {
     action: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)

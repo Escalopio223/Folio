@@ -42,7 +42,6 @@ function handleCreateRule(prefillCategory?: string): void {
         <input
           v-model="rulesStore.searchQuery"
           type="text"
-          placeholder="Buscar ley, axioma..."
           class="w-full pl-7 pr-6 py-1 text-xs neu-well-sm bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none cursor-text select-text"
         />
         <button

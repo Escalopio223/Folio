@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { WorldRule, SaveWorldRuleInput } from '@shared/types'
 import { useProjectStore } from './projectStore'
+import { useGoalsStore } from './goalsStore'
 
 export const useRulesStore = defineStore('rules', () => {
   const projectStore = useProjectStore()
@@ -144,6 +145,7 @@ export const useRulesStore = defineStore('rules', () => {
       // Re-ordenar internamente manteniendo prioridad pinned -> categoría -> orden
       sortRulesLocally()
       selectedRuleId.value = saved.id
+      await useGoalsStore().checkAchievements()
       return saved
     } catch (err) {
       console.error('[Rules Store] Error al guardar regla:', err)

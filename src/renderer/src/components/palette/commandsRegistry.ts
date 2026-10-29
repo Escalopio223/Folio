@@ -4,6 +4,7 @@ import {
   FilePlus,
   Sparkles,
   SunMoon,
+  Palette,
   PanelLeft,
   PanelRight,
   Eye,
@@ -130,11 +131,23 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
+      id: 'open-theme-customizer',
+      title: 'Personalizar Sistema de 3 Colores (Botones, Texto y Background)',
+      description: 'Configurar el color de Botones, Texto, Background y el filtro de gamas de gamificación',
+      category: 'action',
+      badge: 'Sistema',
+      icon: Palette,
+      keywords: ['color', 'colores', 'tema', 'botones', 'texto', 'background', 'fondo', 'gamas', 'filtro', 'claro', 'oscuro'],
+      execute: () => {
+        uiStore.openThemeModal()
+      }
+    },
+    {
       id: 'toggle-theme',
-      title: 'Alternar Modo Oscuro (Espresso / Claro)',
+      title: 'Alternar Tema Claro por Defecto / Estudio Nocturno',
       description: uiStore.isDark
-        ? 'Cambiar al tema cálido Papel Claro'
-        : 'Cambiar al tema inmersivo Espresso Oscuro',
+        ? 'Restablecer al Modo Claro por defecto (Papel Cálido)'
+        : 'Cambiar rápidamente al preset Estudio Nocturno',
       category: 'action',
       badge: 'Sistema',
       icon: SunMoon,
@@ -212,6 +225,27 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
+      id: 'open-session-goal-ritual',
+      title: 'Fijar Meta de Sesión («Ritual de Inicio»)',
+      description: 'Definir un objetivo rápido para esta sesión de escritura o activar modo libre',
+      category: 'action',
+      badge: 'Objetivos',
+      icon: Sparkles,
+      keywords: [
+        'ritual',
+        'sesion',
+        'meta',
+        'objetivo',
+        'inicio',
+        'palabras',
+        'pluma ligera',
+        'libre'
+      ],
+      execute: () => {
+        goalsStore.openSessionPrompt()
+      }
+    },
+    {
       id: 'view-goals-and-achievements',
       title: 'Ver Metas de Escritura y Logros',
       description: 'Abrir el panel de expectativas del libro, ritmo diario y vitrina de insignias',
@@ -221,6 +255,18 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       keywords: ['metas', 'logros', 'objetivo', 'expectativas', 'insignias', 'racha', 'palabras', 'gamificacion'],
       execute: () => {
         goalsStore.openGoalsModal('expectations')
+      }
+    },
+    {
+      id: 'view-achievements-showcase',
+      title: 'Abrir Vitrina de Logros Editoriales',
+      description: 'Consultar los hitos conseguidos y el progreso de tus logros literarios',
+      category: 'action',
+      badge: 'Objetivos',
+      icon: Trophy,
+      keywords: ['vitrina', 'logros', 'hitos', 'trofeos', 'insignias', 'medallas'],
+      execute: () => {
+        goalsStore.openGoalsModal('achievements')
       }
     },
     {

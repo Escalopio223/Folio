@@ -8,7 +8,9 @@ import ScratchpadDrawer from './components/scratchpad/ScratchpadDrawer.vue'
 import { useUiStore } from './stores/uiStore'
 import { useScratchpadStore } from './stores/scratchpadStore'
 import GoalsAndAchievementsModal from './components/goals/GoalsAndAchievementsModal.vue'
+import SessionGoalPromptModal from './components/goals/SessionGoalPromptModal.vue'
 import AchievementToast from './components/goals/AchievementToast.vue'
+import ThemeCustomizerModal from './components/ThemeCustomizerModal.vue'
 import { Feather } from 'lucide-vue-next'
 
 const uiStore = useUiStore()
@@ -75,11 +77,17 @@ onMounted(() => {
     <!-- Scratchpad Global (Bloc de Captura Rápida) (Ctrl+J / Cmd+J) -->
     <ScratchpadDrawer />
 
+    <!-- Sugerencia de Meta de Sesión al Abrir la App («Ritual de Inicio») -->
+    <SessionGoalPromptModal />
+
     <!-- Modal de Metas de Escritura y Sistema de Logros -->
     <GoalsAndAchievementsModal />
 
     <!-- Notificación Flotante Celebratoria de Logros -->
     <AchievementToast />
+
+    <!-- Personalizador de Sistema de 3 Colores y Gamas de Background -->
+    <ThemeCustomizerModal />
   </div>
 </template>
 

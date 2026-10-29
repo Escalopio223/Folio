@@ -42,7 +42,6 @@ const goalsStore = useGoalsStore()
 
 const isProjectModalOpen = ref(false)
 const expandedChapters = ref<Record<string, boolean>>({})
-const lastSavedWordsMap = new Map<string, number>()
 
 // Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
 const { width: windowWidth } = useWindowSize()
@@ -156,9 +155,6 @@ watch(
       folioStore.recordBaseline(folio.id, folio.content || '')
       const initialText = (folio.content || '').replace(/<[^>]*>/g, ' ').trim()
       const words = initialText ? initialText.split(/\s+/).length : 0
-      if (!lastSavedWordsMap.has(folio.id)) {
-        lastSavedWordsMap.set(folio.id, words)
-      }
       wordCount.value = words
       charCount.value = (folio.content || '').length
       readingTime.value = words === 0 ? 0 : Math.max(1, Math.ceil(words / 200))
@@ -197,16 +193,6 @@ async function flushSave(): Promise<void> {
       const synopsisToSave = editFolioSynopsis.value
       const statusToSave = editFolioStatus.value
 
-      // Balance neto de palabras añadidas para metas diarias y sistema de logros
-      const cleanText = (contentToSave || '').replace(/<[^>]*>/g, ' ').trim()
-      const currentWords = cleanText ? cleanText.split(/\s+/).length : 0
-      const prevWords = lastSavedWordsMap.get(targetId) ?? currentWords
-      const wordDelta = currentWords - prevWords
-      if (wordDelta > 0 && projectStore.activeProjectId) {
-        goalsStore.recordProgress({ wordDelta })
-      }
-      lastSavedWordsMap.set(targetId, currentWords)
-
       // Actualizar réplica reactiva en el store para zero-lag en el árbol
       const item = folioStore.folios.find((f) => f.id === targetId)
       if (item) {
@@ -214,6 +200,12 @@ async function flushSave(): Promise<void> {
         item.content = contentToSave
         item.synopsis = synopsisToSave
         item.status = statusToSave
+      }
+
+      // Sincronizar balance neto de palabras de sesión con SQLite
+      folioStore.updateSessionWords(targetId, contentToSave)
+      if (projectStore.activeProjectId) {
+        await goalsStore.flushSessionWordsToDb()
       }
 
       await folioStore.updateFolio({
@@ -393,9 +385,9 @@ async function handleProjectChange(projectId: string): Promise<void> {
     loreStore.fetchLore(projectId),
     trashStore.fetchTrash(projectId),
     scratchpadStore.fetchNotes(projectId),
-    rulesStore.fetchRules(projectId),
-    goalsStore.fetchGoals(projectId)
+    rulesStore.fetchRules(projectId)
   ])
+  await goalsStore.fetchGoals(projectId)
 }
 
 // Project Delete
@@ -432,9 +424,9 @@ onMounted(async () => {
       loreStore.fetchLore(projectStore.activeProjectId),
       trashStore.fetchTrash(projectStore.activeProjectId),
       scratchpadStore.fetchNotes(projectStore.activeProjectId),
-      rulesStore.fetchRules(projectStore.activeProjectId),
-      goalsStore.fetchGoals(projectStore.activeProjectId)
+      rulesStore.fetchRules(projectStore.activeProjectId)
     ])
+    await goalsStore.fetchGoals(projectStore.activeProjectId)
   }
   // Smoothly hide splash screen after initial load
   setTimeout(() => {
@@ -880,13 +872,6 @@ onBeforeUnmount(async () => {
                 leave-from-class="opacity-100 translate-y-0"
                 leave-to-class="opacity-0 translate-y-[-4px]"
               >
-                <div
-                  v-if="uiStore.isFocusMode"
-                  class="absolute -top-2 right-0 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full neu-well-sm text-[10px] font-mono text-[var(--accent)] tracking-wide shadow-sm"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-                  <span>Enfoque en párrafo</span>
-                </div>
               </Transition>
 
               <!-- Título de la escena / capítulo -->

@@ -144,7 +144,8 @@ Folio es una aplicación de escritorio **Local-First para novelistas y escritore
 - [ ] **Exportación del Manuscrito:**
   - Exportación de la obra completa o capítulos individuales a Markdown (`.md`).
   - Exportación a documento de Word (`.docx`) con formato editorial (estilos para títulos de capítulo y escenas).
-  - Exportación a texto plano (`.txt`) o compilar para PDF limpio.
+  - Exportación a PDF.
+  - Exportación a epub.
 - [ ] **Exportación de la Wiki / Fichas de Lore:**
   - Compilado de la biblia del mundo literario en formato Markdown estructurado.
 - [ ] **Respaldos Físicos en 1 Clic:**

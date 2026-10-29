@@ -5,8 +5,7 @@ import {
   Square,
   Copy,
   X,
-  Sun,
-  Moon,
+  Palette,
   PanelLeft,
   PanelLeftClose,
   PanelRight,
@@ -103,12 +102,12 @@ onUnmounted(() => {
         </span>
 
         <div class="neu-well-sm px-2 py-0.5 flex items-center gap-1.5 text-[10px] font-mono text-[var(--text-secondary)]">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#C85A32]"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
           <span>LOCAL</span>
         </div>
       </div>
 
-      <!-- Right: Omnibox, Lore Toggle, Theme & Window Controls -->
+      <!-- Right: Omnibox, Lore Toggle, Custom 3-Color Theme & Window Controls -->
       <div class="no-drag flex items-center gap-2">
         <!-- Quick Command Palette / Omnibox Button (Ctrl+K) -->
         <button
@@ -118,7 +117,7 @@ onUnmounted(() => {
           @click="paletteStore.open"
         >
           <Search :size="13" class="opacity-80" />
-          <span class="text-[11px] font-medium hidden md:inline">Buscar...</span>
+          <span class="text-[11px] font-medium hidden md:inline">Búsqueda global</span>
           <kbd class="neu-well-sm text-[9px] font-mono px-1 py-0.2 text-[var(--text-muted)]">Ctrl+K</kbd>
         </button>
 
@@ -157,16 +156,30 @@ onUnmounted(() => {
 
         <div class="neu-groove-v h-4 my-auto"></div>
 
-        <!-- Theme Toggle Button -->
+        <!-- Custom 3-Color Theme Button -->
         <button
           type="button"
-          class="neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"
-          :title="uiStore.isDark ? 'Cambiar a Modo Papel Claro' : 'Cambiar a Modo Espresso Oscuro'"
-          @click="uiStore.toggleTheme"
+          class="neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isThemeModalOpen }"
+          title="Personalizar Colores (Botones, Texto y Background con filtros)"
+          @click="uiStore.openThemeModal()"
         >
-          <Sun v-if="uiStore.isDark" :size="13" class="text-[#C85A32]" />
-          <Moon v-else :size="13" class="text-[var(--text-primary)]" />
-          <span class="text-[11px] font-medium">{{ uiStore.isDark ? 'Claro' : 'Oscuro' }}</span>
+          <Palette :size="13" class="text-[var(--accent)]" />
+          <span class="text-[11px] font-medium hidden sm:inline">Temas</span>
+          <span class="flex items-center -space-x-1 ml-0.5">
+            <span
+              class="w-2.5 h-2.5 rounded-full border border-white/40"
+              :style="{ backgroundColor: uiStore.buttonColor }"
+            />
+            <span
+              class="w-2.5 h-2.5 rounded-full border border-white/40"
+              :style="{ backgroundColor: uiStore.textColor }"
+            />
+            <span
+              class="w-2.5 h-2.5 rounded-full border border-black/25"
+              :style="{ backgroundColor: uiStore.backgroundColor }"
+            />
+          </span>
         </button>
 
         <div class="neu-groove-v h-4 my-auto"></div>
@@ -194,7 +207,7 @@ onUnmounted(() => {
 
           <button
             type="button"
-            class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[#C85A32]"
+            class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:!text-[var(--accent)]"
             title="Cerrar"
             @click="handleAction('close')"
           >

@@ -2,42 +2,84 @@
 
 :root {
   color-scheme: light;
+
+  /* =========================================================================
+     3 COLORES BASE CONFIGURABLES POR EL USUARIO
+     1. Botones y bordes (--user-btn-color)
+     2. Texto (--user-text-color)
+     3. Fondo de la aplicación (--user-bg-color)
+     ========================================================================= */
+  --user-btn-color: #c85a32;
+  --user-text-color: #261c14;
+  --user-bg-color: #efeae1;
+
+  /* =========================================================================
+     GAMAS AUTOMÁTICAS DEL BACKGROUND (FILTROS Y DERIVACIONES TONALES)
+     ========================================================================= */
   --bg-base: #efeae1;
-  --bg-surface: #f7f4ef;
-  --bg-elevated: #fcfbf9;
+  --bg-surface: color-mix(in oklab, var(--bg-base) 65%, #ffffff 35%);
+  --bg-elevated: color-mix(in oklab, var(--bg-base) 28%, #ffffff 72%);
+  --groove-dark: color-mix(in oklab, var(--bg-base) 84%, #1a140e 16%);
+  --groove-light: color-mix(in oklab, var(--bg-base) 12%, #ffffff 88%);
+  --shadow-dark: color-mix(in oklab, var(--bg-base) 82%, #1a140e 18%);
+  --shadow-light: color-mix(in oklab, var(--bg-base) 8%, #ffffff 92%);
+  --border-subtle: color-mix(in oklab, var(--groove-dark) 55%, transparent);
+
+  /* Gamas de Gamificación (Background filtrado con el acento de botones) */
+  --bg-gamification-card: color-mix(in oklab, var(--bg-surface) 92%, var(--accent) 8%);
+  --bg-gamification-well: color-mix(in oklab, var(--bg-base) 90%, var(--accent) 10%);
+  --bg-gamification-badge: color-mix(in oklab, var(--bg-base) 82%, var(--accent) 18%);
+
+  /* =========================================================================
+     GAMAS AUTOMÁTICAS DEL TEXTO
+     ========================================================================= */
   --text-primary: #261c14;
-  --text-secondary: #6e5d4f;
-  --text-muted: #9e8f80;
+  --text-secondary: color-mix(in oklab, var(--text-primary) 68%, var(--bg-base) 32%);
+  --text-muted: color-mix(in oklab, var(--text-primary) 45%, var(--bg-base) 55%);
+
+  /* =========================================================================
+     GAMAS AUTOMÁTICAS DE BOTONES Y ACENTO
+     ========================================================================= */
   --accent: #c85a32;
-  --accent-hover: #b04822;
-  --groove-dark: #d6cfc3;
-  --groove-light: #ffffff;
-  --neu-raised: 5px 5px 10px #d5cec2, -5px -5px 10px #ffffff;
-  --neu-raised-sm: 2px 2px 5px #d5cec2, -2px -2px 5px #ffffff;
-  --neu-inset: inset 3px 3px 6px #d5cec2, inset -3px -3px 6px #ffffff;
-  --neu-inset-sm: inset 2px 2px 4px #d5cec2, inset -2px -2px 4px #ffffff;
-  scrollbar-color: #d6cfc3 transparent;
+  --accent-hover: color-mix(in oklab, var(--accent) 86%, #000000 14%);
+  --accent-light: color-mix(in oklab, var(--accent) 84%, #ffffff 16%);
+  --accent-dark: color-mix(in oklab, var(--accent) 84%, #000000 16%);
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, var(--bg-base));
+  --btn-on-accent: #f7f4ef;
+
+  /* =========================================================================
+     SOMBRAS Y BISELES NEUMÓRFICOS DE ALTA PRECISIÓN
+     ========================================================================= */
+  --neu-raised:
+    6px 6px 14px var(--shadow-dark),
+    -6px -6px 14px var(--shadow-light),
+    inset 1px 1px 1px var(--groove-light);
+
+  --neu-raised-sm:
+    3px 3px 7px var(--shadow-dark),
+    -3px -3px 7px var(--shadow-light),
+    inset 1px 1px 1px var(--groove-light),
+    inset -1px -1px 1px color-mix(in oklab, var(--groove-dark) 40%, transparent);
+
+  --neu-raised-hover:
+    5px 5px 11px var(--shadow-dark),
+    -4px -4px 10px var(--shadow-light),
+    inset 1px 1px 2px var(--groove-light),
+    inset -1px -1px 1px color-mix(in oklab, var(--accent) 25%, transparent);
+
+  --neu-inset:
+    inset 4px 4px 8px var(--shadow-dark),
+    inset -4px -4px 8px var(--shadow-light);
+
+  --neu-inset-sm:
+    inset 2.5px 2.5px 5px var(--shadow-dark),
+    inset -2.5px -2.5px 5px var(--shadow-light);
+
+  scrollbar-color: var(--groove-dark) transparent;
 }
 
 html.dark {
   color-scheme: dark;
-  /* Negro amarronado / Café espresso tostado y profundo */
-  --bg-base: #120e0b;
-  --bg-surface: #1c1612;
-  --bg-elevated: #261e18;
-  --text-primary: #f7f4ef;
-  --text-secondary: #c2b5a8;
-  --text-muted: #7d6d5e;
-  --accent: #c85a32;
-  --accent-hover: #df6b40;
-  --groove-dark: #090706;
-  --groove-light: #2a211b;
-  /* Sombras calibradas para negro amarronado (luz cálida sutil + sombra profunda) */
-  --neu-raised: 6px 6px 14px #080605, -5px -5px 12px #2a221c;
-  --neu-raised-sm: 3px 3px 6px #080605, -3px -3px 6px #2a221c;
-  --neu-inset: inset 3px 3px 7px #080605, inset -3px -3px 7px #2a221c;
-  --neu-inset-sm: inset 2px 2px 4px #080605, inset -2px -2px 4px #2a221c;
-  scrollbar-color: #2a211b transparent;
 }
 
 body {
@@ -49,6 +91,9 @@ body {
   margin: 0;
   padding: 0;
   height: 100vh;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 input,
@@ -67,7 +112,10 @@ input[type='button'],
 input[type='submit'],
 input[type='reset'],
 .neu-btn,
+.neu-icon-btn,
 .neu-btn-terracotta,
+.neu-swatch,
+.neu-preset-btn,
 .cursor-pointer {
   cursor: pointer !important;
 }
@@ -75,7 +123,7 @@ input[type='reset'],
 /* Áreas de redacción y campos de entrada de texto */
 input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not(
     [type='radio']
-  ):not([type='range']),
+  ):not([type='range']):not([type='color']),
 textarea,
 [contenteditable='true'],
 .ProseMirror,
@@ -110,69 +158,161 @@ textarea,
   font-family: 'Newsreader', 'Playfair Display', Georgia, serif;
 }
 
-.neu-surface {
-  background-color: var(--bg-surface);
+/* =========================================================================
+   SUPERFICIES Y POZOS NEUMÓRFICOS
+   ========================================================================= */
+.neu-surface,
+.neu-card {
+  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-surface));
   box-shadow: var(--neu-raised);
-  border: 1px solid var(--groove-light);
+  border: 1px solid color-mix(in oklab, var(--groove-light) 70%, var(--groove-dark));
   border-radius: 18px;
 }
 
-.neu-well {
-  background-color: var(--bg-base);
+.neu-well,
+.neu-inset {
+  background: linear-gradient(145deg, color-mix(in oklab, var(--bg-base) 92%, var(--shadow-dark) 8%), var(--bg-base));
   box-shadow: var(--neu-inset);
+  border: 1px solid color-mix(in oklab, var(--groove-dark) 45%, transparent);
   border-radius: 14px;
 }
 
 .neu-well-sm {
-  background-color: var(--bg-base);
+  background: linear-gradient(145deg, color-mix(in oklab, var(--bg-base) 94%, var(--shadow-dark) 6%), var(--bg-base));
   box-shadow: var(--neu-inset-sm);
+  border: 1px solid color-mix(in oklab, var(--groove-dark) 35%, transparent);
   border-radius: 10px;
 }
 
-.neu-btn {
-  background-color: var(--bg-surface);
+/* =========================================================================
+   BOTONES NEUMÓRFICOS ESCULPIDOS (TODOS LOS BOTONES TÁCTILES)
+   ========================================================================= */
+.neu-btn,
+.neu-icon-btn {
+  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-surface));
   color: var(--text-primary);
   box-shadow: var(--neu-raised-sm);
-  border: 1px solid var(--groove-light);
-  border-radius: 10px;
-  transition: all 0.15s ease;
+  border: 1px solid color-mix(in oklab, var(--groove-light) 75%, var(--groove-dark));
+  border-radius: 11px;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
   cursor: pointer;
 }
 
-.neu-btn:hover {
+.neu-btn:hover,
+.neu-icon-btn:hover {
   color: var(--accent);
-  transform: translateY(-1px);
+  box-shadow: var(--neu-raised-hover);
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--groove-light));
+  transform: translateY(-1.5px);
 }
 
 .neu-btn:active,
-.neu-btn.is-active {
+.neu-btn.is-active,
+.neu-icon-btn:active {
+  background: linear-gradient(145deg, var(--bg-base), var(--bg-surface));
   box-shadow: var(--neu-inset-sm);
-  transform: translateY(0);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--groove-dark));
+  transform: translateY(0.5px);
   color: var(--accent);
 }
 
+/* Botón Principal de Acento (Cerámica Neumórfica Cálida) */
 .neu-btn-terracotta {
-  background: linear-gradient(145deg, #d6633a, #b84e28);
-  color: #f7f4ef;
+  background: linear-gradient(145deg, var(--accent-light), var(--accent), var(--accent-dark));
+  color: var(--btn-on-accent);
   box-shadow:
-    4px 4px 10px var(--groove-dark),
-    -2px -2px 6px var(--groove-light),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    4px 4px 10px color-mix(in oklab, var(--accent-dark) 38%, var(--shadow-dark)),
+    -3px -3px 8px var(--shadow-light),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.38),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.22);
   border-radius: 12px;
   font-weight: 600;
-  transition: all 0.15s ease;
+  border: 1px solid color-mix(in oklab, var(--accent-light) 65%, rgba(255, 255, 255, 0.35));
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.18s ease;
   cursor: pointer;
-  border: none;
 }
 
 .neu-btn-terracotta:hover {
   filter: brightness(1.06);
-  transform: translateY(-1px);
+  box-shadow:
+    6px 6px 14px color-mix(in oklab, var(--accent-dark) 48%, var(--shadow-dark)),
+    -3px -3px 9px var(--shadow-light),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.48),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1.5px);
 }
 
 .neu-btn-terracotta:active {
-  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.4);
-  transform: translateY(1px);
+  background: linear-gradient(145deg, var(--accent-dark), var(--accent));
+  box-shadow:
+    inset 3px 3px 7px rgba(0, 0, 0, 0.38),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.15);
+  transform: translateY(0.5px);
+}
+
+/* Muestras de color (Swatches) con relieve neumórfico */
+.neu-swatch {
+  box-shadow:
+    2.5px 2.5px 5px var(--shadow-dark),
+    -2px -2px 5px var(--shadow-light),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.45),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.25);
+  border: 1.5px solid color-mix(in oklab, var(--groove-light) 70%, var(--groove-dark));
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s ease;
+}
+
+.neu-swatch:hover {
+  transform: translateY(-1.5px) scale(1.12);
+  box-shadow:
+    4px 4px 8px var(--shadow-dark),
+    -2px -2px 6px var(--shadow-light),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.55);
+}
+
+.neu-swatch:active,
+.neu-swatch.is-selected {
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 2px var(--accent);
+}
+
+/* Botones de Temas Predefinidos con relieve neumórfico */
+.neu-preset-btn {
+  box-shadow:
+    4px 4px 9px var(--shadow-dark),
+    -3px -3px 8px var(--shadow-light),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.22),
+    inset -1px -1px 1px rgba(0, 0, 0, 0.15);
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.neu-preset-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    6px 6px 13px var(--shadow-dark),
+    -4px -4px 10px var(--shadow-light),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.neu-preset-btn:active,
+.neu-preset-btn.is-active {
+  transform: translateY(0.5px);
+  box-shadow:
+    inset 3px 3px 6px rgba(0, 0, 0, 0.25),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.12);
 }
 
 .neu-groove-h {
@@ -187,6 +327,23 @@ textarea,
   height: 100%;
   background-color: var(--groove-dark);
   border-right: 1px solid var(--groove-light);
+}
+
+/* Superficies filtradas para Gamificación */
+.neu-gamification-card {
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--bg-gamification-card) 85%, var(--bg-elevated) 15%),
+    var(--bg-gamification-card)
+  );
+  box-shadow: var(--neu-raised-sm);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--groove-light));
+}
+
+.neu-gamification-well {
+  background-color: var(--bg-gamification-well);
+  box-shadow: var(--neu-inset-sm);
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--groove-dark));
 }
 
 /* Electron Window Drag Regions */
@@ -273,4 +430,3 @@ textarea,
   opacity: 1 !important;
   filter: none !important;
 }
-

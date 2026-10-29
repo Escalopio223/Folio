@@ -37,11 +37,11 @@ export function registerGoalsHandlers(): void {
 
   ipcMain.handle(
     'goals:unlockAchievement',
-    async (_event, projectId: string, achievementKey: string) => {
+    async (_event, projectId: string, achievementKey: string, customLabel?: string | null) => {
       if (!projectId || !achievementKey) {
         throw new Error('Se requieren projectId y achievementKey válidos')
       }
-      return unlockAchievement(projectId, achievementKey)
+      return unlockAchievement(projectId, achievementKey, customLabel)
     }
   )
 }

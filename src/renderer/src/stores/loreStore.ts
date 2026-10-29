@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { LoreItem, CreateLoreInput, UpdateLoreInput } from '@shared/types'
+import { useGoalsStore } from './goalsStore'
 
 export const useLoreStore = defineStore('lore', () => {
   const items = ref<LoreItem[]>([])
@@ -59,6 +60,7 @@ export const useLoreStore = defineStore('lore', () => {
       const created = await window.api.lore.create(input)
       items.value.unshift(created)
       selectLore(created.id)
+      await useGoalsStore().checkAchievements()
       return created
     } catch (err) {
       console.error('[Lore Store] createLore failed:', err)
@@ -116,6 +118,7 @@ export const useLoreStore = defineStore('lore', () => {
           items.value.unshift(restored)
         }
         selectLore(restored.id)
+        await useGoalsStore().checkAchievements()
         return true
       }
       return false

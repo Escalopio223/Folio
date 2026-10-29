@@ -14,6 +14,7 @@ import {
   Layers,
   Flame,
   CheckCircle,
+  Sparkles,
   X
 } from 'lucide-vue-next'
 import { useGoalsStore } from '../../stores/goalsStore'
@@ -25,6 +26,8 @@ const toast = computed(() => goalsStore.activeToast)
 const iconComponent = computed(() => {
   const iconName = toast.value?.icon || 'Trophy'
   switch (iconName) {
+    case 'Sparkles':
+      return Sparkles
     case 'Target':
       return Target
     case 'Zap':
@@ -68,49 +71,52 @@ const iconComponent = computed(() => {
     >
       <div
         v-if="toast"
-        class="fixed bottom-6 right-6 z-50 pointer-events-none max-w-sm w-full select-none"
-        role="alert"
+        class="fixed bottom-8 right-6 z-50 pointer-events-none max-w-md w-full select-none"
+        role="status"
         aria-live="polite"
       >
         <div
-          class="pointer-events-auto neu-surface p-4 rounded-2xl shadow-2xl border border-[var(--groove-dark)]/70 flex items-start gap-3.5 backdrop-blur-md relative overflow-hidden group"
-          :class="{
-            'ring-1 ring-emerald-500/30': toast.type === 'goal',
-            'ring-1 ring-amber-500/30': toast.type === 'achievement'
-          }"
+          class="pointer-events-none neu-gamification-card p-4 rounded-2xl shadow-2xl border flex items-start gap-3.5 relative overflow-hidden"
+          :class="
+            toast.type === 'goal'
+              ? 'border-[#2E7D32]/50 ring-1 ring-[#2E7D32]/25'
+              : 'border-[var(--accent)]/60 ring-1 ring-amber-500/25'
+          "
         >
-          <!-- Resplandor decorativo sutil en la esquina -->
+          <!-- Resplandor decorativo cálido en la esquina -->
           <div
-            class="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-20"
-            :class="toast.type === 'goal' ? 'bg-emerald-500' : 'bg-amber-500'"
+            class="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-20"
+            :class="toast.type === 'goal' ? 'bg-[#2E7D32]' : 'bg-[var(--accent)]'"
           ></div>
 
           <!-- Icono de Hito con relieve neumórfico -->
           <div
-            class="w-10 h-10 rounded-xl neu-well-sm flex items-center justify-center shrink-0"
+            class="w-11 h-11 rounded-xl neu-well-sm flex items-center justify-center shrink-0"
             :class="toast.badgeColor || 'text-[var(--accent)]'"
           >
-            <component :is="iconComponent" :size="20" class="shrink-0" />
+            <component :is="iconComponent" :size="22" class="shrink-0" />
           </div>
 
-          <!-- Contenido textual motivador -->
-          <div class="flex-1 min-w-0 pr-4">
-            <h4 class="font-editorial text-sm font-bold text-[var(--text-primary)] leading-snug">
+          <!-- Contenido textual con tipografía serif legible -->
+          <div class="flex-1 min-w-0 pr-5">
+            <h4 class="font-editorial text-base font-bold text-[var(--text-primary)] leading-snug">
               {{ toast.title }}
             </h4>
-            <p class="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+            <p class="text-sm text-[var(--text-secondary)] mt-1 leading-relaxed">
               {{ toast.description }}
             </p>
           </div>
 
-          <!-- Botón de Cerrar -->
+          <!-- Botón de Cerrar (único elemento con pointer-events-auto para no robar foco del editor) -->
           <button
             type="button"
-            class="absolute top-3 right-3 w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            tabindex="-1"
+            class="pointer-events-auto absolute top-3 right-3 w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
             title="Cerrar notificación"
+            @mousedown.prevent
             @click="goalsStore.dismissToast"
           >
-            <X :size="12" />
+            <X :size="13" />
           </button>
         </div>
       </div>

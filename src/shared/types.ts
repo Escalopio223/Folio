@@ -148,6 +148,15 @@ export interface SaveWorldRuleInput {
   isPinned?: boolean
 }
 
+export type SessionGoalType = 'words' | 'scenes' | 'chapters' | 'free'
+
+export interface ActiveSessionGoal {
+  type: SessionGoalType
+  target: number
+  current: number
+  completed: boolean
+}
+
 export interface ProjectGoals {
   projectId: string
   targetTotalWords: number
@@ -155,6 +164,7 @@ export interface ProjectGoals {
   dailySceneGoal: number
   dailyChapterGoal: number
   deadlineDate: string | null
+  askSessionGoalOnStartup: boolean
   updatedAt: string | Date
 }
 
@@ -163,8 +173,9 @@ export interface DailyWritingLog {
   projectId: string
   date: string // YYYY-MM-DD
   wordsWritten: number
-  scenesCreated: number
-  chaptersCreated: number
+  scenesCompleted: number
+  chaptersCompleted: number
+  sessionGoalsHit: number
   goalMet: boolean
 }
 
@@ -172,6 +183,7 @@ export interface UnlockedAchievement {
   id: number
   projectId: string
   achievementKey: string
+  customLabel: string | null
   unlockedAt: string | Date
 }
 
@@ -188,6 +200,7 @@ export interface RecordProgressPayload {
   wordDelta?: number
   sceneDelta?: number
   chapterDelta?: number
+  sessionGoalHitDelta?: number
 }
 
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized'
@@ -234,7 +247,11 @@ export interface FolioApi {
     getSummary: (projectId: string) => Promise<GoalsSummary>
     updateConfig: (projectId: string, config: Partial<ProjectGoals>) => Promise<ProjectGoals>
     recordProgress: (projectId: string, payload: RecordProgressPayload) => Promise<DailyWritingLog>
-    unlockAchievement: (projectId: string, achievementKey: string) => Promise<UnlockedAchievement | null>
+    unlockAchievement: (
+      projectId: string,
+      achievementKey: string,
+      customLabel?: string | null
+    ) => Promise<UnlockedAchievement | null>
   }
   window: {
     action: (action: WindowAction) => Promise<boolean | void>

@@ -4,6 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import type { ScratchpadNote, SaveScratchpadNoteInput, Folio } from '@shared/types'
 import { useProjectStore } from './projectStore'
 import { useFolioStore } from './folioStore'
+import { useGoalsStore } from './goalsStore'
 
 export type ScratchpadColorTag = 'idea' | 'duda' | 'pendiente' | null
 
@@ -193,6 +194,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
       notes.value.unshift(newNote)
       activeNoteId.value = newNote.id
       saveStatus.value = 'saved'
+      await useGoalsStore().checkAchievements()
       return newNote
     } catch (err) {
       console.error('[ScratchpadStore] Error al crear nota rápida:', err)

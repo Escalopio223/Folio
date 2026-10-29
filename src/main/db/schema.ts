@@ -123,6 +123,9 @@ export const projectGoals = sqliteTable('project_goals', {
   dailySceneGoal: integer('daily_scene_goal').notNull().default(1),
   dailyChapterGoal: integer('daily_chapter_goal').notNull().default(0),
   deadlineDate: text('deadline_date'),
+  askSessionGoalOnStartup: integer('ask_session_goal_on_startup', { mode: 'boolean' })
+    .notNull()
+    .default(true),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 })
 
@@ -135,8 +138,9 @@ export const dailyWritingLogs = sqliteTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     date: text('date').notNull(), // Formato YYYY-MM-DD
     wordsWritten: integer('words_written').notNull().default(0),
-    scenesCreated: integer('scenes_created').notNull().default(0),
-    chaptersCreated: integer('chapters_created').notNull().default(0),
+    scenesCompleted: integer('scenes_completed').notNull().default(0),
+    chaptersCompleted: integer('chapters_completed').notNull().default(0),
+    sessionGoalsHit: integer('session_goals_hit').notNull().default(0),
     goalMet: integer('goal_met', { mode: 'boolean' }).notNull().default(false)
   },
   (table) => [
@@ -152,6 +156,7 @@ export const unlockedAchievements = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     achievementKey: text('achievement_key').notNull(),
+    customLabel: text('custom_label'),
     unlockedAt: integer('unlocked_at', { mode: 'timestamp' }).notNull()
   },
   (table) => [
@@ -167,4 +172,3 @@ export type DailyWritingLogInsert = typeof dailyWritingLogs.$inferInsert
 
 export type UnlockedAchievementSelect = typeof unlockedAchievements.$inferSelect
 export type UnlockedAchievementInsert = typeof unlockedAchievements.$inferInsert
-

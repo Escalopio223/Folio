@@ -307,7 +307,6 @@ watch(
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Buscar personaje, lugar, rasgo..."
         class="w-full pl-8 pr-7 py-1.5 text-xs neu-well-sm bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 focus:outline-none"
       />
       <button

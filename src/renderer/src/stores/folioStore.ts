@@ -16,38 +16,39 @@ export const useFolioStore = defineStore('folio', () => {
     return folios.value.find((f) => f.id === activeFolioId.value) || null
   })
 
-  // Chapters: items with parentId === null
+  // Chapters: items with parentId === null and not archived
   const chapters = computed<Folio[]>(() => {
     return folios.value
-      .filter((f) => f.parentId === null)
+      .filter((f) => f.parentId === null && !f.isArchived)
       .sort((a, b) => a.sortOrder - b.sortOrder)
   })
 
-  // Total words of the active manuscript (excluding trash / archived)
+  // Total words of the active manuscript (excluding trash / archived and orphaned scenes of archived chapters)
   const totalManuscriptWords = computed<number>(() => {
+    const activeChapterIds = new Set(chapters.value.map((c) => c.id))
     return folios.value
-      .filter((f) => !f.isArchived)
+      .filter((f) => !f.isArchived && (f.parentId === null || activeChapterIds.has(f.parentId)))
       .reduce((acc, f) => acc + countWords(f.content || ''), 0)
   })
 
   // Get scenes for a given chapter
   function getScenesForChapter(chapterId: string): Folio[] {
     return folios.value
-      .filter((f) => f.parentId === chapterId)
+      .filter((f) => f.parentId === chapterId && !f.isArchived)
       .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
-  // Session Words Tracking
+  // Session Words & Completed Items Tracking
   const sessionWordsAdded = ref<number>(0)
   const baselineWordCounts = new Map<string, number>()
   const folioDeltas = new Map<string, number>()
+  const completedInSessionIds = new Set<string>()
 
   function countWords(text: string): number {
     const cleanText = (text || '').replace(/<[^>]*>/g, ' ').trim()
     if (!cleanText) return 0
     return cleanText.split(/\s+/).length
   }
-
 
   function recordBaseline(folioId: string, content: string): void {
     if (!baselineWordCounts.has(folioId)) {
@@ -69,6 +70,9 @@ export const useFolioStore = defineStore('folio', () => {
       total += d
     })
     sessionWordsAdded.value = total
+
+    // Sincronizar en tiempo real con el store de metas y sesión activa
+    useGoalsStore().syncLiveSessionWords(total)
   }
 
   function selectFolio(id: string): void {
@@ -91,9 +95,16 @@ export const useFolioStore = defineStore('folio', () => {
       folios.value = active
       trashedFolios.value = trashed
 
+      // Registrar líneas base de todos los folios activos para evitar inflación al cortar/pegar
+      for (const f of active) {
+        recordBaseline(f.id, f.content || '')
+        if (f.status === 'completed') {
+          completedInSessionIds.add(f.id)
+        }
+      }
+
       const exists = active.some((f) => f.id === activeFolioId.value)
       if (!exists) {
-        // Try to select first scene, or first chapter
         const firstScene = active.find((f) => f.parentId !== null)
         if (firstScene) {
           selectFolio(firstScene.id)
@@ -122,12 +133,17 @@ export const useFolioStore = defineStore('folio', () => {
       content: ''
     })
     if (chapter) {
+      completedInSessionIds.add(chapter.id)
       useGoalsStore().recordProgress({ chapterDelta: 1 })
     }
     return chapter
   }
 
-  async function createScene(projectId: string, chapterId: string, title?: string): Promise<Folio | null> {
+  async function createScene(
+    projectId: string,
+    chapterId: string,
+    title?: string
+  ): Promise<Folio | null> {
     const scenes = getScenesForChapter(chapterId)
     const nextOrder = scenes.length + 1
     const scene = await createFolio({
@@ -139,6 +155,7 @@ export const useFolioStore = defineStore('folio', () => {
       content: ''
     })
     if (scene) {
+      completedInSessionIds.add(scene.id)
       useGoalsStore().recordProgress({ sceneDelta: 1 })
     }
     return scene
@@ -161,6 +178,9 @@ export const useFolioStore = defineStore('folio', () => {
 
   async function updateFolio(input: UpdateFolioInput): Promise<Folio | null> {
     try {
+      const existingBefore = folios.value.find((f) => f.id === input.id)
+      const wasCompletedBefore = existingBefore?.status === 'completed'
+
       const updated = await window.api.folio.update(input)
 
       const index = folios.value.findIndex((f) => f.id === updated.id)
@@ -192,8 +212,22 @@ export const useFolioStore = defineStore('folio', () => {
         }
       }
 
-      if (updated.status === 'completed') {
-        useGoalsStore().checkAchievements()
+      const goalsStore = useGoalsStore()
+
+      // Si una escena o capítulo existente pasa a 'completed' (Finalizado) hoy por primera vez
+      if (
+        updated.status === 'completed' &&
+        !wasCompletedBefore &&
+        !completedInSessionIds.has(updated.id)
+      ) {
+        completedInSessionIds.add(updated.id)
+        if (updated.type === 'scene' || updated.parentId !== null) {
+          await goalsStore.recordProgress({ sceneDelta: 1 })
+        } else {
+          await goalsStore.recordProgress({ chapterDelta: 1 })
+        }
+      } else if (updated.status === 'completed') {
+        await goalsStore.checkAchievements()
       }
 
       return updated
@@ -218,6 +252,7 @@ export const useFolioStore = defineStore('folio', () => {
           folios.value.push(restored)
         }
         selectFolio(restored.id)
+        await useGoalsStore().checkAchievements()
         return true
       }
       return false
@@ -257,6 +292,7 @@ export const useFolioStore = defineStore('folio', () => {
     fields?: Partial<Pick<UpdateFolioInput, 'content' | 'title' | 'synopsis' | 'status'>>
   ): Promise<Folio | null> {
     if (!activeFolioId.value) return null
+    await useGoalsStore().flushSessionWordsToDb()
     return updateFolio({
       id: activeFolioId.value,
       ...fields
