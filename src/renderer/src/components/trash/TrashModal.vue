@@ -57,7 +57,9 @@ onClickOutside(modalRef, () => {
 function handleCloseModal(): void {
   trashStore.closeModal()
   // Retorno de foco al editor central
-  const editorEl = document.querySelector('.tiptap-editor, textarea, [contenteditable="true"]') as HTMLElement | null
+  const editorEl = document.querySelector(
+    '.tiptap-editor, .ProseMirror, textarea, [contenteditable="true"]'
+  ) as HTMLElement | null
   editorEl?.focus()
 }
 
@@ -106,14 +108,20 @@ const allTrashItems = computed<TrashedListItem[]>(() => {
   const items: TrashedListItem[] = []
 
   for (const f of trashStore.trashFolios) {
+    const subTypeLabel =
+      f.type === 'frontmatter'
+        ? 'Preliminar'
+        : f.type === 'backmatter'
+          ? 'Anexo'
+          : 'Capítulo'
     items.push({
       id: f.id,
       title: f.title || 'Sin título',
       type: 'folio',
-      subType: f.parentId ? 'Escena' : 'Capítulo',
+      subType: subTypeLabel,
       content: f.content || '',
       updatedAt: new Date(f.updatedAt),
-      icon: f.parentId ? FileText : Bookmark,
+      icon: f.type === 'chapter' ? Bookmark : FileText,
       rawFolio: f
     })
   }
@@ -260,26 +268,39 @@ async function confirmPurge(): Promise<void> {
         <!-- =============================================================== -->
         <!-- CABECERA: TÍTULO, SUBTÍTULO Y BOTÓN DE CIERRE                   -->
         <!-- =============================================================== -->
-        <header class="p-4 border-b border-[var(--groove-dark)]/40 flex items-center justify-between shrink-0 bg-[var(--bg-surface)]">
+        <header
+          class="p-4 border-b border-[var(--groove-dark)]/40 flex items-center justify-between shrink-0 bg-[var(--bg-surface)]"
+        >
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl neu-well flex items-center justify-center text-[var(--accent)] shrink-0">
+            <div
+              class="w-10 h-10 rounded-xl neu-well flex items-center justify-center text-[var(--accent)] shrink-0"
+            >
               <Trash2 :size="20" class="stroke-[1.8]" />
             </div>
             <div>
-              <h2 id="modal-title" class="font-editorial text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <h2
+                id="modal-title"
+                class="font-editorial text-base font-bold text-[var(--text-primary)] flex items-center gap-2"
+              >
                 <span>Papelera de Reciclaje</span>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full neu-well-sm text-[var(--accent)] font-semibold uppercase">
-                  {{ allTrashItems.length }} {{ allTrashItems.length === 1 ? 'elemento' : 'elementos' }}
+                <span
+                  class="text-[10px] font-mono px-2 py-0.5 rounded-full neu-well-sm text-[var(--accent)] font-semibold uppercase"
+                >
+                  {{ allTrashItems.length }}
+                  {{ allTrashItems.length === 1 ? 'elemento' : 'elementos' }}
                 </span>
               </h2>
               <p class="text-xs text-[var(--text-muted)]">
-                Inspecciona o recupera capítulos, escenas y fichas de lore descartadas, o vacía la papelera.
+                Inspecciona o recupera capítulos y fichas de lore descartadas, o vacía la papelera.
               </p>
             </div>
           </div>
 
           <div class="flex items-center gap-2">
-            <kbd class="neu-btn px-2 py-1 text-[10px] font-mono text-[var(--text-muted)] rounded flex items-center gap-1 cursor-pointer hover:text-[var(--text-primary)]" @click="handleCloseModal">
+            <kbd
+              class="neu-btn px-2 py-1 text-[10px] font-mono text-[var(--text-muted)] rounded flex items-center gap-1 cursor-pointer hover:text-[var(--text-primary)]"
+              @click="handleCloseModal"
+            >
               <span>ESC</span>
             </kbd>
             <button
@@ -296,14 +317,20 @@ async function confirmPurge(): Promise<void> {
         <!-- =============================================================== -->
         <!-- BARRA DE HERRAMIENTAS: BÚSQUEDA, FILTRO Y VACIAR                -->
         <!-- =============================================================== -->
-        <div class="px-4 py-2.5 flex items-center justify-between gap-3 border-b border-[var(--groove-dark)]/30 shrink-0">
+        <div
+          class="px-4 py-2.5 flex items-center justify-between gap-3 border-b border-[var(--groove-dark)]/30 shrink-0"
+        >
           <div class="flex items-center gap-2">
             <!-- Filtro por tipo -->
             <div class="neu-well p-1 rounded-xl flex items-center gap-1 text-[11px] font-mono">
               <button
                 type="button"
                 class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                :class="filterType === 'all' ? 'neu-btn is-active font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                :class="
+                  filterType === 'all'
+                    ? 'neu-btn is-active font-bold text-[var(--accent)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                "
                 @click="filterType = 'all'"
               >
                 Todos ({{ trashStore.trashFolios.length + trashStore.trashLore.length }})
@@ -311,15 +338,23 @@ async function confirmPurge(): Promise<void> {
               <button
                 type="button"
                 class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                :class="filterType === 'folio' ? 'neu-btn is-active font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                :class="
+                  filterType === 'folio'
+                    ? 'neu-btn is-active font-bold text-[var(--accent)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                "
                 @click="filterType = 'folio'"
               >
-                Manuscrito ({{ trashStore.trashFolios.length }})
+                Capítulos ({{ trashStore.trashFolios.length }})
               </button>
               <button
                 type="button"
                 class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                :class="filterType === 'lore' ? 'neu-btn is-active font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                :class="
+                  filterType === 'lore'
+                    ? 'neu-btn is-active font-bold text-[var(--accent)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                "
                 @click="filterType = 'lore'"
               >
                 Wiki ({{ trashStore.trashLore.length }})
@@ -350,9 +385,11 @@ async function confirmPurge(): Promise<void> {
           <button
             type="button"
             class="px-3.5 py-1.5 text-xs font-editorial font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-            :class="allTrashItems.length > 0
-              ? 'bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 active:scale-95'
-              : 'opacity-40 pointer-events-none neu-btn text-[var(--text-muted)]'"
+            :class="
+              allTrashItems.length > 0
+                ? 'bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 active:scale-95'
+                : 'opacity-40 pointer-events-none neu-btn text-[var(--text-muted)]'
+            "
             :disabled="allTrashItems.length === 0"
             @click="promptEmptyTrash"
           >
@@ -380,7 +417,11 @@ async function confirmPurge(): Promise<void> {
                   {{ searchQuery ? 'No hay elementos coincidentes' : 'La papelera está vacía' }}
                 </p>
                 <p class="text-[11px] text-[var(--text-muted)] max-w-xs leading-relaxed">
-                  {{ searchQuery ? 'Prueba con otro término de búsqueda.' : 'No hay escenas erróneas, notas duplicadas ni fichas de lore descartadas en este proyecto.' }}
+                  {{
+                    searchQuery
+                      ? 'Prueba con otro término de búsqueda.'
+                      : 'No hay capítulos descartados ni fichas de lore archivadas en este proyecto.'
+                  }}
                 </p>
               </div>
             </div>
@@ -389,9 +430,11 @@ async function confirmPurge(): Promise<void> {
               v-for="item in allTrashItems"
               :key="item.id"
               class="p-3 rounded-xl cursor-pointer transition-all border group relative"
-              :class="selectedItem?.id === item.id
-                ? 'neu-well border-l-4 !border-l-[var(--accent)] border-[var(--groove-dark)]/40'
-                : 'neu-btn border-transparent hover:border-[var(--groove-dark)]/30'"
+              :class="
+                selectedItem?.id === item.id
+                  ? 'neu-well border-l-4 !border-l-[var(--accent)] border-[var(--groove-dark)]/40'
+                  : 'neu-btn border-transparent hover:border-[var(--groove-dark)]/30'
+              "
               @click="trashStore.selectFolio(item.id)"
             >
               <div class="flex items-start justify-between gap-2 mb-1.5">
@@ -417,11 +460,15 @@ async function confirmPurge(): Promise<void> {
               </div>
 
               <!-- Extracto del contenido -->
-              <p class="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed mb-2 font-serif">
+              <p
+                class="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed mb-2 font-serif"
+              >
                 {{ formatPreviewText(item.content) || 'Sin contenido de texto' }}
               </p>
 
-              <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
+              <div
+                class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]"
+              >
                 <span class="flex items-center gap-1">
                   <Clock :size="10" />
                   {{ formatDate(item.updatedAt) }}
@@ -440,7 +487,9 @@ async function confirmPurge(): Promise<void> {
           >
             <div v-if="selectedItem" class="flex-1 flex flex-col overflow-hidden space-y-3">
               <!-- Barra superior de acciones para el elemento seleccionado -->
-              <div class="flex items-center justify-between gap-2 pb-2 border-b border-[var(--groove-dark)]/30 shrink-0">
+              <div
+                class="flex items-center justify-between gap-2 pb-2 border-b border-[var(--groove-dark)]/30 shrink-0"
+              >
                 <div class="min-w-0">
                   <span class="text-[10px] font-mono uppercase text-[var(--accent)] font-semibold">
                     {{ selectedItem.subType }}
@@ -477,7 +526,7 @@ async function confirmPurge(): Promise<void> {
                   <button
                     type="button"
                     class="neu-btn-terracotta px-3 py-1.5 text-xs flex items-center gap-1.5 font-bold cursor-pointer active:scale-95 transition-transform"
-                    title="Restaurar este elemento de vuelta a la novela o wiki"
+                    title="Restaurar este elemento de vuelta al manuscrito o wiki"
                     @click="handleRestore(selectedItem)"
                   >
                     <Undo2 :size="13" />
@@ -487,32 +536,41 @@ async function confirmPurge(): Promise<void> {
               </div>
 
               <!-- Contenedor Neu-well de Lectura Rápida de Sólo Lectura -->
-              <div class="flex-1 neu-well rounded-xl p-4 overflow-y-auto editorial-scrollbar font-serif text-sm leading-relaxed text-[var(--text-primary)] select-text border border-[var(--groove-dark)]/40">
+              <div
+                class="flex-1 neu-well rounded-xl p-4 overflow-y-auto editorial-scrollbar font-serif text-sm leading-relaxed text-[var(--text-primary)] select-text border border-[var(--groove-dark)]/40"
+              >
                 <div
                   v-if="selectedItem.content"
                   class="space-y-3 whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-white"
                 >
                   {{ formatPreviewText(selectedItem.content) }}
                 </div>
-                <div v-else class="h-full flex items-center justify-center text-xs italic text-[var(--text-muted)] font-sans">
+                <div
+                  v-else
+                  class="h-full flex items-center justify-center text-xs italic text-[var(--text-muted)] font-sans"
+                >
                   Este elemento no contiene cuerpo de texto.
                 </div>
               </div>
 
               <!-- Pie de métricas -->
-              <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0 pt-1">
+              <div
+                class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0 pt-1"
+              >
                 <span v-if="selectedItem.type === 'folio'">
-                  {{ trashStore.countWords(selectedItem.content) }} palabras · {{ selectedItem.content.length }} caracteres
+                  {{ trashStore.countWords(selectedItem.content) }} palabras ·
+                  {{ selectedItem.content.length }} caracteres
                 </span>
-                <span v-else>
-                  Ficha de Lore archivada
-                </span>
+                <span v-else> Ficha de Lore archivada </span>
                 <span>No afecta el conteo de palabras del manuscrito activo</span>
               </div>
             </div>
 
             <!-- Estado sin selección -->
-            <div v-else class="h-full flex flex-col items-center justify-center text-center p-6 text-[var(--text-muted)] space-y-2 neu-well rounded-xl">
+            <div
+              v-else
+              class="h-full flex flex-col items-center justify-center text-center p-6 text-[var(--text-muted)] space-y-2 neu-well rounded-xl"
+            >
               <BookOpen :size="32" class="opacity-20" />
               <p class="text-xs font-editorial">Selecciona un elemento para previsualizarlo</p>
             </div>
@@ -532,25 +590,40 @@ async function confirmPurge(): Promise<void> {
             aria-labelledby="confirm-purge-title"
           >
             <div class="flex items-start gap-3">
-              <div class="w-10 h-10 rounded-xl neu-well flex items-center justify-center text-rose-500 shrink-0">
+              <div
+                class="w-10 h-10 rounded-xl neu-well flex items-center justify-center text-rose-500 shrink-0"
+              >
                 <AlertTriangle :size="22" />
               </div>
               <div>
-                <h3 id="confirm-purge-title" class="font-editorial text-sm font-bold text-[var(--text-primary)]">
-                  {{ purgeConfirm.mode === 'all' ? '¿Vaciar papelera permanentemente?' : '¿Eliminar registro físico irreversible?' }}
+                <h3
+                  id="confirm-purge-title"
+                  class="font-editorial text-sm font-bold text-[var(--text-primary)]"
+                >
+                  {{
+                    purgeConfirm.mode === 'all'
+                      ? '¿Vaciar papelera permanentemente?'
+                      : '¿Eliminar registro físico irreversible?'
+                  }}
                 </h3>
                 <p class="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
                   <template v-if="purgeConfirm.mode === 'all'">
-                    Esta acción purgará físicamente todos los borradores, escenas y fichas archivadas en la papelera de SQLite. Esta acción no se puede deshacer.
+                    Esta acción purgará físicamente todos los capítulos y fichas archivadas en la
+                    papelera de SQLite. Esta acción no se puede deshacer.
                   </template>
                   <template v-else>
-                    ¿Deseas purgar de forma permanente <span class="font-bold text-[var(--text-primary)]">"{{ purgeConfirm.item?.title }}"</span>? Esta acción es irreversible.
+                    ¿Deseas purgar de forma permanente
+                    <span class="font-bold text-[var(--text-primary)]"
+                      >"{{ purgeConfirm.item?.title }}"</span
+                    >? Esta acción es irreversible.
                   </template>
                 </p>
               </div>
             </div>
 
-            <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--groove-dark)]/40">
+            <div
+              class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--groove-dark)]/40"
+            >
               <button
                 type="button"
                 class="neu-btn px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"

@@ -20,19 +20,26 @@ export interface UpdateProjectInput {
   genre?: string
 }
 
-export type FolioType = 'chapter' | 'scene'
+export type FolioType = 'frontmatter' | 'chapter' | 'backmatter'
+export type FolioStatus = 'draft' | 'in_progress' | 'done'
 
 export interface Folio {
   id: string
   projectId: string
-  parentId: string | null
   type: FolioType
   title: string
+  subtitle: string
+  synopsis: string
+  povTag: string
+  timeline: string | null
+  location: string | null
+  targetWords: number
+  includeInExport: boolean
   content: string
-  synopsis?: string
+  status: FolioStatus
+  wordCount: number
+  orderIndex: number
   icon: string
-  sortOrder: number
-  status: string
   isFavorite: boolean
   isArchived: boolean
   createdAt: string | Date
@@ -41,25 +48,37 @@ export interface Folio {
 
 export interface CreateFolioInput {
   projectId: string
-  parentId?: string | null
   type?: FolioType
   title?: string
-  content?: string
+  subtitle?: string
   synopsis?: string
+  povTag?: string
+  timeline?: string | null
+  location?: string | null
+  targetWords?: number
+  includeInExport?: boolean
+  content?: string
+  status?: FolioStatus
+  wordCount?: number
+  orderIndex?: number
   icon?: string
-  sortOrder?: number
-  status?: string
 }
 
 export interface UpdateFolioInput {
   id: string
-  title?: string
-  content?: string
-  synopsis?: string
-  parentId?: string | null
   type?: FolioType
-  sortOrder?: number
-  status?: string
+  title?: string
+  subtitle?: string
+  synopsis?: string
+  povTag?: string
+  timeline?: string | null
+  location?: string | null
+  targetWords?: number
+  includeInExport?: boolean
+  content?: string
+  status?: FolioStatus
+  wordCount?: number
+  orderIndex?: number
   icon?: string
   isFavorite?: boolean
   isArchived?: boolean
@@ -68,11 +87,11 @@ export interface UpdateFolioInput {
 export interface LoreItem {
   id: string
   projectId: string
-  category: string // 'personaje' | 'lugar' | 'objeto' | 'idea' | 'pensamiento' | custom
+  category: string
   name: string
   summary: string
   content: string
-  attributes: Record<string, string> // Pares dinámicos: e.g. { Rol: "Protagonista", Edad: "28" }
+  attributes: Record<string, string>
   icon: string
   isFavorite: boolean
   isArchived: boolean
@@ -148,7 +167,7 @@ export interface SaveWorldRuleInput {
   isPinned?: boolean
 }
 
-export type SessionGoalType = 'words' | 'scenes' | 'chapters' | 'free'
+export type SessionGoalType = 'words' | 'chapters' | 'free'
 
 export interface ActiveSessionGoal {
   type: SessionGoalType
@@ -161,7 +180,6 @@ export interface ProjectGoals {
   projectId: string
   targetTotalWords: number
   dailyWordGoal: number
-  dailySceneGoal: number
   dailyChapterGoal: number
   deadlineDate: string | null
   askSessionGoalOnStartup: boolean
@@ -173,7 +191,6 @@ export interface DailyWritingLog {
   projectId: string
   date: string // YYYY-MM-DD
   wordsWritten: number
-  scenesCompleted: number
   chaptersCompleted: number
   sessionGoalsHit: number
   goalMet: boolean
@@ -198,7 +215,6 @@ export interface GoalsSummary {
 
 export interface RecordProgressPayload {
   wordDelta?: number
-  sceneDelta?: number
   chapterDelta?: number
   sessionGoalHitDelta?: number
 }
@@ -219,6 +235,7 @@ export interface FolioApi {
     getById: (id: string) => Promise<Folio | null>
     create: (input: CreateFolioInput) => Promise<Folio>
     update: (input: UpdateFolioInput) => Promise<Folio>
+    reorder: (ids: string[]) => Promise<boolean>
     restore: (id: string) => Promise<Folio>
     deletePermanent: (id: string) => Promise<boolean>
     emptyTrash: (projectId: string) => Promise<{ purgedFolios: number; purgedLore: number }>
@@ -255,5 +272,8 @@ export interface FolioApi {
   }
   window: {
     action: (action: WindowAction) => Promise<boolean | void>
+  }
+  export: {
+    htmlToPdfBuffer: (html: string) => Promise<Uint8Array>
   }
 }

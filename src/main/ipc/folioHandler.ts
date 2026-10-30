@@ -5,6 +5,7 @@ import {
   getFolioById,
   createFolio,
   updateFolio,
+  reorderFolios,
   restoreFolio,
   deleteFolioPermanent,
   emptyTrash
@@ -36,6 +37,13 @@ export function registerFolioHandlers(): void {
       throw new Error('Valid folio ID is required for update')
     }
     return updateFolio(input)
+  })
+
+  ipcMain.handle('folio:reorder', async (_event, ids: string[]) => {
+    if (!Array.isArray(ids)) {
+      throw new Error('Valid array of chapter IDs is required')
+    }
+    return reorderFolios(ids)
   })
 
   ipcMain.handle('folio:restore', async (_event, id: string) => {

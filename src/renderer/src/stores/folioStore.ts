@@ -1,9 +1,29 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Folio, CreateFolioInput, UpdateFolioInput } from '@shared/types'
+import type {
+  Folio,
+  FolioType,
+  FolioStatus,
+  CreateFolioInput,
+  UpdateFolioInput
+} from '@shared/types'
 import { useGoalsStore } from './goalsStore'
 
 const LAST_ACTIVE_FOLIO_KEY = 'folio:lastActiveFolio'
+
+export interface CreateChapterOptions {
+  type?: FolioType
+  title?: string
+  subtitle?: string
+  synopsis?: string
+  povTag?: string
+  timeline?: string | null
+  location?: string | null
+  targetWords?: number
+  includeInExport?: boolean
+  content?: string
+  status?: FolioStatus
+}
 
 export const useFolioStore = defineStore('folio', () => {
   const folios = ref<Folio[]>([])
@@ -11,41 +31,40 @@ export const useFolioStore = defineStore('folio', () => {
   const activeFolioId = ref<string | null>(localStorage.getItem(LAST_ACTIVE_FOLIO_KEY))
   const isLoading = ref(false)
 
+  // Selección activa de Capítulo (Folio)
   const activeFolio = computed<Folio | null>(() => {
     if (!activeFolioId.value) return null
     return folios.value.find((f) => f.id === activeFolioId.value) || null
   })
 
-  // Chapters: items with parentId === null and not archived
+  // Alias semántico para claridad en componentes
+  const activeChapter = computed<Folio | null>(() => activeFolio.value)
+
+  // Lista plana de capítulos activos ordenados por orderIndex
   const chapters = computed<Folio[]>(() => {
     return folios.value
-      .filter((f) => f.parentId === null && !f.isArchived)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .filter((f) => !f.isArchived)
+      .slice()
+      .sort((a, b) => a.orderIndex - b.orderIndex)
   })
 
-  // Total words of the active manuscript (excluding trash / archived and orphaned scenes of archived chapters)
+  // Total de palabras del manuscrito activo (excluyendo papelera / archivados)
   const totalManuscriptWords = computed<number>(() => {
-    const activeChapterIds = new Set(chapters.value.map((c) => c.id))
-    return folios.value
-      .filter((f) => !f.isArchived && (f.parentId === null || activeChapterIds.has(f.parentId)))
-      .reduce((acc, f) => acc + countWords(f.content || ''), 0)
+    return chapters.value.reduce((acc, f) => acc + countWords(f.content || ''), 0)
   })
 
-  // Get scenes for a given chapter
-  function getScenesForChapter(chapterId: string): Folio[] {
-    return folios.value
-      .filter((f) => f.parentId === chapterId && !f.isArchived)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-  }
-
-  // Session Words & Completed Items Tracking
+  // Seguimiento de palabras de sesión y capítulos finalizados hoy
   const sessionWordsAdded = ref<number>(0)
   const baselineWordCounts = new Map<string, number>()
   const folioDeltas = new Map<string, number>()
   const completedInSessionIds = new Set<string>()
 
   function countWords(text: string): number {
-    const cleanText = (text || '').replace(/<[^>]*>/g, ' ').trim()
+    const withoutBreaks = (text || '').replace(
+      /<div[^>]*data-type=["']scene-break["'][^>]*>[\s\S]*?<\/div>/gi,
+      ' '
+    )
+    const cleanText = withoutBreaks.replace(/<[^>]*>/g, ' ').trim()
     if (!cleanText) return 0
     return cleanText.split(/\s+/).length
   }
@@ -76,11 +95,15 @@ export const useFolioStore = defineStore('folio', () => {
   }
 
   function selectFolio(id: string): void {
-    activeFolioId.value = id
-    localStorage.setItem(LAST_ACTIVE_FOLIO_KEY, id)
-    const target = folios.value.find((f) => f.id === id)
-    if (target) {
-      recordBaseline(id, target.content || '')
+    activeFolioId.value = id || null
+    if (id) {
+      localStorage.setItem(LAST_ACTIVE_FOLIO_KEY, id)
+      const target = folios.value.find((f) => f.id === id)
+      if (target) {
+        recordBaseline(id, target.content || '')
+      }
+    } else {
+      localStorage.removeItem(LAST_ACTIVE_FOLIO_KEY)
     }
   }
 
@@ -95,20 +118,17 @@ export const useFolioStore = defineStore('folio', () => {
       folios.value = active
       trashedFolios.value = trashed
 
-      // Registrar líneas base de todos los folios activos para evitar inflación al cortar/pegar
+      // Registrar líneas base de todos los capítulos activos
       for (const f of active) {
         recordBaseline(f.id, f.content || '')
-        if (f.status === 'completed') {
+        if (f.status === 'done') {
           completedInSessionIds.add(f.id)
         }
       }
 
       const exists = active.some((f) => f.id === activeFolioId.value)
       if (!exists) {
-        const firstScene = active.find((f) => f.parentId !== null)
-        if (firstScene) {
-          selectFolio(firstScene.id)
-        } else if (active.length > 0) {
+        if (active.length > 0) {
           selectFolio(active[0].id)
         } else {
           activeFolioId.value = null
@@ -122,43 +142,52 @@ export const useFolioStore = defineStore('folio', () => {
     }
   }
 
-  async function createChapter(projectId: string, title?: string): Promise<Folio | null> {
-    const nextOrder = chapters.value.length + 1
+  async function createChapter(
+    projectId: string,
+    titleOrOptions?: string | CreateChapterOptions
+  ): Promise<Folio | null> {
+    const opts: CreateChapterOptions =
+      typeof titleOrOptions === 'string'
+        ? { title: titleOrOptions }
+        : titleOrOptions || {}
+
+    const type: FolioType = opts.type || 'chapter'
+    const nextOrder =
+      chapters.value.reduce((max, c) => Math.max(max, c.orderIndex), 0) + 1
+
+    const standardChaptersCount = chapters.value.filter((c) => c.type === 'chapter').length
+    const defaultTitle =
+      type === 'frontmatter'
+        ? 'Prólogo'
+        : type === 'backmatter'
+          ? 'Epílogo'
+          : `Capítulo ${standardChaptersCount + 1}`
+
+    const content = opts.content ?? ''
+    const wordCount = countWords(content)
+
     const chapter = await createFolio({
       projectId,
-      parentId: null,
-      type: 'chapter',
-      title: title || `Capítulo ${nextOrder}`,
-      sortOrder: nextOrder,
-      content: ''
+      type,
+      title: opts.title?.trim() || defaultTitle,
+      subtitle: opts.subtitle ?? '',
+      synopsis: opts.synopsis ?? '',
+      povTag: opts.povTag ?? '',
+      timeline: opts.timeline ?? null,
+      location: opts.location ?? null,
+      targetWords: opts.targetWords ?? 0,
+      includeInExport: opts.includeInExport ?? true,
+      content,
+      wordCount,
+      status: opts.status ?? 'draft',
+      orderIndex: nextOrder
     })
+
     if (chapter) {
       completedInSessionIds.add(chapter.id)
-      useGoalsStore().recordProgress({ chapterDelta: 1 })
+      await useGoalsStore().recordProgress({ chapterDelta: 1 })
     }
     return chapter
-  }
-
-  async function createScene(
-    projectId: string,
-    chapterId: string,
-    title?: string
-  ): Promise<Folio | null> {
-    const scenes = getScenesForChapter(chapterId)
-    const nextOrder = scenes.length + 1
-    const scene = await createFolio({
-      projectId,
-      parentId: chapterId,
-      type: 'scene',
-      title: title || `Escena ${nextOrder}`,
-      sortOrder: nextOrder,
-      content: ''
-    })
-    if (scene) {
-      completedInSessionIds.add(scene.id)
-      useGoalsStore().recordProgress({ sceneDelta: 1 })
-    }
-    return scene
   }
 
   async function createFolio(input: CreateFolioInput): Promise<Folio | null> {
@@ -176,10 +205,68 @@ export const useFolioStore = defineStore('folio', () => {
     }
   }
 
+  async function updateChapterMeta(
+    id: string,
+    meta: Partial<
+      Pick<
+        UpdateFolioInput,
+        | 'title'
+        | 'subtitle'
+        | 'synopsis'
+        | 'povTag'
+        | 'timeline'
+        | 'location'
+        | 'type'
+        | 'status'
+        | 'targetWords'
+        | 'includeInExport'
+      >
+    >
+  ): Promise<Folio | null> {
+    return updateFolio({
+      id,
+      ...meta
+    })
+  }
+
+  async function updateChapterContent(
+    id: string,
+    content: string,
+    wordCount?: number
+  ): Promise<Folio | null> {
+    return updateFolio({
+      id,
+      content,
+      wordCount: wordCount !== undefined ? wordCount : countWords(content)
+    })
+  }
+
+  async function reorderChapters(orderedIds: string[]): Promise<boolean> {
+    try {
+      // Actualización optimista en memoria
+      const orderMap = new Map<string, number>()
+      orderedIds.forEach((id, idx) => {
+        orderMap.set(id, idx + 1)
+      })
+      folios.value = folios.value.map((f) => {
+        const nextOrder = orderMap.get(f.id)
+        if (nextOrder !== undefined) {
+          return { ...f, orderIndex: nextOrder }
+        }
+        return f
+      })
+
+      return await window.api.folio.reorder(orderedIds)
+    } catch (err) {
+      console.error('[Folio Store] reorderChapters failed:', err)
+      return false
+    }
+  }
+
   async function updateFolio(input: UpdateFolioInput): Promise<Folio | null> {
     try {
       const existingBefore = folios.value.find((f) => f.id === input.id)
-      const wasCompletedBefore = existingBefore?.status === 'completed'
+      const wasDoneBefore = existingBefore?.status === 'done'
 
       const updated = await window.api.folio.update(input)
 
@@ -189,7 +276,8 @@ export const useFolioStore = defineStore('folio', () => {
           folios.value.splice(index, 1)
           trashedFolios.value.unshift(updated)
           if (activeFolioId.value === updated.id) {
-            activeFolioId.value = folios.value[0]?.id || null
+            const remaining = chapters.value
+            activeFolioId.value = remaining[0]?.id || null
             if (activeFolioId.value) {
               localStorage.setItem(LAST_ACTIVE_FOLIO_KEY, activeFolioId.value)
             } else {
@@ -214,19 +302,15 @@ export const useFolioStore = defineStore('folio', () => {
 
       const goalsStore = useGoalsStore()
 
-      // Si una escena o capítulo existente pasa a 'completed' (Finalizado) hoy por primera vez
+      // Si un capítulo existente pasa a 'done' (Finalizado) hoy por primera vez
       if (
-        updated.status === 'completed' &&
-        !wasCompletedBefore &&
+        updated.status === 'done' &&
+        !wasDoneBefore &&
         !completedInSessionIds.has(updated.id)
       ) {
         completedInSessionIds.add(updated.id)
-        if (updated.type === 'scene' || updated.parentId !== null) {
-          await goalsStore.recordProgress({ sceneDelta: 1 })
-        } else {
-          await goalsStore.recordProgress({ chapterDelta: 1 })
-        }
-      } else if (updated.status === 'completed') {
+        await goalsStore.recordProgress({ chapterDelta: 1 })
+      } else {
         await goalsStore.checkAchievements()
       }
 
@@ -273,7 +357,7 @@ export const useFolioStore = defineStore('folio', () => {
         trashedFolios.value = trashedFolios.value.filter((f) => f.id !== id)
         folios.value = folios.value.filter((f) => f.id !== id)
         if (activeFolioId.value === id) {
-          activeFolioId.value = folios.value[0]?.id || null
+          activeFolioId.value = chapters.value[0]?.id || null
           if (activeFolioId.value) {
             localStorage.setItem(LAST_ACTIVE_FOLIO_KEY, activeFolioId.value)
           } else {
@@ -289,7 +373,23 @@ export const useFolioStore = defineStore('folio', () => {
   }
 
   async function saveCurrentFolio(
-    fields?: Partial<Pick<UpdateFolioInput, 'content' | 'title' | 'synopsis' | 'status'>>
+    fields?: Partial<
+      Pick<
+        UpdateFolioInput,
+        | 'content'
+        | 'wordCount'
+        | 'title'
+        | 'subtitle'
+        | 'synopsis'
+        | 'povTag'
+        | 'timeline'
+        | 'location'
+        | 'type'
+        | 'status'
+        | 'targetWords'
+        | 'includeInExport'
+      >
+    >
   ): Promise<Folio | null> {
     if (!activeFolioId.value) return null
     await useGoalsStore().flushSessionWordsToDb()
@@ -304,6 +404,7 @@ export const useFolioStore = defineStore('folio', () => {
     trashedFolios,
     activeFolioId,
     activeFolio,
+    activeChapter,
     chapters,
     totalManuscriptWords,
     isLoading,
@@ -311,12 +412,13 @@ export const useFolioStore = defineStore('folio', () => {
     countWords,
     recordBaseline,
     updateSessionWords,
-    getScenesForChapter,
     selectFolio,
     fetchFolios,
     createChapter,
-    createScene,
     createFolio,
+    updateChapterMeta,
+    updateChapterContent,
+    reorderChapters,
     updateFolio,
     saveCurrentFolio,
     moveToTrash,

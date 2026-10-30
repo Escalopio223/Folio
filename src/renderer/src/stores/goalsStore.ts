@@ -39,7 +39,6 @@ export const useGoalsStore = defineStore('goals', () => {
     projectId: '',
     targetTotalWords: 50000,
     dailyWordGoal: 500,
-    dailySceneGoal: 1,
     dailyChapterGoal: 0,
     deadlineDate: null,
     askSessionGoalOnStartup: true,
@@ -51,7 +50,6 @@ export const useGoalsStore = defineStore('goals', () => {
     projectId: '',
     date: getLocalDateString(),
     wordsWritten: 0,
-    scenesCompleted: 0,
     chaptersCompleted: 0,
     sessionGoalsHit: 0,
     goalMet: false
@@ -135,12 +133,6 @@ export const useGoalsStore = defineStore('goals', () => {
       return true
     }
     if (config.value.dailyWordGoal > 0 && liveTodayWords.value >= config.value.dailyWordGoal) {
-      return true
-    }
-    if (
-      config.value.dailySceneGoal > 0 &&
-      todayLog.value.scenesCompleted >= config.value.dailySceneGoal
-    ) {
       return true
     }
     if (
@@ -332,9 +324,7 @@ export const useGoalsStore = defineStore('goals', () => {
     const unitText =
       type === 'words'
         ? `${target.toLocaleString('es-ES')} palabras`
-        : type === 'scenes'
-          ? `${target} ${target === 1 ? 'escena' : 'escenas'}`
-          : `${target} ${target === 1 ? 'capítulo' : 'capítulos'}`
+        : `${target} ${target === 1 ? 'capítulo' : 'capítulos'}`
 
     showToast({
       title: '✨ Meta de Sesión Cumplida',
@@ -370,27 +360,15 @@ export const useGoalsStore = defineStore('goals', () => {
     const scratchpadStore = useScratchpadStore()
 
     let completedChaptersCount = 0
-    let scenesCount = 0
-    let completedScenesCount = 0
 
     for (const chap of folioStore.chapters) {
-      const scenes = folioStore.getScenesForChapter(chap.id)
-      scenesCount += scenes.length
-      for (const s of scenes) {
-        if (s.status === 'completed') {
-          completedScenesCount++
-        }
-      }
-      const isChapCompleted =
-        chap.status === 'completed' ||
-        (scenes.length > 0 && scenes.every((s) => s.status === 'completed'))
-      if (isChapCompleted) {
+      if (chap.status === 'done') {
         completedChaptersCount++
       }
     }
 
     const activeDaysCount = recentHistory.value.filter(
-      (l) => l.wordsWritten > 0 || l.scenesCompleted > 0 || l.chaptersCompleted > 0 || l.goalMet
+      (l) => l.wordsWritten > 0 || l.chaptersCompleted > 0 || l.goalMet
     ).length
 
     return {
@@ -405,8 +383,6 @@ export const useGoalsStore = defineStore('goals', () => {
       currentStreak: currentStreak.value,
       activeDaysCount,
       chaptersCount: folioStore.chapters.length,
-      scenesCount,
-      completedScenesCount,
       completedChaptersCount,
       hasCompletedChapter: completedChaptersCount > 0,
       loreCount: loreStore.items.length,
@@ -477,10 +453,12 @@ export const useGoalsStore = defineStore('goals', () => {
       syncRecentHistoryAndStreak()
       await checkAchievements()
 
-      // Mostrar sugerencia de Meta de Sesión ("Ritual de Inicio") si procede
+      // Mostrar sugerencia de Meta de Sesión al abrir si no se ha desactivado
+      const skipFromStorage = localStorage.getItem('folio:skipSessionGoalPrompt') === 'true'
       const alreadyPromptedForProject = promptedProjectsInSession.value.has(projectId)
       if (
         config.value.askSessionGoalOnStartup &&
+        !skipFromStorage &&
         !alreadyPromptedForProject &&
         !hasPromptedThisSession.value
       ) {
@@ -505,6 +483,14 @@ export const useGoalsStore = defineStore('goals', () => {
       const updated = await window.api.goals.updateConfig(activeProjectId.value, partial)
       config.value = updated
 
+      if (partial.askSessionGoalOnStartup !== undefined) {
+        if (partial.askSessionGoalOnStartup) {
+          localStorage.removeItem('folio:skipSessionGoalPrompt')
+        } else {
+          localStorage.setItem('folio:skipSessionGoalPrompt', 'true')
+        }
+      }
+
       syncRecentHistoryAndStreak()
       await checkAchievements()
       return updated
@@ -524,14 +510,9 @@ export const useGoalsStore = defineStore('goals', () => {
       const updatedLog = await window.api.goals.recordProgress(activeProjectId.value, payload)
       todayLog.value = updatedLog
 
-      // Actualizar progreso de Meta de Sesión si es de escenas o capítulos
+      // Actualizar progreso de Meta de Sesión si es de capítulos
       if (activeSessionGoal.value && !activeSessionGoal.value.completed) {
-        if (activeSessionGoal.value.type === 'scenes' && payload.sceneDelta && payload.sceneDelta > 0) {
-          activeSessionGoal.value.current += payload.sceneDelta
-          if (activeSessionGoal.value.current >= activeSessionGoal.value.target) {
-            await completeActiveSessionGoal()
-          }
-        } else if (
+        if (
           activeSessionGoal.value.type === 'chapters' &&
           payload.chapterDelta &&
           payload.chapterDelta > 0
@@ -551,7 +532,8 @@ export const useGoalsStore = defineStore('goals', () => {
           title: '¡Expectativa Diaria Cumplida! 🎉',
           description: `Has alcanzado tu hábito diario de ${config.value.dailyWordGoal.toLocaleString('es-ES')} palabras hoy.`,
           icon: 'CheckCircle',
-          badgeColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/35',
+          badgeColor:
+            'text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/35',
           type: 'goal'
         })
       }

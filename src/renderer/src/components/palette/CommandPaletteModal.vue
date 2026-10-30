@@ -140,51 +140,52 @@ const filteredActions = computed<PaletteItem[]>(() => {
   }))
 })
 
-// 2. Manuscrito (Capítulos y Escenas)
+// 2. Manuscrito (Capítulos planos)
 const filteredManuscript = computed<PaletteItem[]>(() => {
   const q = normalize(paletteStore.query)
-  const folios = folioStore.folios.filter((f) => !f.isArchived)
+  const folios = folioStore.chapters
+
+  const getBadgeLabel = (type: string) =>
+    type === 'frontmatter' ? 'Preliminar' : type === 'backmatter' ? 'Anexo' : 'Capítulo'
 
   if (!q) {
-    // Si la búsqueda está vacía, mostramos los capítulos principales y escenas destacadas
-    return folios.slice(0, 6).map((f) => {
-      const isChapter = f.parentId === null
-      return {
-        id: `folio-${f.id}`,
-        title: f.title || (isChapter ? 'Capítulo sin título' : 'Escena sin título'),
-        description: isChapter
-          ? `Capítulo #${f.sortOrder}`
-          : `Escena del capítulo`,
-        snippet: extractSnippet(f.synopsis || f.content, ''),
-        section: 'manuscript',
-        badge: isChapter ? 'Capítulo' : 'Escena',
-        icon: isChapter ? Bookmark : FileText,
-        execute: () => {
-          folioStore.selectFolio(f.id)
-          uiStore.setLeftSidebar(true)
-        }
+    return folios.slice(0, 6).map((f) => ({
+      id: `folio-${f.id}`,
+      title: f.title || 'Capítulo sin título',
+      description: `${getBadgeLabel(f.type)} #${f.orderIndex}`,
+      snippet: extractSnippet(f.subtitle || f.synopsis || f.content, ''),
+      section: 'manuscript',
+      badge: getBadgeLabel(f.type),
+      icon: f.type === 'chapter' ? Bookmark : FileText,
+      execute: () => {
+        folioStore.selectFolio(f.id)
+        uiStore.setLeftSidebar(true)
       }
-    })
+    }))
   }
 
   const results: PaletteItem[] = []
   for (const f of folios) {
-    const isChapter = f.parentId === null
     const matchTitle = normalize(f.title).includes(q)
+    const matchSubtitle = normalize(f.subtitle || '').includes(q)
     const matchSynopsis = normalize(f.synopsis || '').includes(q)
+    const matchPov = normalize(f.povTag || '').includes(q)
     const plainContent = (f.content || '').replace(/<[^>]*>/g, ' ')
     const matchContent = normalize(plainContent).includes(q)
 
-    if (matchTitle || matchSynopsis || matchContent) {
-      const snippet = extractSnippet(matchContent ? plainContent : f.synopsis || plainContent, paletteStore.query)
+    if (matchTitle || matchSubtitle || matchSynopsis || matchPov || matchContent) {
+      const snippet = extractSnippet(
+        matchContent ? plainContent : f.synopsis || f.subtitle || plainContent,
+        paletteStore.query
+      )
       results.push({
         id: `folio-${f.id}`,
-        title: f.title || (isChapter ? 'Capítulo sin título' : 'Escena sin título'),
-        description: isChapter ? `Capítulo orden #${f.sortOrder}` : `Escena de manuscrito`,
+        title: f.title || 'Capítulo sin título',
+        description: `${getBadgeLabel(f.type)} #${f.orderIndex}${f.povTag ? ` · POV: ${f.povTag}` : ''}`,
         snippet,
         section: 'manuscript',
-        badge: isChapter ? 'Capítulo' : 'Escena',
-        icon: isChapter ? Bookmark : FileText,
+        badge: getBadgeLabel(f.type),
+        icon: f.type === 'chapter' ? Bookmark : FileText,
         execute: () => {
           folioStore.selectFolio(f.id)
           uiStore.setLeftSidebar(true)
@@ -278,7 +279,10 @@ const filteredWorldRules = computed<PaletteItem[]>(() => {
     const matchDet = normalize(r.details || '').includes(q)
 
     if (matchTitle || matchAxiom || matchCat || matchLim || matchDet) {
-      const snippet = extractSnippet(matchAxiom ? r.axiom : (r.limitations || r.details || r.axiom), paletteStore.query)
+      const snippet = extractSnippet(
+        matchAxiom ? r.axiom : r.limitations || r.details || r.axiom,
+        paletteStore.query
+      )
       results.push({
         id: `rule-${r.id}`,
         title: r.title,
@@ -419,7 +423,9 @@ onUnmounted(() => {
         >
           <!-- Barra de Entrada y Búsqueda -->
           <div class="p-3 border-b border-[var(--groove-dark)]/40">
-            <div class="neu-well px-3.5 py-2.5 flex items-center gap-3 rounded-xl border border-[var(--groove-dark)]/30">
+            <div
+              class="neu-well px-3.5 py-2.5 flex items-center gap-3 rounded-xl border border-[var(--groove-dark)]/30"
+            >
               <Search :size="16" class="text-[var(--accent)] shrink-0 opacity-90" />
 
               <input
@@ -427,7 +433,7 @@ onUnmounted(() => {
                 :value="paletteStore.query"
                 type="text"
                 class="bg-transparent border-none outline-none w-full text-xs md:text-sm font-sans placeholder-[var(--text-muted)] text-[var(--text-primary)] caret-[var(--accent)]"
-                placeholder="Escribe una acción, capítulo, escena o personaje..."
+                placeholder="Escribe una acción, capítulo, personaje o regla..."
                 autocomplete="off"
                 spellcheck="false"
                 @input="paletteStore.setQuery(($event.target as HTMLInputElement).value)"
@@ -457,13 +463,16 @@ onUnmounted(() => {
                 No se encontraron resultados para "{{ paletteStore.query }}"
               </p>
               <p class="text-[11px] text-[var(--text-muted)] max-w-xs">
-                Prueba buscando nombres de personajes, palabras de capítulos o comandos como "modo" o "nuevo".
+                Prueba buscando nombres de personajes, palabras de capítulos o comandos como "modo"
+                o "nuevo".
               </p>
             </div>
 
             <!-- 1. SECCIÓN: ACCIONES DEL SISTEMA -->
             <div v-if="filteredActions.length > 0" class="space-y-1">
-              <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between">
+              <div
+                class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between"
+              >
                 <span>Acciones del Sistema</span>
                 <span>{{ filteredActions.length }}</span>
               </div>
@@ -478,13 +487,19 @@ onUnmounted(() => {
                   'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
                     allResults[paletteStore.selectedIndex]?.id !== item.id
                 }"
-                @mouseenter="paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))"
+                @mouseenter="
+                  paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))
+                "
                 @click="executeItem(item)"
               >
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    :class="allResults[paletteStore.selectedIndex]?.id === item.id ? 'text-[var(--accent)] neu-well-sm' : 'text-[var(--text-muted)] neu-surface'"
+                    :class="
+                      allResults[paletteStore.selectedIndex]?.id === item.id
+                        ? 'text-[var(--accent)] neu-well-sm'
+                        : 'text-[var(--text-muted)] neu-surface'
+                    "
                   >
                     <component :is="item.icon" :size="13" />
                   </div>
@@ -492,7 +507,10 @@ onUnmounted(() => {
                     <div class="truncate text-xs text-[var(--text-primary)] font-medium">
                       {{ item.title }}
                     </div>
-                    <div v-if="item.description" class="text-[10px] text-[var(--text-muted)] truncate">
+                    <div
+                      v-if="item.description"
+                      class="text-[10px] text-[var(--text-muted)] truncate"
+                    >
                       {{ item.description }}
                     </div>
                   </div>
@@ -505,17 +523,21 @@ onUnmounted(() => {
                   >
                     {{ item.shortcut }}
                   </kbd>
-                  <span class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold">
+                  <span
+                    class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold"
+                  >
                     {{ item.badge }}
                   </span>
                 </div>
               </div>
             </div>
 
-            <!-- 2. SECCIÓN: MANUSCRITO (CAPÍTULOS Y ESCENAS) -->
+            <!-- 2. SECCIÓN: MANUSCRITO (CAPÍTULOS) -->
             <div v-if="filteredManuscript.length > 0" class="space-y-1">
-              <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2">
-                <span>Manuscrito</span>
+              <div
+                class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2"
+              >
+                <span>Capítulos del Manuscrito</span>
                 <span>{{ filteredManuscript.length }}</span>
               </div>
 
@@ -529,28 +551,41 @@ onUnmounted(() => {
                   'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
                     allResults[paletteStore.selectedIndex]?.id !== item.id
                 }"
-                @mouseenter="paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))"
+                @mouseenter="
+                  paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))
+                "
                 @click="executeItem(item)"
               >
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    :class="allResults[paletteStore.selectedIndex]?.id === item.id ? 'text-[var(--accent)] neu-well-sm' : 'text-[var(--text-muted)] neu-surface'"
+                    :class="
+                      allResults[paletteStore.selectedIndex]?.id === item.id
+                        ? 'text-[var(--accent)] neu-well-sm'
+                        : 'text-[var(--text-muted)] neu-surface'
+                    "
                   >
                     <component :is="item.icon" :size="13" />
                   </div>
                   <div class="min-w-0">
-                    <div class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]">
+                    <div
+                      class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]"
+                    >
                       {{ item.title }}
                     </div>
-                    <div v-if="item.snippet" class="text-[10px] text-[var(--text-muted)] truncate italic">
+                    <div
+                      v-if="item.snippet"
+                      class="text-[10px] text-[var(--text-muted)] truncate italic"
+                    >
                       {{ item.snippet }}
                     </div>
                   </div>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold">
+                  <span
+                    class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold"
+                  >
                     {{ item.badge }}
                   </span>
                 </div>
@@ -559,7 +594,9 @@ onUnmounted(() => {
 
             <!-- 3. SECCIÓN: REGLAS DEL MUNDO -->
             <div v-if="filteredWorldRules.length > 0" class="space-y-1">
-              <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2">
+              <div
+                class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2"
+              >
                 <span>Reglas del Mundo & Leyes</span>
                 <span>{{ filteredWorldRules.length }}</span>
               </div>
@@ -574,28 +611,41 @@ onUnmounted(() => {
                   'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
                     allResults[paletteStore.selectedIndex]?.id !== item.id
                 }"
-                @mouseenter="paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))"
+                @mouseenter="
+                  paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))
+                "
                 @click="executeItem(item)"
               >
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    :class="allResults[paletteStore.selectedIndex]?.id === item.id ? 'text-[var(--accent)] neu-well-sm' : 'text-[var(--text-muted)] neu-surface'"
+                    :class="
+                      allResults[paletteStore.selectedIndex]?.id === item.id
+                        ? 'text-[var(--accent)] neu-well-sm'
+                        : 'text-[var(--text-muted)] neu-surface'
+                    "
                   >
                     <component :is="item.icon" :size="13" />
                   </div>
                   <div class="min-w-0">
-                    <div class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]">
+                    <div
+                      class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]"
+                    >
                       {{ item.title }}
                     </div>
-                    <div v-if="item.snippet" class="text-[10px] text-[var(--text-muted)] truncate italic">
+                    <div
+                      v-if="item.snippet"
+                      class="text-[10px] text-[var(--text-muted)] truncate italic"
+                    >
                       {{ item.snippet }}
                     </div>
                   </div>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold">
+                  <span
+                    class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold"
+                  >
                     {{ item.badge }}
                   </span>
                 </div>
@@ -604,7 +654,9 @@ onUnmounted(() => {
 
             <!-- 4. SECCIÓN: LORE & WIKI -->
             <div v-if="filteredLore.length > 0" class="space-y-1">
-              <div class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2">
+              <div
+                class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between border-t border-[var(--groove-dark)]/20 pt-2"
+              >
                 <span>Wiki & Lore</span>
                 <span>{{ filteredLore.length }}</span>
               </div>
@@ -619,28 +671,41 @@ onUnmounted(() => {
                   'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
                     allResults[paletteStore.selectedIndex]?.id !== item.id
                 }"
-                @mouseenter="paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))"
+                @mouseenter="
+                  paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))
+                "
                 @click="executeItem(item)"
               >
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    :class="allResults[paletteStore.selectedIndex]?.id === item.id ? 'text-[var(--accent)] neu-well-sm' : 'text-[var(--text-muted)] neu-surface'"
+                    :class="
+                      allResults[paletteStore.selectedIndex]?.id === item.id
+                        ? 'text-[var(--accent)] neu-well-sm'
+                        : 'text-[var(--text-muted)] neu-surface'
+                    "
                   >
                     <component :is="item.icon" :size="13" />
                   </div>
                   <div class="min-w-0">
-                    <div class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]">
+                    <div
+                      class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]"
+                    >
                       {{ item.title }}
                     </div>
-                    <div v-if="item.snippet" class="text-[10px] text-[var(--text-muted)] truncate italic">
+                    <div
+                      v-if="item.snippet"
+                      class="text-[10px] text-[var(--text-muted)] truncate italic"
+                    >
                       {{ item.snippet }}
                     </div>
                   </div>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold">
+                  <span
+                    class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold"
+                  >
                     {{ item.badge }}
                   </span>
                 </div>
@@ -649,7 +714,9 @@ onUnmounted(() => {
           </div>
 
           <!-- Pie del Modal: Atajos de Navegación Editorial -->
-          <div class="px-3.5 py-2 neu-surface border-t border-[var(--groove-dark)]/40 flex items-center justify-between text-[11px] font-mono text-[var(--text-muted)] select-none bg-[var(--bg-base)]/60">
+          <div
+            class="px-3.5 py-2 neu-surface border-t border-[var(--groove-dark)]/40 flex items-center justify-between text-[11px] font-mono text-[var(--text-muted)] select-none bg-[var(--bg-base)]/60"
+          >
             <div class="flex items-center gap-3">
               <span class="flex items-center gap-1">
                 <ArrowUpDown :size="12" class="opacity-70" />

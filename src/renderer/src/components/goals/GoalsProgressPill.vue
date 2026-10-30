@@ -40,10 +40,6 @@ const progressLabel = computed(() => {
     if (g.type === 'words') {
       return `${g.current.toLocaleString('es-ES')} / ${g.target.toLocaleString('es-ES')} pal.`
     }
-    if (g.type === 'scenes') {
-      const unit = g.target === 1 ? 'escena' : 'escenas'
-      return `${g.current} / ${g.target} ${unit}`
-    }
     const unit = g.target === 1 ? 'capítulo' : 'capítulos'
     return `${g.current} / ${g.target} ${unit}`
   }

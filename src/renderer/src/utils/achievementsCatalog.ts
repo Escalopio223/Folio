@@ -5,7 +5,6 @@ export type AchievementCategory = 'goals' | 'volume' | 'consistency' | 'worldbui
 export interface AchievementEvaluationContext {
   todayLog: {
     wordsWritten: number
-    scenesCompleted: number
     chaptersCompleted: number
     sessionGoalsHit: number
     goalMet: boolean
@@ -13,7 +12,6 @@ export interface AchievementEvaluationContext {
   config: {
     targetTotalWords: number
     dailyWordGoal: number
-    dailySceneGoal: number
     dailyChapterGoal: number
   }
   activeSessionGoal: ActiveSessionGoal | null
@@ -21,8 +19,6 @@ export interface AchievementEvaluationContext {
   currentStreak: number
   activeDaysCount: number
   chaptersCount: number
-  scenesCount: number
-  completedScenesCount: number
   completedChaptersCount: number
   hasCompletedChapter: boolean
   loreCount: number
@@ -74,13 +70,9 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
         const unit =
           ctx.activeSessionGoal.type === 'words'
             ? 'palabras'
-            : ctx.activeSessionGoal.type === 'scenes'
-              ? ctx.activeSessionGoal.target === 1
-                ? 'escena'
-                : 'escenas'
-              : ctx.activeSessionGoal.target === 1
-                ? 'capítulo'
-                : 'capítulos'
+            : ctx.activeSessionGoal.target === 1
+              ? 'capítulo'
+              : 'capítulos'
         return `Meta de sesión cumplida: ${ctx.activeSessionGoal.target.toLocaleString('es-ES')} ${unit}`
       }
       return 'Meta de sesión alcanzada con éxito'
@@ -89,12 +81,7 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
       if (ctx.activeSessionGoal && ctx.activeSessionGoal.type !== 'free') {
         const current = ctx.activeSessionGoal.current
         const target = Math.max(1, ctx.activeSessionGoal.target)
-        const unitLabel =
-          ctx.activeSessionGoal.type === 'words'
-            ? 'palabras'
-            : ctx.activeSessionGoal.type === 'scenes'
-              ? 'escenas'
-              : 'capítulos'
+        const unitLabel = ctx.activeSessionGoal.type === 'words' ? 'palabras' : 'capítulos'
         return {
           current,
           target,
@@ -197,26 +184,18 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
     key: 'daily_goal_hit',
     title: 'Deber del Día',
     description:
-      'Alcanzar el 100% de tu expectativa diaria configurada (en palabras, escenas o capítulos).',
+      'Alcanzar el 100% de tu expectativa diaria configurada (en palabras o capítulos).',
     category: 'goals',
     categoryLabel: 'Tus Propias Metas',
     icon: 'Target',
     badgeColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/12 border-emerald-500/30',
     check: (ctx) =>
       (ctx.config.dailyWordGoal > 0 && ctx.todayLog.wordsWritten >= ctx.config.dailyWordGoal) ||
-      (ctx.config.dailySceneGoal > 0 &&
-        ctx.todayLog.scenesCompleted >= ctx.config.dailySceneGoal) ||
       (ctx.config.dailyChapterGoal > 0 &&
         ctx.todayLog.chaptersCompleted >= ctx.config.dailyChapterGoal),
     getCustomLabel: (ctx) => {
       if (ctx.config.dailyWordGoal > 0 && ctx.todayLog.wordsWritten >= ctx.config.dailyWordGoal) {
         return `Meta diaria alcanzada: ${ctx.config.dailyWordGoal.toLocaleString('es-ES')} palabras`
-      }
-      if (
-        ctx.config.dailySceneGoal > 0 &&
-        ctx.todayLog.scenesCompleted >= ctx.config.dailySceneGoal
-      ) {
-        return `Meta diaria alcanzada: ${ctx.config.dailySceneGoal} escena(s)`
       }
       if (
         ctx.config.dailyChapterGoal > 0 &&
@@ -360,28 +339,23 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
   },
   {
     key: 'daily_scene_architect',
-    title: 'Arquitecto de Escenas',
-    description: 'Cumplir tu objetivo de escenas propuestas en una jornada.',
+    title: 'Impulso Capitular',
+    description: 'Crear o cerrar al menos 1 capítulo dentro de una misma jornada de escritura.',
     category: 'goals',
     categoryLabel: 'Tus Propias Metas',
     icon: 'Layout',
     badgeColor: 'text-sky-600 dark:text-sky-400 bg-sky-500/12 border-sky-500/30',
-    check: (ctx) => {
-      const target = Math.max(1, ctx.config.dailySceneGoal)
-      return ctx.todayLog.scenesCompleted >= target
-    },
-    getCustomLabel: (ctx) => {
-      const target = Math.max(1, ctx.config.dailySceneGoal)
-      return `Objetivo cumplido: ${target} ${target === 1 ? 'escena completada' : 'escenas completadas'} en el día`
-    },
+    check: (ctx) => ctx.todayLog.chaptersCompleted >= 1,
+    getCustomLabel: (ctx) =>
+      `Avance capitular: ${ctx.todayLog.chaptersCompleted} ${ctx.todayLog.chaptersCompleted === 1 ? 'capítulo avanzado' : 'capítulos avanzados'} hoy`,
     getProgress: (ctx) => {
-      const current = ctx.todayLog.scenesCompleted
-      const target = Math.max(1, ctx.config.dailySceneGoal)
+      const current = ctx.todayLog.chaptersCompleted
+      const target = 1
       return {
         current,
         target,
         percentage: Math.min(100, Math.round((current / target) * 100)),
-        unitLabel: target === 1 ? 'escena hoy' : 'escenas hoy'
+        unitLabel: 'capítulo hoy'
       }
     }
   },
@@ -661,7 +635,7 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
   },
 
   // =========================================================================
-  // 3. CONSTANCIA Y OFICIO (16 LOGROS DE HÁBITO Y ESTRUCTURA)
+  // 3. CONSTANCIA Y OFICIO (16 LOGROS DE HÁBITO Y ESTRUCTURA CAPITULAR)
   // =========================================================================
   {
     key: 'streak_2',
@@ -799,66 +773,66 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
   },
   {
     key: 'scenes_5',
-    title: 'Tejedor de Escenas',
-    description: 'Estructurar al menos 5 escenas activas dentro de tu manuscrito.',
+    title: 'Cinco Capítulos Forjados',
+    description: 'Estructurar al menos 5 capítulos activos dentro de tu manuscrito.',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'Layout',
     badgeColor: 'text-sky-600 dark:text-sky-400 bg-sky-500/12 border-sky-500/30',
-    check: (ctx) => ctx.scenesCount >= 5,
+    check: (ctx) => ctx.chaptersCount >= 5,
     getProgress: (ctx) => ({
-      current: ctx.scenesCount,
+      current: ctx.chaptersCount,
       target: 5,
-      percentage: Math.min(100, Math.round((ctx.scenesCount / 5) * 100)),
-      unitLabel: 'escenas'
+      percentage: Math.min(100, Math.round((ctx.chaptersCount / 5) * 100)),
+      unitLabel: 'capítulos'
     })
   },
   {
     key: 'scenes_15',
-    title: 'Mosaico Dramático',
-    description: 'Alcanzar 15 escenas organizadas en la estructura de tu obra.',
+    title: 'Quince Capítulos en Pie',
+    description: 'Alcanzar 15 capítulos organizados en la estructura de tu obra.',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'Layout',
     badgeColor: 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/12 border-indigo-500/30',
-    check: (ctx) => ctx.scenesCount >= 15,
+    check: (ctx) => ctx.chaptersCount >= 15,
     getProgress: (ctx) => ({
-      current: ctx.scenesCount,
+      current: ctx.chaptersCount,
       target: 15,
-      percentage: Math.min(100, Math.round((ctx.scenesCount / 15) * 100)),
-      unitLabel: 'escenas'
+      percentage: Math.min(100, Math.round((ctx.chaptersCount / 15) * 100)),
+      unitLabel: 'capítulos'
     })
   },
   {
     key: 'scenes_30',
-    title: 'Tapiz de Escenas',
-    description: 'Alcanzar 30 escenas construidas a lo largo de tu manuscrito.',
+    title: 'Tapiz de Veinticinco Capítulos',
+    description: 'Alcanzar 25 capítulos construidos a lo largo de tu manuscrito.',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'Layout',
     badgeColor: 'text-violet-600 dark:text-violet-400 bg-violet-500/12 border-violet-500/30',
-    check: (ctx) => ctx.scenesCount >= 30,
+    check: (ctx) => ctx.chaptersCount >= 25,
     getProgress: (ctx) => ({
-      current: ctx.scenesCount,
-      target: 30,
-      percentage: Math.min(100, Math.round((ctx.scenesCount / 30) * 100)),
-      unitLabel: 'escenas'
+      current: ctx.chaptersCount,
+      target: 25,
+      percentage: Math.min(100, Math.round((ctx.chaptersCount / 25) * 100)),
+      unitLabel: 'capítulos'
     })
   },
   {
     key: 'scenes_completed_5',
-    title: 'Cinco Escenas Pulidas',
-    description: 'Tener al menos 5 escenas marcadas con el estado «Finalizado».',
+    title: 'Cinco Capítulos Pulidos',
+    description: 'Tener al menos 5 capítulos marcados con el estado «Finalizado».',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'CheckCircle',
     badgeColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/12 border-emerald-500/30',
-    check: (ctx) => ctx.completedScenesCount >= 5,
+    check: (ctx) => ctx.completedChaptersCount >= 5,
     getProgress: (ctx) => ({
-      current: ctx.completedScenesCount,
+      current: ctx.completedChaptersCount,
       target: 5,
-      percentage: Math.min(100, Math.round((ctx.completedScenesCount / 5) * 100)),
-      unitLabel: 'escenas finalizadas'
+      percentage: Math.min(100, Math.round((ctx.completedChaptersCount / 5) * 100)),
+      unitLabel: 'capítulos finalizados'
     })
   },
   {
@@ -896,7 +870,7 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
   {
     key: 'first_chapter_closed',
     title: 'Capítulo Sellado',
-    description: 'Marcar todas las escenas de un capítulo como Finalizado.',
+    description: 'Marcar tu primer capítulo con el estado «Finalizado».',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'BookmarkCheck',
@@ -905,7 +879,7 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
     getCustomLabel: (ctx) =>
       ctx.completedChaptersCount > 1
         ? `${ctx.completedChaptersCount} capítulos sellados en la obra`
-        : 'Primer capítulo con todas sus escenas finalizadas',
+        : 'Primer capítulo marcado como finalizado',
     getProgress: (ctx) => ({
       current: ctx.hasCompletedChapter ? 1 : 0,
       target: 1,
@@ -916,7 +890,7 @@ export const ACHIEVEMENTS_CATALOG: AchievementItem[] = [
   {
     key: 'three_chapters_closed',
     title: 'Tres Capítulos Sellados',
-    description: 'Completar íntegramente 3 capítulos con todas sus escenas finalizadas.',
+    description: 'Completar íntegramente 3 capítulos marcados como «Finalizado».',
     category: 'consistency',
     categoryLabel: 'Constancia y Oficio',
     icon: 'BookmarkCheck',

@@ -430,3 +430,23 @@ textarea,
   opacity: 1 !important;
   filter: none !important;
 }
+
+
+/* Botón de Cerrar Aplicación con Hover Rojo */
+.neu-btn.neu-close-btn:hover {
+  background: linear-gradient(145deg, #ef4444, #dc2626) !important;
+  color: #ffffff !important;
+  border-color: #f87171 !important;
+  box-shadow:
+    3px 3px 8px color-mix(in oklab, #991b1b 45%, var(--shadow-dark)),
+    -2px -2px 6px var(--shadow-light),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.35) !important;
+}
+
+.neu-btn.neu-close-btn:active {
+  background: linear-gradient(145deg, #b91c1c, #dc2626) !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35) !important;
+  transform: translateY(0.5px);
+}

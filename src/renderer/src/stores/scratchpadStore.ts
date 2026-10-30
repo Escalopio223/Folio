@@ -83,7 +83,11 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
       }
       saveStatus.value = 'saved'
       const now = new Date()
-      lastSavedTime.value = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      lastSavedTime.value = now.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
     } catch (err) {
       console.error('[ScratchpadStore] Error al guardar nota en SQLite:', err)
       saveStatus.value = 'error'
@@ -306,9 +310,9 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // PROMOVER A ESCENA DEL MANUSCRITO
+  // PROMOVER A CAPÍTULO DEL MANUSCRITO
   // ---------------------------------------------------------------------------
-  async function promoteToScene(noteId: number): Promise<Folio | null> {
+  async function promoteToChapter(noteId: number): Promise<Folio | null> {
     const projectStore = useProjectStore()
     const folioStore = useFolioStore()
 
@@ -321,59 +325,32 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     // Priorizar el título de la nota si existe, o la primera línea
     const noteTitle = note.title?.trim()
     const firstLine = note.content.trim().split('\n')[0] || ''
-    const cleanTitle = noteTitle || firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 50).trim() || 'Nueva Escena (Scratchpad)'
+    const cleanTitle =
+      noteTitle ||
+      firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 50).trim() ||
+      'Nuevo Capítulo (Scratchpad)'
 
-    // Determinar capítulo de destino:
-    // 1. Si el folio activo es un capítulo, usarlo.
-    // 2. Si el folio activo es una escena, usar su parentId (capítulo).
-    // 3. Si existen capítulos en el manuscrito, usar el primero.
-    // 4. Si no hay capítulos, crear uno nuevo.
-    let targetChapterId: string | null = null
-
-    if (folioStore.activeFolio) {
-      if (folioStore.activeFolio.type === 'chapter') {
-        targetChapterId = folioStore.activeFolio.id
-      } else if (folioStore.activeFolio.parentId) {
-        targetChapterId = folioStore.activeFolio.parentId
-      }
-    }
-
-    if (!targetChapterId) {
-      if (folioStore.chapters.length > 0) {
-        targetChapterId = folioStore.chapters[0].id
-      } else {
-        const newChapter = await folioStore.createChapter(projectStore.activeProjectId, 'Capítulo I')
-        if (newChapter) {
-          targetChapterId = newChapter.id
-        }
-      }
-    }
-
-    if (!targetChapterId) {
-      console.error('[ScratchpadStore] No fue posible determinar o crear un capítulo de destino')
-      return null
-    }
+    const htmlContent = note.content
+      .trim()
+      .split(/\n{2,}/)
+      .map((para) => `<p>${para.trim()}</p>`)
+      .join('')
 
     try {
-      const scene = await folioStore.createFolio({
-        projectId: projectStore.activeProjectId,
-        parentId: targetChapterId,
-        type: 'scene',
+      const chapter = await folioStore.createChapter(projectStore.activeProjectId, {
+        type: 'chapter',
         title: cleanTitle,
-        content: note.content,
-        sortOrder: folioStore.getScenesForChapter(targetChapterId).length + 1
+        content: htmlContent
       })
 
-      if (scene) {
-        // Seleccionar la nueva escena en el editor
-        folioStore.selectFolio(scene.id)
-        // Eliminar nota del Scratchpad ya que ha sido promovida
+      if (chapter) {
+        folioStore.selectFolio(chapter.id)
         await deleteNote(noteId)
       }
 
-      return scene
+      return chapter
     } catch (err) {
-      console.error('[ScratchpadStore] Error al promover nota a escena:', err)
+      console.error('[ScratchpadStore] Error al promover nota a capítulo:', err)
       return null
     }
   }
@@ -419,7 +396,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     deleteNote,
     togglePin,
     setColorTag,
-    promoteToScene,
+    promoteToChapter,
     copyNote
   }
 })

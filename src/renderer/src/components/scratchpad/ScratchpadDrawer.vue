@@ -153,7 +153,10 @@ function getTagOption(tag: string | null): TagOption | undefined {
 }
 
 // Extractor del extracto o título resumido de una nota
-function getNoteSummary(note: { title?: string; content?: string }): { title: string; subtitle: string } {
+function getNoteSummary(note: { title?: string; content?: string }): {
+  title: string
+  subtitle: string
+} {
   const noteTitle = note.title?.trim()
   const content = note.content?.trim() || ''
   const lines = content.split('\n').filter((l) => l.trim().length > 0)
@@ -161,8 +164,8 @@ function getNoteSummary(note: { title?: string; content?: string }): { title: st
 
   const displayTitle = noteTitle || firstLine || 'Nota sin título'
   const displaySubtitle = noteTitle
-    ? (firstLine || 'Sin contenido adicional')
-    : (lines[1]?.trim() || 'Sin contenido adicional')
+    ? firstLine || 'Sin contenido adicional'
+    : lines[1]?.trim() || 'Sin contenido adicional'
 
   return {
     title: displayTitle.slice(0, 36) + (displayTitle.length > 36 ? '…' : ''),
@@ -214,9 +217,9 @@ async function handlePromote(): Promise<void> {
   const noteContent = scratchpadStore.activeNote?.content || ''
   if (!noteContent.trim()) return
 
-  const scene = await scratchpadStore.promoteToScene(scratchpadStore.activeNoteId)
-  if (scene) {
-    promoteToast.value = `¡Promovida a "${scene.title}"!`
+  const chapter = await scratchpadStore.promoteToChapter(scratchpadStore.activeNoteId)
+  if (chapter) {
+    promoteToast.value = `¡Promovida a "${chapter.title}"!`
     setTimeout(() => {
       promoteToast.value = null
       handleClose()
@@ -256,9 +259,13 @@ async function handleCreateNewNote(): Promise<void> {
         <!-- =============================================================== -->
         <!-- 1. CABECERA DEL SCRATCHPAD                                      -->
         <!-- =============================================================== -->
-        <header class="p-3.5 border-b border-[var(--groove-dark)]/40 flex items-center justify-between shrink-0 bg-[var(--bg-surface)]">
+        <header
+          class="p-3.5 border-b border-[var(--groove-dark)]/40 flex items-center justify-between shrink-0 bg-[var(--bg-surface)]"
+        >
           <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-xl neu-well flex items-center justify-center text-[var(--accent)] shrink-0">
+            <div
+              class="w-8 h-8 rounded-xl neu-well flex items-center justify-center text-[var(--accent)] shrink-0"
+            >
               <Feather :size="16" class="stroke-[2.2]" />
             </div>
             <div class="min-w-0">
@@ -266,7 +273,9 @@ async function handleCreateNewNote(): Promise<void> {
                 <h2 class="font-editorial text-sm font-bold text-[var(--text-primary)] truncate">
                   Scratchpad
                 </h2>
-                <span class="text-[9px] font-mono px-1.5 py-0.2 rounded-full neu-well-sm text-[var(--accent)] font-semibold">
+                <span
+                  class="text-[9px] font-mono px-1.5 py-0.2 rounded-full neu-well-sm text-[var(--accent)] font-semibold"
+                >
                   {{ scratchpadStore.totalCount }}
                 </span>
               </div>
@@ -303,7 +312,9 @@ async function handleCreateNewNote(): Promise<void> {
         <!-- =============================================================== -->
         <!-- 2. MINI BARRA DE BÚSQUEDA Y FILTRO DE CATEGORÍAS                -->
         <!-- =============================================================== -->
-        <div class="px-3 py-2 border-b border-[var(--groove-dark)]/30 space-y-2 shrink-0 bg-[var(--bg-base)]/40">
+        <div
+          class="px-3 py-2 border-b border-[var(--groove-dark)]/30 space-y-2 shrink-0 bg-[var(--bg-base)]/40"
+        >
           <div class="relative flex items-center">
             <Search :size="12" class="absolute left-2.5 text-[var(--text-muted)] pointer-events-none" />
             <input
@@ -328,7 +339,11 @@ async function handleCreateNewNote(): Promise<void> {
             <button
               type="button"
               class="neu-btn px-2.5 py-1 rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 font-mono text-[10px] active:scale-95"
-              :class="scratchpadStore.selectedColorFilter === 'all' ? 'is-active neu-well !text-[var(--accent)] font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
+              :class="
+                scratchpadStore.selectedColorFilter === 'all'
+                  ? 'is-active neu-well !text-[var(--accent)] font-bold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              "
               @click="scratchpadStore.selectedColorFilter = 'all'"
             >
               Todas ({{ scratchpadStore.notes.length }})
@@ -339,7 +354,11 @@ async function handleCreateNewNote(): Promise<void> {
               :key="opt.value || ''"
               type="button"
               class="neu-btn px-2.5 py-1 rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 flex items-center gap-1.5 text-[10px] active:scale-95"
-              :class="scratchpadStore.selectedColorFilter === opt.value ? 'is-active neu-well font-bold text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
+              :class="
+                scratchpadStore.selectedColorFilter === opt.value
+                  ? 'is-active neu-well font-bold text-[var(--text-primary)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              "
               @click="scratchpadStore.selectedColorFilter = opt.value || 'all'"
             >
               <span class="w-1.5 h-1.5 rounded-full" :class="opt.dotClass"></span>
@@ -352,7 +371,9 @@ async function handleCreateNewNote(): Promise<void> {
         <!-- 3. LISTA MINIATURA DE NOTAS (Colapsable / Deslizable)          -->
         <!-- =============================================================== -->
         <div class="border-b border-[var(--groove-dark)]/30 shrink-0">
-          <div class="px-3 py-1.5 flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-surface)]">
+          <div
+            class="px-3 py-1.5 flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-surface)]"
+          >
             <span class="flex items-center gap-1">
               <ListFilter :size="10" />
               <span>Notas guardadas ({{ scratchpadStore.filteredNotes.length }})</span>
@@ -398,18 +419,29 @@ async function handleCreateNewNote(): Promise<void> {
                 </div>
                 <div class="flex items-center gap-2 mt-0.5 text-[9px] text-[var(--text-muted)] font-mono">
                   <span>{{ formatRelativeTime(note.updatedAt) }}</span>
-                  <span v-if="note.colorTag" class="px-1 py-0.1 rounded text-[8px] font-sans" :class="getTagOption(note.colorTag)?.badgeClass">
+                  <span
+                    v-if="note.colorTag"
+                    class="px-1 py-0.1 rounded text-[8px] font-sans"
+                    :class="getTagOption(note.colorTag)?.badgeClass"
+                  >
                     {{ getTagOption(note.colorTag)?.label }}
                   </span>
                 </div>
               </div>
 
               <!-- Acciones rápidas de la miniatura -->
-              <div class="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity" @click.stop>
+              <div
+                class="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity"
+                @click.stop
+              >
                 <button
                   type="button"
                   class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                  :class="note.isPinned ? 'neu-well text-amber-500 font-bold' : 'text-[var(--text-muted)] hover:text-amber-500'"
+                  :class="
+                    note.isPinned
+                      ? 'neu-well text-amber-500 font-bold'
+                      : 'text-[var(--text-muted)] hover:text-amber-500'
+                  "
                   :title="note.isPinned ? 'Desfijar' : 'Fijar nota arriba'"
                   @click="scratchpadStore.togglePin(note.id)"
                 >
@@ -448,7 +480,11 @@ async function handleCreateNewNote(): Promise<void> {
                 <button
                   type="button"
                   class="neu-btn px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all cursor-pointer active:scale-95"
-                  :class="!scratchpadStore.activeNote.colorTag ? 'neu-well font-bold text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
+                  :class="
+                    !scratchpadStore.activeNote.colorTag
+                      ? 'neu-well font-bold text-[var(--text-primary)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  "
                   @click="scratchpadStore.setColorTag(scratchpadStore.activeNote.id, null)"
                 >
                   Ninguna
@@ -458,7 +494,11 @@ async function handleCreateNewNote(): Promise<void> {
                   :key="opt.value || ''"
                   type="button"
                   class="neu-btn px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  :class="scratchpadStore.activeNote.colorTag === opt.value ? 'neu-well font-bold ' + opt.badgeClass : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
+                  :class="
+                    scratchpadStore.activeNote.colorTag === opt.value
+                      ? 'neu-well font-bold ' + opt.badgeClass
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  "
                   @click="scratchpadStore.setColorTag(scratchpadStore.activeNote.id, opt.value)"
                 >
                   <component :is="opt.icon" :size="10" />
@@ -471,12 +511,22 @@ async function handleCreateNewNote(): Promise<void> {
                 <button
                   type="button"
                   class="neu-btn px-2.5 py-1 rounded-lg text-[10px] flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                  :class="scratchpadStore.activeNote.isPinned ? 'neu-well text-amber-500 font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'"
-                  :title="scratchpadStore.activeNote.isPinned ? 'Desfijar de la parte superior' : 'Fijar nota arriba'"
+                  :class="
+                    scratchpadStore.activeNote.isPinned
+                      ? 'neu-well text-amber-500 font-bold'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  "
+                  :title="
+                    scratchpadStore.activeNote.isPinned
+                      ? 'Desfijar de la parte superior'
+                      : 'Fijar nota arriba'
+                  "
                   @click="scratchpadStore.togglePin(scratchpadStore.activeNote.id)"
                 >
                   <Pin :size="11" :class="{ 'fill-current rotate-45': scratchpadStore.activeNote.isPinned }" />
-                  <span class="hidden sm:inline">{{ scratchpadStore.activeNote.isPinned ? 'Fijada' : 'Fijar' }}</span>
+                  <span class="hidden sm:inline">{{
+                    scratchpadStore.activeNote.isPinned ? 'Fijada' : 'Fijar'
+                  }}</span>
                 </button>
 
                 <button
@@ -492,7 +542,9 @@ async function handleCreateNewNote(): Promise<void> {
             </div>
 
             <!-- 1. Bloque pequeño: Nombre / Título de la idea o apunte -->
-            <div class="neu-well-sm rounded-xl px-3 py-1.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)] transition-all shrink-0">
+            <div
+              class="neu-well-sm rounded-xl px-3 py-1.5 border border-[var(--groove-dark)]/40 focus-within:ring-1 focus-within:ring-[var(--accent)] transition-all shrink-0"
+            >
               <input
                 ref="titleInputRef"
                 :value="scratchpadStore.activeNote.title"
@@ -504,7 +556,9 @@ async function handleCreateNewNote(): Promise<void> {
             </div>
 
             <!-- 2. Bloque principal: Contenido / Desarrollo de la idea -->
-            <div class="flex-1 neu-well rounded-2xl p-3 flex flex-col overflow-hidden relative border border-[var(--groove-dark)]/40">
+            <div
+              class="flex-1 neu-well rounded-2xl p-3 flex flex-col overflow-hidden relative border border-[var(--groove-dark)]/40"
+            >
               <textarea
                 ref="textareaRef"
                 :value="scratchpadStore.activeNote.content"
@@ -544,7 +598,9 @@ async function handleCreateNewNote(): Promise<void> {
             v-else
             class="flex-1 flex flex-col items-center justify-center text-center p-6 neu-well rounded-2xl text-[var(--text-muted)] space-y-3"
           >
-            <div class="w-12 h-12 rounded-2xl neu-surface flex items-center justify-center text-[var(--accent)]">
+            <div
+              class="w-12 h-12 rounded-2xl neu-surface flex items-center justify-center text-[var(--accent)]"
+            >
               <Sparkles :size="22" />
             </div>
             <div>
@@ -569,7 +625,9 @@ async function handleCreateNewNote(): Promise<void> {
         <!-- =============================================================== -->
         <!-- 5. PIE DEL DRAWER: MÉTRICAS Y ACCIONES PRINCIPALES              -->
         <!-- =============================================================== -->
-        <footer class="p-3 border-t border-[var(--groove-dark)]/40 bg-[var(--bg-surface)] shrink-0 flex items-center justify-between gap-2">
+        <footer
+          class="p-3 border-t border-[var(--groove-dark)]/40 bg-[var(--bg-surface)] shrink-0 flex items-center justify-between gap-2"
+        >
           <!-- Métricas de texto e indicador de autoguardado -->
           <div class="flex items-center gap-2 text-[10px] font-mono text-[var(--text-muted)] min-w-0">
             <span class="truncate">{{ noteWords }} palabras · {{ noteChars }} car.</span>
@@ -596,7 +654,7 @@ async function handleCreateNewNote(): Promise<void> {
             </span>
           </div>
 
-          <!-- Acciones clave: Promover a Escena & Copiar -->
+          <!-- Acciones clave: Promover a Capítulo & Copiar -->
           <div class="flex items-center gap-2 shrink-0">
             <!-- Copiar -->
             <button
@@ -610,16 +668,16 @@ async function handleCreateNewNote(): Promise<void> {
               <span class="text-[11px] font-medium hidden sm:inline">Copiar</span>
             </button>
 
-            <!-- Promover a Escena -->
+            <!-- Promover a Capítulo -->
             <button
               type="button"
               class="neu-btn neu-btn-terracotta px-3.5 py-1.5 text-xs flex items-center gap-1.5 text-white transition-all cursor-pointer active:scale-95 font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Convertir esta nota en una nueva escena dentro del manuscrito activo"
+              title="Convertir esta nota en un nuevo capítulo dentro del manuscrito activo"
               :disabled="!scratchpadStore.activeNote?.content"
               @click="handlePromote"
             >
               <BookOpen :size="12" />
-              <span class="text-[11px]">Promover a Escena</span>
+              <span class="text-[11px]">Promover a Capítulo</span>
             </button>
           </div>
         </footer>

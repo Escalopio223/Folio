@@ -1,7 +1,6 @@
 import type { Component } from 'vue'
 import {
   FolderPlus,
-  FilePlus,
   Sparkles,
   SunMoon,
   Palette,
@@ -14,7 +13,8 @@ import {
   Scale,
   RotateCcw,
   Target,
-  Trophy
+  Trophy,
+  BookOpen
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -67,7 +67,8 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       category: 'action',
       badge: 'Acción',
       icon: FolderPlus,
-      keywords: ['capitulo', 'crear', 'seccion', 'manuscrito', 'nuevo'],
+      shortcut: 'Ctrl+Alt+N',
+      keywords: ['capitulo', 'crear', 'seccion', 'manuscrito', 'nuevo', 'folio'],
       execute: async () => {
         if (!projectStore.activeProjectId) return
         uiStore.setLeftSidebar(true)
@@ -75,39 +76,37 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
-      id: 'new-scene',
-      title: 'Nueva Escena',
-      description: 'Crear una escena en el capítulo activo o primer capítulo disponible',
+      id: 'new-frontmatter',
+      title: 'Nuevo Preliminar (Prólogo / Dedicatoria)',
+      description: 'Añadir una página preliminar al inicio de la obra',
       category: 'action',
       badge: 'Acción',
-      icon: FilePlus,
-      shortcut: 'Ctrl+Alt+N',
-      keywords: ['escena', 'crear', 'folio', 'redaccion', 'nueva'],
+      icon: BookOpen,
+      keywords: ['preliminar', 'prologo', 'dedicatoria', 'frontmatter', 'prefacio'],
       execute: async () => {
         if (!projectStore.activeProjectId) return
         uiStore.setLeftSidebar(true)
-
-        let targetChapterId: string | null = null
-        if (folioStore.activeFolio) {
-          if (folioStore.activeFolio.parentId) {
-            targetChapterId = folioStore.activeFolio.parentId
-          } else {
-            targetChapterId = folioStore.activeFolio.id
-          }
-        }
-
-        if (!targetChapterId && folioStore.chapters.length > 0) {
-          targetChapterId = folioStore.chapters[0].id
-        }
-
-        if (targetChapterId) {
-          await folioStore.createScene(projectStore.activeProjectId, targetChapterId)
-        } else {
-          const chap = await folioStore.createChapter(projectStore.activeProjectId)
-          if (chap) {
-            await folioStore.createScene(projectStore.activeProjectId, chap.id)
-          }
-        }
+        await folioStore.createChapter(projectStore.activeProjectId, {
+          type: 'frontmatter',
+          title: 'Prólogo'
+        })
+      }
+    },
+    {
+      id: 'new-backmatter',
+      title: 'Nuevo Anexo / Epílogo',
+      description: 'Añadir un epílogo, glosario o apéndice al cierre del libro',
+      category: 'action',
+      badge: 'Acción',
+      icon: BookOpen,
+      keywords: ['anexo', 'epilogo', 'apendice', 'backmatter', 'glosario'],
+      execute: async () => {
+        if (!projectStore.activeProjectId) return
+        uiStore.setLeftSidebar(true)
+        await folioStore.createChapter(projectStore.activeProjectId, {
+          type: 'backmatter',
+          title: 'Epílogo'
+        })
       }
     },
     {
@@ -133,11 +132,24 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     {
       id: 'open-theme-customizer',
       title: 'Personalizar Sistema de 3 Colores (Botones, Texto y Background)',
-      description: 'Configurar el color de Botones, Texto, Background y el filtro de gamas de gamificación',
+      description:
+        'Configurar el color de Botones, Texto, Background y el filtro de gamas de gamificación',
       category: 'action',
       badge: 'Sistema',
       icon: Palette,
-      keywords: ['color', 'colores', 'tema', 'botones', 'texto', 'background', 'fondo', 'gamas', 'filtro', 'claro', 'oscuro'],
+      keywords: [
+        'color',
+        'colores',
+        'tema',
+        'botones',
+        'texto',
+        'background',
+        'fondo',
+        'gamas',
+        'filtro',
+        'claro',
+        'oscuro'
+      ],
       execute: () => {
         uiStore.openThemeModal()
       }
@@ -158,30 +170,44 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     },
     {
       id: 'toggle-manuscript-sidebar',
-      title: 'Alternar Árbol de Manuscrito (Sidebar Izq)',
+      title: 'Alternar Panel de Manuscrito (Sidebar Izq)',
       description: uiStore.isLeftSidebarOpen
-        ? 'Ocultar panel lateral izquierdo de capítulos y escenas'
-        : 'Mostrar panel lateral izquierdo de capítulos y escenas',
+        ? 'Ocultar panel lateral izquierdo de capítulos'
+        : 'Mostrar panel lateral izquierdo de capítulos',
       category: 'action',
       badge: 'Vista',
       icon: PanelLeft,
-      shortcut: 'Ctrl+B',
+      shortcut: 'Ctrl+1',
       keywords: ['sidebar', 'arbol', 'manuscrito', 'capitulos', 'izq', 'panel'],
       execute: () => {
         uiStore.toggleLeftSidebar()
       }
     },
     {
+      id: 'focus-editor-canvas',
+      title: 'Enfocar Lienzo Central (Editor)',
+      description: 'Devolver el foco del cursor directamente a la prosa del capítulo activo',
+      category: 'action',
+      badge: 'Vista',
+      icon: Feather,
+      shortcut: 'Ctrl+2',
+      keywords: ['editor', 'lienzo', 'foco', 'prosa', 'escribir', 'central'],
+      execute: () => {
+        const editorEl = document.querySelector('.ProseMirror') as HTMLElement | null
+        editorEl?.focus()
+      }
+    },
+    {
       id: 'toggle-wiki-inspector',
-      title: 'Alternar Wiki Inspector (Sidebar Der)',
+      title: 'Alternar Wiki / Reglas (Sidebar Der)',
       description: uiStore.isRightSidebarOpen
         ? 'Ocultar panel lateral derecho de Lore & Wiki'
         : 'Mostrar panel lateral derecho de Lore & Wiki',
       category: 'action',
       badge: 'Vista',
       icon: PanelRight,
-      shortcut: 'Ctrl+N',
-      keywords: ['wiki', 'lore', 'inspector', 'der', 'panel', 'derecho'],
+      shortcut: 'Ctrl+3',
+      keywords: ['wiki', 'lore', 'inspector', 'der', 'panel', 'derecho', 'reglas'],
       execute: () => {
         uiStore.toggleRightSidebar()
       }
@@ -252,7 +278,16 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       category: 'action',
       badge: 'Objetivos',
       icon: Trophy,
-      keywords: ['metas', 'logros', 'objetivo', 'expectativas', 'insignias', 'racha', 'palabras', 'gamificacion'],
+      keywords: [
+        'metas',
+        'logros',
+        'objetivo',
+        'expectativas',
+        'insignias',
+        'racha',
+        'palabras',
+        'gamificacion'
+      ],
       execute: () => {
         goalsStore.openGoalsModal('expectations')
       }
@@ -272,7 +307,7 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     {
       id: 'config-daily-words',
       title: 'Configurar Objetivo Diario de Palabras',
-      description: 'Definir o ajustar tu meta de palabras, escenas y capítulos por jornada',
+      description: 'Definir o ajustar tu meta de palabras y capítulos por jornada',
       category: 'action',
       badge: 'Objetivos',
       icon: Target,
@@ -297,7 +332,7 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     {
       id: 'open-trash',
       title: 'Abrir Papelera de Reciclaje',
-      description: 'Inspeccionar o recuperar escenas y fichas eliminadas, o vaciar residuos',
+      description: 'Inspeccionar o recuperar capítulos y fichas eliminadas, o vaciar residuos',
       category: 'action',
       badge: 'Sistema',
       icon: Trash2,
@@ -308,12 +343,12 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     },
     {
       id: 'send-to-trash',
-      title: 'Mover Escena Actual a la Papelera',
-      description: 'Descartar la escena activa y enviarla a la papelera de reciclaje',
+      title: 'Mover Capítulo Actual a la Papelera',
+      description: 'Descartar el capítulo activo y enviarlo a la papelera de reciclaje',
       category: 'action',
       badge: 'Manuscrito',
       icon: Trash2,
-      keywords: ['descartar', 'papelera', 'escena', 'archivar', 'borrar', 'eliminar'],
+      keywords: ['descartar', 'papelera', 'capitulo', 'archivar', 'borrar', 'eliminar'],
       execute: async () => {
         if (folioStore.activeFolioId) {
           await trashStore.moveToTrash(folioStore.activeFolioId, 'folio')

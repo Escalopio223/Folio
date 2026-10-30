@@ -12,24 +12,31 @@ import WikiInspector from '../components/WikiInspector.vue'
 import PanelResizer from '../components/PanelResizer.vue'
 import {
   ChevronDown,
-  ChevronRight,
   Plus,
-  FileText,
   Bookmark,
   Trash2,
   Check,
   Eye,
-  Flame
+  Flame,
+  Pencil,
+  GripVertical,
+  Sparkles,
+  Clock,
+  MapPin
 } from 'lucide-vue-next'
-import TiptapEditor from '../components/editor/TiptapEditor.vue'
+import TiptapEditor, { type SceneBreakAnchor } from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import type { Editor } from '@tiptap/vue-3'
-import type { Folio } from '@shared/types'
+import type { Folio, FolioType, FolioStatus } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
 import { useRulesStore } from '../stores/rulesStore'
 import { useGoalsStore } from '../stores/goalsStore'
 import GoalsProgressPill from '../components/goals/GoalsProgressPill.vue'
+import {
+  useChapterMetrics,
+  type ChapterMetricsSnapshot
+} from '../composables/useChapterMetrics'
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
@@ -41,7 +48,6 @@ const rulesStore = useRulesStore()
 const goalsStore = useGoalsStore()
 
 const isProjectModalOpen = ref(false)
-const expandedChapters = ref<Record<string, boolean>>({})
 
 // Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
 const { width: windowWidth } = useWindowSize()
@@ -68,11 +74,61 @@ const maxAllowedRightWidth = computed(() => {
   )
 })
 
-// Manuscript Editable States
+// =========================================================================
+// ESTADOS REACTIVOS DEL CAPÍTULO ACTIVO (NIVEL ÚNICO)
+// =========================================================================
 const editFolioTitle = ref('')
+const editFolioSubtitle = ref('')
+const editFolioTimeline = ref('')
+const editFolioLocation = ref('')
 const editFolioContent = ref('')
 const editFolioSynopsis = ref('')
-const editFolioStatus = ref('draft')
+const editFolioPovTag = ref('')
+const editFolioTargetWords = ref<number>(0)
+const editFolioIncludeInExport = ref<boolean>(true)
+const editFolioType = ref<FolioType>('chapter')
+const editFolioStatus = ref<FolioStatus>('draft')
+
+// Estado no intrusivo para metadatos inline (Línea temporal y Ubicación)
+const isTimelineFocused = ref(false)
+const isLocationFocused = ref(false)
+const timelineInputRef = ref<HTMLInputElement | null>(null)
+const locationInputRef = ref<HTMLInputElement | null>(null)
+
+function openTimelineInput(): void {
+  isTimelineFocused.value = true
+  nextTick(() => {
+    timelineInputRef.value?.focus()
+  })
+}
+
+function openLocationInput(): void {
+  isLocationFocused.value = true
+  nextTick(() => {
+    locationInputRef.value?.focus()
+  })
+}
+
+async function handleTimelineBlur(): Promise<void> {
+  isTimelineFocused.value = false
+  editFolioTimeline.value = editFolioTimeline.value.trim()
+  onEditorInput()
+  await flushSave()
+}
+
+async function handleLocationBlur(): Promise<void> {
+  isLocationFocused.value = false
+  editFolioLocation.value = editFolioLocation.value.trim()
+  onEditorInput()
+  await flushSave()
+}
+
+function formatSidebarReadingTime(words: number): string {
+  const safeWords = Math.max(0, Math.floor(Number(words) || 0))
+  if (safeWords === 0) return '0 min'
+  return `~${Math.ceil(safeWords / 200)} min`
+}
+
 const isStatusDropdownOpen = ref(false)
 const statusDropdownRef = ref<HTMLElement | null>(null)
 
@@ -80,23 +136,134 @@ onClickOutside(statusDropdownRef, () => {
   isStatusDropdownOpen.value = false
 })
 
-const statusOptions = [
-  { value: 'draft', label: 'Borrador', color: 'bg-amber-500' },
-  { value: 'in_progress', label: 'En curso', color: 'bg-sky-500' },
-  { value: 'completed', label: 'Finalizado', color: 'bg-emerald-500' }
-]
+const statusOptions: Array<{ value: FolioStatus; label: string; color: string; dotClass: string }> =
+  [
+    { value: 'draft', label: 'Borrador', color: 'bg-amber-500', dotClass: 'bg-amber-500' },
+    { value: 'in_progress', label: 'En curso', color: 'bg-sky-500', dotClass: 'bg-sky-500' },
+    { value: 'done', label: 'Finalizado', color: 'bg-emerald-500', dotClass: 'bg-emerald-500' }
+  ]
 
 const currentStatusObj = computed(() => {
   return statusOptions.find((o) => o.value === editFolioStatus.value) || statusOptions[0]
 })
 
-function setFolioStatus(status: string): void {
+function getStatusDotColor(status: string): string {
+  if (status === 'done') return 'bg-emerald-500'
+  if (status === 'in_progress') return 'bg-sky-500'
+  return 'bg-amber-500'
+}
+
+function getStatusLabel(status: string): string {
+  if (status === 'done') return 'Finalizado'
+  if (status === 'in_progress') return 'En curso'
+  return 'Borrador'
+}
+
+function setFolioStatus(status: FolioStatus): void {
   editFolioStatus.value = status
   isStatusDropdownOpen.value = false
   onEditorInput()
 }
 
-// Save states & indicators
+// =========================================================================
+// EDICIÓN RÁPIDA EN LÍNEA DEL TÍTULO EN EL ÁRBOL DEL MANUSCRITO
+// =========================================================================
+const inlineEditingId = ref<string | null>(null)
+const inlineTitleDraft = ref('')
+
+function startInlineEdit(chap: Folio): void {
+  inlineEditingId.value = chap.id
+  inlineTitleDraft.value = chap.title
+  nextTick(() => {
+    const inputEl = document.getElementById(`inline-title-${chap.id}`) as HTMLInputElement | null
+    inputEl?.focus()
+    inputEl?.select()
+  })
+}
+
+async function commitInlineEdit(chap: Folio): Promise<void> {
+  if (inlineEditingId.value !== chap.id) return
+  const clean = inlineTitleDraft.value.trim() || 'Sin título'
+  inlineEditingId.value = null
+  if (clean === chap.title) return
+
+  if (folioStore.activeFolioId === chap.id) {
+    editFolioTitle.value = clean
+  }
+  await folioStore.updateChapterMeta(chap.id, { title: clean })
+}
+
+function cancelInlineEdit(): void {
+  inlineEditingId.value = null
+}
+
+// =========================================================================
+// DRAG & DROP DE UN SOLO NIVEL PARA REORDENAR CAPÍTULOS
+// =========================================================================
+const draggedChapterId = ref<string | null>(null)
+const dragOverChapterId = ref<string | null>(null)
+
+function onDragStartChapter(e: DragEvent, chapId: string): void {
+  draggedChapterId.value = chapId
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', chapId)
+  }
+}
+
+function onDragOverChapter(e: DragEvent, chapId: string): void {
+  e.preventDefault()
+  if (draggedChapterId.value && draggedChapterId.value !== chapId) {
+    dragOverChapterId.value = chapId
+  }
+}
+
+function onDragLeaveChapter(chapId: string): void {
+  if (dragOverChapterId.value === chapId) {
+    dragOverChapterId.value = null
+  }
+}
+
+async function onDropChapter(e: DragEvent, targetChapId: string): Promise<void> {
+  e.preventDefault()
+  const sourceId = draggedChapterId.value
+  draggedChapterId.value = null
+  dragOverChapterId.value = null
+
+  if (!sourceId || sourceId === targetChapId) return
+
+  const currentList = folioStore.chapters.map((c) => c.id)
+  const fromIdx = currentList.indexOf(sourceId)
+  const toIdx = currentList.indexOf(targetChapId)
+  if (fromIdx === -1 || toIdx === -1) return
+
+  currentList.splice(fromIdx, 1)
+  currentList.splice(toIdx, 0, sourceId)
+
+  await folioStore.reorderChapters(currentList)
+}
+
+function onDragEndChapter(): void {
+  draggedChapterId.value = null
+  dragOverChapterId.value = null
+}
+
+// =========================================================================
+// SUB-NAVEGACIÓN DINÁMICA POR SCENEBREAK (* * *) EN EL CAPÍTULO ACTIVO
+// =========================================================================
+const activeTramoAnchors = ref<SceneBreakAnchor[]>([])
+
+function handleSceneBreakAnchors(anchors: SceneBreakAnchor[]): void {
+  activeTramoAnchors.value = anchors
+}
+
+function scrollToTramo(anchorIndex: number): void {
+  tiptapEditorRef.value?.scrollToSceneBreak(anchorIndex)
+}
+
+// =========================================================================
+// ESTADOS DE GUARDADO & AUTOGUARDADO
+// =========================================================================
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 const saveStatus = ref<SaveStatus>('saved')
 const lastSavedTime = ref<string>('')
@@ -113,21 +280,28 @@ function onEditorReady(ed: Editor): void {
   activeEditor.value = ed
 }
 
-// Word, character count and estimated reading time (Zero-Lag reactive from TipTap)
-const wordCount = ref(0)
-const charCount = ref(0)
-const readingTime = ref(0)
+// Métricas reactivas del capítulo activo mediante composable useChapterMetrics
+const {
+  wordCount,
+  charCount,
+  readingTimeLabel,
+  formattedWordCount,
+  charDetailsTooltip,
+  applySnapshot,
+  updateFromHtmlImmediate,
+  resetMetrics
+} = useChapterMetrics({
+  targetWords: editFolioTargetWords,
+  wpm: 210
+})
 
-function handleEditorStats(stats: {
-  wordCount: number
-  charCount: number
-  readingTime: number
-  plainText: string
-}): void {
-  wordCount.value = stats.wordCount
-  charCount.value = stats.charCount
-  readingTime.value = stats.readingTime
+function handleEditorStats(stats: ChapterMetricsSnapshot): void {
+  applySnapshot(stats)
   if (folioStore.activeFolioId) {
+    const item = folioStore.folios.find((f) => f.id === folioStore.activeFolioId)
+    if (item) {
+      item.wordCount = stats.wordCount
+    }
     folioStore.updateSessionWords(folioStore.activeFolioId, stats.plainText)
   }
 }
@@ -142,8 +316,17 @@ watch(
     isSyncing = true
     if (folio) {
       editFolioTitle.value = folio.title
+      editFolioSubtitle.value = folio.subtitle || ''
+      editFolioTimeline.value = folio.timeline || ''
+      editFolioLocation.value = folio.location || ''
+      isTimelineFocused.value = false
+      isLocationFocused.value = false
       editFolioContent.value = folio.content
       editFolioSynopsis.value = folio.synopsis || ''
+      editFolioPovTag.value = folio.povTag || ''
+      editFolioTargetWords.value = folio.targetWords || 0
+      editFolioIncludeInExport.value = folio.includeInExport ?? true
+      editFolioType.value = folio.type || 'chapter'
       editFolioStatus.value = folio.status || 'draft'
       saveStatus.value = 'saved'
       hasPendingChanges.value = false
@@ -153,23 +336,25 @@ watch(
         second: '2-digit'
       })
       folioStore.recordBaseline(folio.id, folio.content || '')
-      const initialText = (folio.content || '').replace(/<[^>]*>/g, ' ').trim()
-      const words = initialText ? initialText.split(/\s+/).length : 0
-      wordCount.value = words
-      charCount.value = (folio.content || '').length
-      readingTime.value = words === 0 ? 0 : Math.max(1, Math.ceil(words / 200))
-      if (folio.parentId) {
-        expandedChapters.value[folio.parentId] = true
-      }
+      updateFromHtmlImmediate(folio.content || '')
     } else {
       editFolioTitle.value = ''
+      editFolioSubtitle.value = ''
+      editFolioTimeline.value = ''
+      editFolioLocation.value = ''
+      isTimelineFocused.value = false
+      isLocationFocused.value = false
       editFolioContent.value = ''
       editFolioSynopsis.value = ''
+      editFolioPovTag.value = ''
+      editFolioTargetWords.value = 0
+      editFolioIncludeInExport.value = true
+      editFolioType.value = 'chapter'
+      editFolioStatus.value = 'draft'
+      activeTramoAnchors.value = []
       saveStatus.value = 'saved'
       hasPendingChanges.value = false
-      wordCount.value = 0
-      charCount.value = 0
-      readingTime.value = 0
+      resetMetrics()
     }
     setTimeout(() => {
       isSyncing = false
@@ -189,17 +374,33 @@ async function flushSave(): Promise<void> {
     if (folioStore.activeFolioId) {
       const targetId = folioStore.activeFolioId
       const titleToSave = editFolioTitle.value.trim() || 'Sin título'
+      const subtitleToSave = editFolioSubtitle.value.trim()
+      const timelineToSave = editFolioTimeline.value.trim() || null
+      const locationToSave = editFolioLocation.value.trim() || null
       const contentToSave = tiptapEditorRef.value?.getHTML() ?? editFolioContent.value
       const synopsisToSave = editFolioSynopsis.value
+      const povTagToSave = editFolioPovTag.value.trim()
+      const targetWordsToSave = Math.max(0, Number(editFolioTargetWords.value) || 0)
+      const includeInExportToSave = editFolioIncludeInExport.value
+      const typeToSave = editFolioType.value
       const statusToSave = editFolioStatus.value
+      const currentWords = folioStore.countWords(contentToSave)
 
       // Actualizar réplica reactiva en el store para zero-lag en el árbol
       const item = folioStore.folios.find((f) => f.id === targetId)
       if (item) {
         item.title = titleToSave
+        item.subtitle = subtitleToSave
+        item.timeline = timelineToSave
+        item.location = locationToSave
         item.content = contentToSave
         item.synopsis = synopsisToSave
+        item.povTag = povTagToSave
+        item.targetWords = targetWordsToSave
+        item.includeInExport = includeInExportToSave
+        item.type = typeToSave
         item.status = statusToSave
+        item.wordCount = currentWords
       }
 
       // Sincronizar balance neto de palabras de sesión con SQLite
@@ -211,8 +412,16 @@ async function flushSave(): Promise<void> {
       await folioStore.updateFolio({
         id: targetId,
         title: titleToSave,
+        subtitle: subtitleToSave,
+        timeline: timelineToSave,
+        location: locationToSave,
         content: contentToSave,
+        wordCount: currentWords,
         synopsis: synopsisToSave,
+        povTag: povTagToSave,
+        targetWords: targetWordsToSave,
+        includeInExport: includeInExportToSave,
+        type: typeToSave,
         status: statusToSave
       })
     }
@@ -246,9 +455,17 @@ function onEditorInput(): void {
     const target = folioStore.folios.find((f) => f.id === folioStore.activeFolioId)
     if (target) {
       target.title = editFolioTitle.value.trim() || 'Sin título'
+      target.subtitle = editFolioSubtitle.value
+      target.timeline = editFolioTimeline.value.trim() || null
+      target.location = editFolioLocation.value.trim() || null
       target.synopsis = editFolioSynopsis.value
+      target.povTag = editFolioPovTag.value
+      target.targetWords = Math.max(0, Number(editFolioTargetWords.value) || 0)
+      target.includeInExport = editFolioIncludeInExport.value
+      target.type = editFolioType.value
       target.status = editFolioStatus.value
       target.content = editFolioContent.value
+      target.wordCount = wordCount.value
     }
     folioStore.updateSessionWords(folioStore.activeFolioId, editFolioContent.value)
   }
@@ -256,38 +473,20 @@ function onEditorInput(): void {
   debouncedSave()
 }
 
-
 // Forzar guardado manual (Ctrl+S / Cmd+S)
 async function handleManualSave(): Promise<void> {
   await flushSave()
 }
 
-// Crear nuevo folio rápido con el teclado (Ctrl+N / Cmd+N)
-async function handleQuickNewFolio(): Promise<void> {
+// Crear nuevo capítulo rápido con el teclado (Ctrl+Alt+N / Cmd+Alt+N)
+async function handleQuickNewChapter(): Promise<void> {
   if (!projectStore.activeProjectId) return
 
   if (hasPendingChanges.value) {
     await flushSave()
   }
 
-  let targetChapterId: string | null = null
-  if (folioStore.activeFolio) {
-    if (folioStore.activeFolio.type === 'chapter') {
-      targetChapterId = folioStore.activeFolio.id
-    } else if (folioStore.activeFolio.parentId) {
-      targetChapterId = folioStore.activeFolio.parentId
-    }
-  }
-
-  if (!targetChapterId && folioStore.chapters.length > 0) {
-    targetChapterId = folioStore.chapters[0].id
-  }
-
-  if (targetChapterId) {
-    await handleCreateScene(targetChapterId)
-  } else {
-    await handleCreateChapter()
-  }
+  await handleCreateChapter()
 
   nextTick(() => {
     titleInputRef.value?.focus()
@@ -298,7 +497,6 @@ async function handleQuickNewFolio(): Promise<void> {
 // Listener de atajos de teclado globales de productividad
 function handleGlobalKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
-
 
   // Ctrl+Shift+F / Cmd+Shift+F: Alternar Modo Enfoque
   if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'f') {
@@ -314,10 +512,10 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Ctrl+Alt+N / Cmd+Alt+N: Nuevo folio sin usar el ratón
+  // Ctrl+Alt+N / Cmd+Alt+N: Nuevo capítulo sin usar el ratón
   if (isCtrlOrCmd && e.altKey && e.key.toLowerCase() === 'n') {
     e.preventDefault()
-    handleQuickNewFolio()
+    handleQuickNewChapter()
     return
   }
 
@@ -329,17 +527,8 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
   }
 }
 
-// Chapter expansion toggle (cerrado de base por defecto)
-function toggleChapter(chapterId: string): void {
-  expandedChapters.value[chapterId] = !isChapterExpanded(chapterId)
-}
-
-function isChapterExpanded(chapterId: string): boolean {
-  return expandedChapters.value[chapterId] === true // default cerrado
-}
-
-// Selection Handlers con flush forzado previo para garantizar CERO pérdida de datos
-async function selectSceneOrChapter(folio: Folio): Promise<void> {
+// Selection Handler con flush forzado previo para garantizar CERO pérdida de datos
+async function selectChapter(folio: Folio): Promise<void> {
   if (folioStore.activeFolioId === folio.id) return
 
   if (hasPendingChanges.value) {
@@ -349,28 +538,15 @@ async function selectSceneOrChapter(folio: Folio): Promise<void> {
   folioStore.selectFolio(folio.id)
 }
 
-// Creation Handlers
-async function handleCreateChapter(): Promise<void> {
+// Creation Handler
+async function handleCreateChapter(type: FolioType = 'chapter'): Promise<void> {
   if (!projectStore.activeProjectId) return
   if (hasPendingChanges.value) {
     await flushSave()
   }
-  const chapter = await folioStore.createChapter(projectStore.activeProjectId)
+  const chapter = await folioStore.createChapter(projectStore.activeProjectId, { type })
   if (chapter) {
-    expandedChapters.value[chapter.id] = true
-    await selectSceneOrChapter(chapter)
-  }
-}
-
-async function handleCreateScene(chapterId: string): Promise<void> {
-  if (!projectStore.activeProjectId) return
-  if (hasPendingChanges.value) {
-    await flushSave()
-  }
-  const scene = await folioStore.createScene(projectStore.activeProjectId, chapterId)
-  if (scene) {
-    expandedChapters.value[chapterId] = true
-    await selectSceneOrChapter(scene)
+    await selectChapter(chapter)
   }
 }
 
@@ -452,7 +628,7 @@ onBeforeUnmount(async () => {
     />
 
     <!-- ================================================================= -->
-    <!-- COLUMNA 1: ÁRBOL DEL MANUSCRITO (CAPÍTULOS Y ESCENAS - COLAPSIBLE) -->
+    <!-- COLUMNA 1: ÁRBOL DEL MANUSCRITO (CAPÍTULOS PLANOS - COLAPSIBLE)   -->
     <!-- ================================================================= -->
     <aside
       class="app-sidebar neu-surface flex flex-col overflow-hidden shrink-0"
@@ -476,139 +652,141 @@ onBeforeUnmount(async () => {
       <!-- Botón para añadir capítulo -->
       <button
         type="button"
-        class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0 active:scale-95 transition-transform"
-        @click="handleCreateChapter"
+        class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0 active:scale-95 transition-transform cursor-pointer"
+        title="Crear un nuevo capítulo en el manuscrito (Ctrl+Alt+N)"
+        @click="handleCreateChapter('chapter')"
       >
         <Plus :size="14" />
         <span>Nuevo Capítulo</span>
       </button>
 
-      <!-- Árbol jerárquico de Capítulos y Escenas -->
+      <!-- Lista plana de Capítulos con Drag & Drop y Sub-navegación por * * * -->
       <div class="flex-1 overflow-y-auto space-y-2 pr-1 editorial-scrollbar">
-        <div v-for="chap in folioStore.chapters" :key="chap.id" class="space-y-1">
-          <!-- Cabecera de Capítulo -->
+        <div
+          v-for="chap in folioStore.chapters"
+          :key="chap.id"
+          class="space-y-1 transition-all"
+          draggable="true"
+          @dragstart="onDragStartChapter($event, chap.id)"
+          @dragover="onDragOverChapter($event, chap.id)"
+          @dragleave="onDragLeaveChapter(chap.id)"
+          @drop="onDropChapter($event, chap.id)"
+          @dragend="onDragEndChapter"
+        >
+          <!-- Fila de Capítulo -->
           <div
-            class="neu-btn w-full p-2.5 flex items-center justify-between group transition-all cursor-pointer"
-            :class="folioStore.activeFolioId === chap.id ? 'is-active !border-[#C85A32]' : ''"
-            @click="selectSceneOrChapter(chap)"
+            class="w-full p-2.5 rounded-xl flex flex-col gap-1.5 group transition-all cursor-pointer relative"
+            :class="[
+              folioStore.activeFolioId === chap.id
+                ? 'neu-well border-l-4 !border-l-[var(--accent)] shadow-inner'
+                : 'neu-btn',
+              dragOverChapterId === chap.id ? 'ring-2 ring-[var(--accent)]/60 scale-[1.01]' : '',
+              draggedChapterId === chap.id ? 'opacity-50' : ''
+            ]"
+            @click="selectChapter(chap)"
+            @dblclick.stop="startInlineEdit(chap)"
           >
-            <div class="flex items-center gap-2 min-w-0">
-              <!-- Botón Neumórfico Táctil para Desplegar / Replegar -->
-              <button
-                type="button"
-                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/40 transition-all cursor-pointer shrink-0 active:scale-95"
-                :class="isChapterExpanded(chap.id) ? '!text-[var(--accent)] font-bold' : ''"
-                title="Desplegar / Replegar capítulo"
-                @click.stop="toggleChapter(chap.id)"
-              >
-                <ChevronDown
-                  v-if="isChapterExpanded(chap.id)"
-                  :size="13"
-                  class="transition-transform duration-200"
+            <!-- Línea 1: Drag handle, Punto de Estado, Icono de Tipo, Título editable y Acciones -->
+            <div class="flex items-center justify-between gap-2 min-w-0">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                <GripVertical
+                  :size="12"
+                  class="text-[var(--text-muted)] opacity-40 group-hover:opacity-90 shrink-0 cursor-grab"
+                  title="Arrastrar para reordenar capítulo"
                 />
-                <ChevronRight v-else :size="13" class="transition-transform duration-200" />
-              </button>
-              <span class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate">
-                {{ chap.title }}
-              </span>
+
+                <!-- Punto de color según estado (Borrador/En curso/Finalizado) -->
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :class="getStatusDotColor(chap.status)"
+                  :title="`Estado: ${getStatusLabel(chap.status)}`"
+                ></span>
+
+                <!-- Edición rápida en línea o título truncado -->
+                <input
+                  v-if="inlineEditingId === chap.id"
+                  :id="`inline-title-${chap.id}`"
+                  v-model="inlineTitleDraft"
+                  type="text"
+                  class="w-full bg-[var(--bg-base)] px-1.5 py-0.5 rounded text-xs font-editorial font-bold text-[var(--text-primary)] border border-[var(--accent)] focus:outline-none"
+                  @click.stop
+                  @keydown.enter.prevent="commitInlineEdit(chap)"
+                  @keydown.esc.prevent="cancelInlineEdit"
+                  @blur="commitInlineEdit(chap)"
+                />
+                <span
+                  v-else
+                  class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate"
+                  :title="`${chap.title} (Doble clic para renombrar)`"
+                >
+                  {{ chap.title }}
+                </span>
+              </div>
+
+              <!-- Botones rápidos del capítulo: Renombrar y Papelera -->
+              <div class="flex items-center gap-1 shrink-0" @click.stop>
+                <button
+                  type="button"
+                  class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-all cursor-pointer active:scale-95"
+                  title="Renombrar título del capítulo"
+                  @click="startInlineEdit(chap)"
+                >
+                  <Pencil :size="10" />
+                </button>
+                <button
+                  type="button"
+                  class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
+                  title="Mover capítulo a papelera"
+                  @click="trashStore.moveToTrash(chap.id, 'folio')"
+                >
+                  <Trash2 :size="11" />
+                </button>
+              </div>
             </div>
 
-            <!-- Controles del Capítulo: Añadir escena y Mover a Papelera -->
-            <div class="flex items-center gap-1 shrink-0" @click.stop>
-              <button
-                type="button"
-                class="w-6 h-6 rounded-lg neu-well-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all cursor-pointer active:scale-95"
-                title="Añadir escena a este capítulo"
-                @click="handleCreateScene(chap.id)"
-              >
-                <Plus :size="12" />
-              </button>
-              <button
-                type="button"
-                class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
-                title="Mover capítulo a papelera"
-                @click="trashStore.moveToTrash(chap.id, 'folio')"
-              >
-                <Trash2 :size="11" />
-              </button>
+            <!-- Línea 2: Estado y conteo de palabras + tiempo estimado de lectura -->
+            <div class="flex items-center justify-between gap-2 pl-4 text-[10px] font-mono">
+              <span class="text-[var(--text-muted)] truncate">
+                {{ getStatusLabel(chap.status) }}
+              </span>
+
+              <!-- Conteo de palabras y tiempo de lectura estimado -->
+              <span class="text-[var(--text-muted)] shrink-0">
+                {{
+                  (folioStore.activeFolioId === chap.id ? wordCount : chap.wordCount).toLocaleString(
+                    'es-ES'
+                  )
+                }}
+                pal. ·
+                {{
+                  formatSidebarReadingTime(
+                    folioStore.activeFolioId === chap.id ? wordCount : chap.wordCount
+                  )
+                }}
+              </span>
             </div>
           </div>
 
-          <!-- Lista de Escenas anidadas dentro del Capítulo -->
+          <!-- Sub-navegación Dinámica por SceneBreak (* * *) para el capítulo activo -->
           <div
-            v-if="isChapterExpanded(chap.id)"
-            class="pl-3 space-y-1.5 border-l border-[var(--groove-dark)]/40 ml-3.5 mt-1"
+            v-if="folioStore.activeFolioId === chap.id && activeTramoAnchors.length > 0"
+            class="pl-3.5 ml-3.5 border-l border-[var(--groove-dark)]/50 space-y-1 pt-0.5"
           >
-            <div
-              v-for="scene in folioStore.getScenesForChapter(chap.id)"
-              :key="scene.id"
-              class="transition-all"
-            >
-              <!-- Escena activa (Hundida) -->
-              <div
-                v-if="folioStore.activeFolioId === scene.id"
-                class="neu-well p-2.5 border-l-4 border-[#C85A32] cursor-pointer flex items-center justify-between gap-2 group"
-                @click="selectSceneOrChapter(scene)"
-              >
-                <div class="flex items-center gap-2 min-w-0">
-                  <FileText :size="13" class="text-[var(--accent)] shrink-0" />
-                  <span class="text-xs font-medium text-[var(--text-primary)] truncate">
-                    {{ scene.title }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0" @click.stop>
-                  <!-- Botón Borrar a Papelera siempre visible con relieve neumórfico -->
-                  <button
-                    type="button"
-                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
-                    title="Mover escena a papelera"
-                    @click="trashStore.moveToTrash(scene.id, 'folio')"
-                  >
-                    <Trash2 :size="11" />
-                  </button>
-                  <span
-                    class="text-[9px] font-mono px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] shrink-0 uppercase"
-                  >
-                    {{ scene.status }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Escena inactiva -->
-              <div
-                v-else
-                role="button"
-                tabindex="0"
-                class="neu-btn w-full p-2 text-left flex items-center justify-between text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] group cursor-pointer"
-                @click="selectSceneOrChapter(scene)"
-              >
-                <div class="flex items-center gap-2 min-w-0">
-                  <FileText :size="12" class="opacity-40 shrink-0" />
-                  <span class="truncate">{{ scene.title }}</span>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0" @click.stop>
-                  <!-- Botón Borrar a Papelera siempre visible con relieve neumórfico -->
-                  <button
-                    type="button"
-                    class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:!text-rose-400 transition-all cursor-pointer active:scale-95"
-                    title="Mover escena a papelera"
-                    @click="trashStore.moveToTrash(scene.id, 'folio')"
-                  >
-                    <Trash2 :size="11" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Botón rápido para agregar escena si no hay -->
             <button
-              v-if="folioStore.getScenesForChapter(chap.id).length === 0"
+              v-for="tramo in activeTramoAnchors"
+              :key="tramo.index"
               type="button"
-              class="w-full py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] italic text-left pl-2 transition-colors flex items-center gap-1.5"
-              @click="handleCreateScene(chap.id)"
+              class="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-base)]/50 transition-all cursor-pointer group/tramo"
+              :title="`Saltar a ${tramo.romanLabel}: ${tramo.snippet}`"
+              @click.stop="scrollToTramo(tramo.index)"
             >
-              <Plus :size="11" />
-              <span>Crear primera escena</span>
+              <Sparkles :size="10" class="text-[var(--accent)] opacity-70 shrink-0" />
+              <span class="font-mono text-[10px] font-bold text-[var(--accent)] shrink-0">
+                {{ tramo.romanLabel }}
+              </span>
+              <span class="truncate italic text-[10px] text-[var(--text-muted)] group-hover/tramo:text-[var(--text-secondary)]">
+                {{ tramo.snippet }}
+              </span>
             </button>
           </div>
         </div>
@@ -623,7 +801,7 @@ onBeforeUnmount(async () => {
           <button
             type="button"
             class="text-xs text-[var(--accent)] hover:underline cursor-pointer"
-            @click="handleCreateChapter"
+            @click="handleCreateChapter('chapter')"
           >
             Comenzar Capítulo I
           </button>
@@ -660,11 +838,15 @@ onBeforeUnmount(async () => {
       <div
         class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)] shrink-0"
       >
-        <span>{{ folioStore.chapters.length }} caps · {{ folioStore.folios.length }} docs</span>
+        <span>
+          {{ folioStore.chapters.length }}
+          {{ folioStore.chapters.length === 1 ? 'capítulo' : 'capítulos' }} ·
+          {{ folioStore.totalManuscriptWords.toLocaleString('es-ES') }} pal.
+        </span>
         <span
           class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-1"
         >
-          <strong class="text-[var(--accent)]">Ctrl+B</strong>: Ocultar árbol
+          <strong class="text-[var(--accent)]">Ctrl+1</strong>: Panel
         </span>
       </div>
     </aside>
@@ -708,70 +890,12 @@ onBeforeUnmount(async () => {
               {{ projectStore.activeProject?.title }} /
             </span>
             <span class="text-xs font-semibold text-[var(--text-primary)] truncate font-editorial">
-              {{ folioStore.activeFolio.title || 'Sin título' }}
+              {{ editFolioTitle || 'Sin título' }}
             </span>
           </div>
 
-          <!-- Controles de Escena -->
+          <!-- Controles Superiores de Capítulo y Guardado -->
           <div class="flex items-center gap-2 shrink-0">
-            <!-- Selector de estado personalizado táctil -->
-            <div ref="statusDropdownRef" class="relative">
-              <button
-                type="button"
-                class="neu-well-sm px-2.5 py-1 text-xs text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-                @click="isStatusDropdownOpen = !isStatusDropdownOpen"
-              >
-                <span
-                  class="w-1.5 h-1.5 rounded-full shrink-0"
-                  :class="currentStatusObj.color"
-                ></span>
-                <span class="font-medium text-[11px]">{{ currentStatusObj.label }}</span>
-                <ChevronDown
-                  :size="11"
-                  class="text-[var(--text-muted)] transition-transform duration-150 shrink-0"
-                  :class="{ 'rotate-180': isStatusDropdownOpen }"
-                />
-              </button>
-
-              <Transition
-                enter-active-class="transition duration-100 ease-out"
-                enter-from-class="opacity-0 scale-95"
-                enter-to-class="opacity-100 scale-100"
-                leave-active-class="transition duration-75 ease-in"
-                leave-from-class="opacity-100 scale-100"
-                leave-to-class="opacity-0 scale-95"
-              >
-                <div
-                  v-if="isStatusDropdownOpen"
-                  class="absolute right-0 top-full mt-1.5 z-50 neu-surface p-1 min-w-[125px] shadow-xl border border-[var(--groove-dark)]/50 backdrop-blur-md"
-                >
-                  <button
-                    v-for="opt in statusOptions"
-                    :key="opt.value"
-                    type="button"
-                    class="w-full px-2 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
-                    :class="
-                      opt.value === editFolioStatus
-                        ? 'text-[var(--accent)] font-semibold neu-well-sm'
-                        : 'text-[var(--text-primary)]'
-                    "
-                    @click="setFolioStatus(opt.value)"
-                  >
-                    <div class="flex items-center gap-2">
-                      <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="opt.color"></span>
-                      <span>{{ opt.label }}</span>
-                    </div>
-                    <Check
-                      v-if="opt.value === editFolioStatus"
-                      :size="12"
-                      class="text-[var(--accent)] shrink-0"
-                    />
-                  </button>
-                </div>
-              </Transition>
-            </div>
-
-
             <!-- Conmutador: Modo Enfoque por Párrafo -->
             <button
               type="button"
@@ -796,7 +920,7 @@ onBeforeUnmount(async () => {
             <button
               type="button"
               class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400 cursor-pointer"
-              title="Mover escena a papelera"
+              title="Mover capítulo a papelera"
               @click="trashStore.moveToTrash(folioStore.activeFolio.id, 'folio')"
             >
               <Trash2 :size="13" />
@@ -858,42 +982,168 @@ onBeforeUnmount(async () => {
 
         <!-- Papel / Lienzo Hundido Editorial -->
         <div class="flex-1 flex flex-col neu-well overflow-hidden relative min-h-0">
-          <!-- Cabecera de Capítulo Fija: Siempre visible arriba sin scroll -->
+          <!-- Cabecera Editorial de Capítulo Integrada -->
           <div
-            class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3 border-b border-[var(--groove-dark)]/40 bg-[var(--bg-base)]"
+            class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 border-b border-[var(--groove-dark)]/40 bg-[var(--bg-base)]"
           >
-            <div class="max-w-3xl mx-auto w-full relative">
-              <!-- Insignia flotante sutil de Modo Enfoque -->
-              <Transition
-                enter-active-class="transition duration-200 ease-out"
-                enter-from-class="opacity-0 translate-y-[-4px]"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition duration-150 ease-in"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 translate-y-[-4px]"
-              >
-              </Transition>
-
-              <!-- Título de la escena / capítulo -->
+            <div class="max-w-3xl mx-auto w-full relative space-y-2">
+              <!-- 1. Título del Capítulo (Tipografía serif grande, siempre 100% visible en Focus Mode) -->
               <input
                 ref="titleInputRef"
                 v-model="editFolioTitle"
                 type="text"
-                placeholder="Título del capítulo o escena..."
-                class="chapter-title font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none mb-1.5 placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
+                placeholder="Título del capítulo..."
+                class="chapter-title font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
                 @input="onEditorInput"
                 @keydown.enter.prevent="tiptapEditorRef?.focus()"
                 @keydown.down="tiptapEditorRef?.focus()"
               />
 
-              <!-- Sinopsis o nota de la escena (opcional) -->
+              <!-- 2. Subtítulo / Epígrafe Opcional en cursiva sutil debajo del título -->
               <input
-                v-model="editFolioSynopsis"
+                v-model="editFolioSubtitle"
                 type="text"
-                placeholder="Sinopsis o nota de la escena..."
-                class="text-xs font-mono text-[var(--text-muted)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50 w-full italic"
+                placeholder="Subtítulo o epígrafe opcional (ej. «Donde las cenizas hablan...»)"
+                class="editor-metadata font-editorial italic text-sm md:text-base text-[var(--text-secondary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/45 w-full"
                 @input="onEditorInput"
+                @keydown.enter.prevent="tiptapEditorRef?.focus()"
               />
+
+              <!-- 3. Fila de Estado y Metadatos Discretos (Línea temporal / Fecha y Ubicación) -->
+              <div class="editor-metadata flex flex-wrap items-center gap-2 pt-0.5 select-none">
+                <div ref="statusDropdownRef" class="relative inline-flex items-center">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-btn text-[11px] font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                    title="Cambiar estado del capítulo"
+                    @click="isStatusDropdownOpen = !isStatusDropdownOpen"
+                  >
+                    <span
+                      class="w-2 h-2 rounded-full shrink-0"
+                      :class="currentStatusObj.color"
+                    ></span>
+                    <span>{{ currentStatusObj.label }}</span>
+                    <ChevronDown
+                      :size="11"
+                      class="text-[var(--text-muted)] transition-transform duration-150 shrink-0"
+                      :class="{ 'rotate-180': isStatusDropdownOpen }"
+                    />
+                  </button>
+
+                  <Transition
+                    enter-active-class="transition duration-100 ease-out"
+                    enter-from-class="opacity-0 scale-95"
+                    enter-to-class="opacity-100 scale-100"
+                    leave-active-class="transition duration-75 ease-in"
+                    leave-from-class="opacity-100 scale-100"
+                    leave-to-class="opacity-0 scale-95"
+                  >
+                    <div
+                      v-if="isStatusDropdownOpen"
+                      class="absolute left-0 top-full mt-1.5 z-50 neu-surface p-1 min-w-[135px] shadow-xl border border-[var(--groove-dark)]/50"
+                    >
+                      <button
+                        v-for="opt in statusOptions"
+                        :key="opt.value"
+                        type="button"
+                        class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
+                        :class="
+                          opt.value === editFolioStatus
+                            ? 'text-[var(--accent)] font-semibold neu-well-sm'
+                            : 'text-[var(--text-primary)]'
+                        "
+                        @click="setFolioStatus(opt.value)"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="w-2 h-2 rounded-full shrink-0"
+                            :class="opt.color"
+                          ></span>
+                          <span>{{ opt.label }}</span>
+                        </div>
+                        <Check
+                          v-if="opt.value === editFolioStatus"
+                          :size="12"
+                          class="text-[var(--accent)] shrink-0"
+                        />
+                      </button>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!-- Separador sutil -->
+                <span class="text-[var(--text-muted)]/35 font-mono text-xs select-none">·</span>
+
+                <!-- Metadato discreto 1: Línea temporal / Fecha -->
+                <div class="inline-flex items-center">
+                  <button
+                    v-if="!editFolioTimeline && !isTimelineFocused"
+                    type="button"
+                    class="inline-flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-muted)]/70 hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]/60 transition-all cursor-pointer"
+                    title="Añadir fecha o línea temporal..."
+                    @click="openTimelineInput"
+                  >
+                    <Clock :size="12" />
+                  </button>
+                  <label
+                    v-else
+                    class="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]/40 focus-within:bg-[var(--bg-surface)]/70 transition-colors"
+                  >
+                    <Clock :size="12" class="text-[var(--text-muted)] shrink-0" />
+                    <input
+                      ref="timelineInputRef"
+                      v-model="editFolioTimeline"
+                      type="text"
+                      placeholder="Añadir fecha/momento..."
+                      class="bg-transparent border-none focus:outline-none text-xs text-[var(--text-secondary)] focus:text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/50 font-sans min-w-[90px]"
+                      :style="{
+                        width: editFolioTimeline
+                          ? `${Math.min(28, Math.max(8, editFolioTimeline.length + 1))}ch`
+                          : '16ch'
+                      }"
+                      @focus="isTimelineFocused = true"
+                      @input="onEditorInput"
+                      @blur="handleTimelineBlur"
+                      @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+                    />
+                  </label>
+                </div>
+
+                <!-- Metadato discreto 2: Ubicación -->
+                <div class="inline-flex items-center">
+                  <button
+                    v-if="!editFolioLocation && !isLocationFocused"
+                    type="button"
+                    class="inline-flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-muted)]/70 hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]/60 transition-all cursor-pointer"
+                    title="Añadir ubicación..."
+                    @click="openLocationInput"
+                  >
+                    <MapPin :size="12" />
+                  </button>
+                  <label
+                    v-else
+                    class="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]/40 focus-within:bg-[var(--bg-surface)]/70 transition-colors"
+                  >
+                    <MapPin :size="12" class="text-[var(--text-muted)] shrink-0" />
+                    <input
+                      ref="locationInputRef"
+                      v-model="editFolioLocation"
+                      type="text"
+                      placeholder="Añadir ubicación..."
+                      class="bg-transparent border-none focus:outline-none text-xs text-[var(--text-secondary)] focus:text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/50 font-sans min-w-[80px]"
+                      :style="{
+                        width: editFolioLocation
+                          ? `${Math.min(28, Math.max(8, editFolioLocation.length + 1))}ch`
+                          : '14ch'
+                      }"
+                      @focus="isLocationFocused = true"
+                      @input="onEditorInput"
+                      @blur="handleLocationBlur"
+                      @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -907,9 +1157,10 @@ onBeforeUnmount(async () => {
                 ref="tiptapEditorRef"
                 v-model:content="editFolioContent"
                 :scroll-container="scrollContainerRef"
-                placeholder="Empieza a escribir tu escena..."
+                placeholder="Empieza a escribir tu capítulo..."
                 @ready="onEditorReady"
                 @stats="handleEditorStats"
+                @scene-breaks="handleSceneBreakAnchors"
                 @change="onEditorInput"
                 @save="handleManualSave"
               />
@@ -923,7 +1174,7 @@ onBeforeUnmount(async () => {
           class="status-bar editor-metadata shrink-0 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-[var(--text-muted)] select-none pt-0.5"
         >
           <div class="flex items-center gap-3">
-            <span>{{ wordCount }} palabras</span>
+            <span>{{ formattedWordCount }} palabras</span>
             <span>·</span>
             <span
               class="inline-flex items-center gap-1 font-semibold text-[var(--accent)]"
@@ -933,20 +1184,15 @@ onBeforeUnmount(async () => {
               +{{ folioStore.sessionWordsAdded }} sesión
             </span>
             <span>·</span>
-            <!-- Píldora de Progreso y Racha Diaria con Anillo SVG -->
+            <!-- Píldora de Progreso y Racha Diaria -->
             <GoalsProgressPill />
             <span>·</span>
-            <span>{{ charCount }} caracteres</span>
+            <span :title="charDetailsTooltip">{{ charCount.toLocaleString('es-ES') }} caracteres</span>
             <span>·</span>
-            <span class="text-[var(--accent)] opacity-85">~{{ readingTime }} min de lectura</span>
+            <span class="text-[var(--accent)] opacity-85">{{ readingTimeLabel }}</span>
           </div>
 
           <div class="flex items-center gap-2">
-            <span
-              class="text-[10px] px-1.5 py-0.5 rounded neu-well-sm text-[var(--text-muted)] uppercase"
-            >
-              {{ folioStore.activeFolio.type === 'chapter' ? 'Capítulo' : 'Escena' }}
-            </span>
             <span
               class="neu-well-sm px-2 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-2"
             >
@@ -958,7 +1204,7 @@ onBeforeUnmount(async () => {
         </footer>
       </template>
 
-      <!-- Estado Vacío cuando no hay folio activo -->
+      <!-- Estado Vacío cuando no hay capítulo activo -->
       <div v-else class="flex-1 flex flex-col items-center justify-center neu-well p-8 text-center">
         <div class="w-24 h-24 mb-4 flex items-center justify-center shrink-0 drop-shadow-xl">
           <FolioLogo />
@@ -967,14 +1213,13 @@ onBeforeUnmount(async () => {
           {{ projectStore.activeProject?.title || 'Bienvenido a Folio' }}
         </h3>
         <p class="text-xs text-[var(--text-muted)] max-w-sm mb-6">
-          Selecciona un capítulo o escena en el árbol del manuscrito a la izquierda para comenzar a
-          escribir.
+          Selecciona un capítulo en el panel del manuscrito a la izquierda para comenzar a escribir.
         </p>
 
         <button
           type="button"
           class="neu-btn-terracotta py-2 px-5 text-xs flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
-          @click="handleCreateChapter"
+          @click="handleCreateChapter('chapter')"
         >
           <Plus :size="14" />
           <span>Crear Primer Capítulo</span>

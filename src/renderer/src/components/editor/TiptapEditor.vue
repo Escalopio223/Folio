@@ -15,6 +15,17 @@ import { Indent } from './extensions/Indent'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
+import {
+  computeMetricsFromText,
+  type ChapterMetricsSnapshot
+} from '../../composables/useChapterMetrics'
+
+export interface SceneBreakAnchor {
+  index: number
+  romanLabel: string
+  pos: number
+  snippet: string
+}
 
 const props = withDefaults(
   defineProps<{
@@ -24,7 +35,7 @@ const props = withDefaults(
   }>(),
   {
     content: '',
-    placeholder: 'Empieza a escribir tu escena...',
+    placeholder: 'Empieza a escribir tu capítulo...',
     scrollContainer: null
   }
 )
@@ -33,28 +44,82 @@ const emit = defineEmits<{
   (e: 'update:content', value: string): void
   (e: 'change'): void
   (e: 'save'): void
-  (
-    e: 'stats',
-    value: { wordCount: number; charCount: number; readingTime: number; plainText: string }
-  ): void
+  (e: 'stats', value: ChapterMetricsSnapshot): void
+  (e: 'scene-breaks', value: SceneBreakAnchor[]): void
   (e: 'ready', editor: Editor): void
 }>()
 
 const uiStore = useUiStore()
 
-function calculateStats(text: string): {
-  wordCount: number
-  charCount: number
-  readingTime: number
-  plainText: string
-} {
-  const plain = (text || '').trim()
-  const wordCount = plain ? plain.split(/\s+/).length : 0
-  const charCount = text.length
-  const readingTime = wordCount === 0 ? 0 : Math.max(1, Math.ceil(wordCount / 200))
-  return { wordCount, charCount, readingTime, plainText: text }
+function toRoman(num: number): string {
+  const romans: Array<[number, string]> = [
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I']
+  ]
+  let n = Math.max(1, num)
+  let res = ''
+  for (const [val, sym] of romans) {
+    while (n >= val) {
+      res += sym
+      n -= val
+    }
+  }
+  return res
 }
 
+function calculateStats(text: string): ChapterMetricsSnapshot {
+  return computeMetricsFromText(text)
+}
+
+function scanSceneBreaks(ed: { state: Editor['state'] }): SceneBreakAnchor[] {
+  const anchors: SceneBreakAnchor[] = []
+  const doc = ed.state.doc
+
+  // Recoger posiciones de los nodos sceneBreak
+  const breakPositions: number[] = []
+  doc.descendants((node, pos) => {
+    if (node.type.name === 'sceneBreak') {
+      breakPositions.push(pos)
+    }
+  })
+
+  if (breakPositions.length === 0) {
+    return []
+  }
+
+  // Tramo I = inicio del capítulo (pos 0) + Tramo II, III... tras cada * * *
+  const allTramoStarts = [0, ...breakPositions]
+  allTramoStarts.forEach((startPos, idx) => {
+    const nextBreakPos = idx + 1 < allTramoStarts.length ? allTramoStarts[idx + 1] : doc.content.size
+    let snippet = ''
+    doc.nodesBetween(startPos, nextBreakPos, (node) => {
+      if (snippet.length >= 44) return false
+      if (node.isText && node.text) {
+        const clean = node.text.trim()
+        if (clean) {
+          snippet += (snippet ? ' ' : '') + clean
+        }
+      }
+      return true
+    })
+    const trimmed = snippet.replace(/\s+/g, ' ').trim()
+    const displaySnippet = trimmed
+      ? trimmed.slice(0, 34) + (trimmed.length > 34 ? '…' : '')
+      : 'Sin texto posterior'
+
+    anchors.push({
+      index: idx,
+      romanLabel: `Tramo ${toRoman(idx + 1)}`,
+      pos: startPos,
+      snippet: displaySnippet
+    })
+  })
+
+  return anchors
+}
 
 const editor = useEditor({
   content: normalizeHtml(props.content),
@@ -101,8 +166,9 @@ const editor = useEditor({
     const html = ed.getHTML()
     const text = ed.getText()
 
-    // 1. Emitir estadísticas en tiempo real (Zero-Lag)
+    // 1. Emitir estadísticas y tramos (* * *) en tiempo real (Zero-Lag)
     emit('stats', calculateStats(text))
+    emit('scene-breaks', scanSceneBreaks(ed))
 
     // 2. Emitir contenido actualizado para persistencia reactiva
     emit('update:content', html)
@@ -110,7 +176,7 @@ const editor = useEditor({
   }
 })
 
-// Sincronizar contenido si cambia desde el exterior (ej. cambio de escena activa)
+// Sincronizar contenido si cambia desde el exterior (ej. cambio de capítulo activo)
 watch(
   () => props.content,
   (newContent) => {
@@ -121,6 +187,7 @@ watch(
       editor.value.commands.setContent(normalizeHtml(newContent || ''), { emitUpdate: false })
       const text = editor.value.getText()
       emit('stats', calculateStats(text))
+      emit('scene-breaks', scanSceneBreaks(editor.value))
     }
   }
 )
@@ -130,6 +197,7 @@ watch(
   (ed) => {
     if (ed) {
       emit('ready', ed)
+      emit('scene-breaks', scanSceneBreaks(ed))
     }
   },
   { immediate: true }
@@ -138,6 +206,7 @@ watch(
 onMounted(() => {
   if (editor.value) {
     emit('ready', editor.value)
+    emit('scene-breaks', scanSceneBreaks(editor.value))
   }
 })
 
@@ -145,11 +214,32 @@ onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
+function scrollToSceneBreak(anchorIndex: number): void {
+  if (!editor.value) return
+  const proseMirrorEl = editor.value.view.dom as HTMLElement
+  if (anchorIndex <= 0) {
+    if (props.scrollContainer) {
+      props.scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      proseMirrorEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    editor.value.commands.focus('start')
+    return
+  }
+
+  const breaks = proseMirrorEl.querySelectorAll('div[data-type="scene-break"], .scene-break')
+  const targetEl = breaks[anchorIndex - 1] as HTMLElement | undefined
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
 defineExpose({
   editor,
   getHTML: () => editor.value?.getHTML() || '',
   getText: () => editor.value?.getText() || '',
-  focus: () => editor.value?.commands.focus()
+  focus: () => editor.value?.commands.focus(),
+  scrollToSceneBreak
 })
 </script>
 
@@ -308,7 +398,6 @@ defineExpose({
 .ProseMirror [data-text-align='left'] {
   text-align: left;
 }
-
 
 /* Modo Enfoque en Párrafo (Focus Mode) */
 .focus-mode-active .ProseMirror > * {

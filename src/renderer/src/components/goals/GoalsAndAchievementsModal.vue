@@ -46,7 +46,6 @@ const selectedCategory = ref<'all' | AchievementCategory>('all')
 
 // Formularios locales para editar metas reactivamente
 const editDailyWords = ref(500)
-const editDailyScenes = ref(1)
 const editDailyChapters = ref(0)
 const editTargetWords = ref(50000)
 const editDeadlineDate = ref<string>('')
@@ -55,12 +54,11 @@ const isSaving = ref(false)
 const saveSuccess = ref(false)
 
 // Controles en caliente para Meta de Sesión
-const quickSessionType = ref<'words' | 'scenes' | 'chapters'>('words')
+const quickSessionType = ref<'words' | 'chapters'>('words')
 const quickSessionTarget = ref<number>(500)
 
 function syncFormValues(): void {
   editDailyWords.value = goalsStore.config.dailyWordGoal
-  editDailyScenes.value = goalsStore.config.dailySceneGoal
   editDailyChapters.value = goalsStore.config.dailyChapterGoal
   editTargetWords.value = goalsStore.config.targetTotalWords
   editDeadlineDate.value = goalsStore.config.deadlineDate || ''
@@ -99,10 +97,6 @@ function stepDailyWords(delta: number): void {
   editDailyWords.value = Math.max(50, (Number(editDailyWords.value) || 500) + delta)
 }
 
-function stepDailyScenes(delta: number): void {
-  editDailyScenes.value = Math.max(0, Math.min(30, (Number(editDailyScenes.value) || 0) + delta))
-}
-
 function stepDailyChapters(delta: number): void {
   editDailyChapters.value = Math.max(
     0,
@@ -115,12 +109,10 @@ function applyHotSessionGoal(): void {
   goalsStore.setSessionGoal(quickSessionType.value, safeTarget)
 }
 
-function switchSessionGoalType(type: 'words' | 'scenes' | 'chapters'): void {
+function switchSessionGoalType(type: 'words' | 'chapters'): void {
   quickSessionType.value = type
   if (type === 'words') {
     quickSessionTarget.value = editDailyWords.value || 500
-  } else if (type === 'scenes') {
-    quickSessionTarget.value = Math.max(1, editDailyScenes.value || 1)
   } else {
     quickSessionTarget.value = Math.max(1, editDailyChapters.value || 1)
   }
@@ -214,7 +206,7 @@ const achievementSections = computed(() => {
     {
       id: 'consistency',
       title: '3. Constancia y Oficio',
-      subtitle: 'Reconocimientos al hábito editorial continuo y al cierre de estructura narrativa.',
+      subtitle: 'Reconocimientos al hábito editorial continuo y al cierre de estructura capitular.',
       items: ACHIEVEMENTS_CATALOG.filter((a) => a.category === 'consistency')
     },
     {
@@ -292,7 +284,6 @@ async function handleSaveGoals(): Promise<void> {
   try {
     await goalsStore.updateConfig({
       dailyWordGoal: Math.max(50, Number(editDailyWords.value) || 500),
-      dailySceneGoal: Math.max(0, Number(editDailyScenes.value) ?? 1),
       dailyChapterGoal: Math.max(0, Number(editDailyChapters.value) ?? 0),
       targetTotalWords: Math.max(500, Number(editTargetWords.value) || 50000),
       deadlineDate: editDeadlineDate.value ? editDeadlineDate.value : null,
@@ -607,9 +598,7 @@ onBeforeUnmount(() => {
                       {{
                         goalsStore.activeSessionGoal.type === 'words'
                           ? 'palabras'
-                          : goalsStore.activeSessionGoal.type === 'scenes'
-                            ? 'escenas'
-                            : 'capítulos'
+                          : 'capítulos'
                       }}
                       ({{ goalsStore.sessionGoalExactPercentage }}%)
                     </span>
@@ -641,7 +630,6 @@ onBeforeUnmount(() => {
                     <button
                       v-for="t in [
                         { id: 'words', label: 'Palabras' },
-                        { id: 'scenes', label: 'Escenas' },
                         { id: 'chapters', label: 'Capítulos' }
                       ]"
                       :key="t.id"
@@ -652,7 +640,7 @@ onBeforeUnmount(() => {
                           ? 'neu-btn font-semibold text-[var(--accent)]'
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       "
-                      @click="switchSessionGoalType(t.id as any)"
+                      @click="switchSessionGoalType(t.id as 'words' | 'chapters')"
                     >
                       {{ t.label }}
                     </button>
@@ -800,8 +788,8 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
 
-                <!-- Controles Diarios con Botones + / - (Palabras/día, Escenas/día, Capítulos/día) -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- Controles Diarios con Botones + / - (Palabras/día y Capítulos/día) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <!-- Palabras / día -->
                   <div class="neu-well p-4 rounded-2xl space-y-3">
                     <label
@@ -851,57 +839,6 @@ onBeforeUnmount(() => {
                         @click="editDailyWords = preset"
                       >
                         {{ preset }}
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Escenas / día -->
-                  <div class="neu-well p-4 rounded-2xl space-y-3">
-                    <label
-                      class="text-xs font-semibold text-[var(--text-primary)] flex items-center justify-between"
-                    >
-                      <span>Escenas / día</span>
-                      <span class="font-mono text-[var(--accent)] font-bold">
-                        Hoy: {{ goalsStore.todayLog.scenesCompleted }} / {{ editDailyScenes }}
-                      </span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        class="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer shrink-0"
-                        @click="stepDailyScenes(-1)"
-                      >
-                        <Minus :size="14" />
-                      </button>
-                      <input
-                        v-model.number="editDailyScenes"
-                        type="number"
-                        min="0"
-                        max="30"
-                        class="w-full text-center neu-surface px-2 py-2 rounded-xl text-sm font-mono font-bold text-[var(--text-primary)] border-none focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        class="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer shrink-0"
-                        @click="stepDailyScenes(1)"
-                      >
-                        <Plus :size="14" />
-                      </button>
-                    </div>
-                    <div class="flex items-center justify-between gap-1 pt-0.5">
-                      <button
-                        v-for="sPreset in [1, 2, 3, 5]"
-                        :key="sPreset"
-                        type="button"
-                        class="flex-1 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer"
-                        :class="
-                          editDailyScenes === sPreset
-                            ? 'neu-surface font-bold text-[var(--accent)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        "
-                        @click="editDailyScenes = sPreset"
-                      >
-                        {{ sPreset }} esc.
                       </button>
                     </div>
                   </div>

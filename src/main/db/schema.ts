@@ -14,14 +14,20 @@ export const folios = sqliteTable(
   {
     id: text('id').primaryKey(),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-    parentId: text('parent_id'), // null = capítulo, id = escena
-    type: text('type').notNull().default('chapter'), // 'chapter' | 'scene'
+    type: text('type').notNull().default('chapter'), // 'frontmatter' | 'chapter' | 'backmatter'
     title: text('title').notNull().default('Sin título'),
-    content: text('content').notNull().default(''),
+    subtitle: text('subtitle').notNull().default(''),
     synopsis: text('synopsis').notNull().default(''),
+    povTag: text('pov_tag').notNull().default(''),
+    timeline: text('timeline'),
+    location: text('location'),
+    targetWords: integer('target_words').notNull().default(0),
+    includeInExport: integer('include_in_export', { mode: 'boolean' }).notNull().default(true),
+    content: text('content').notNull().default(''),
+    status: text('status').notNull().default('draft'), // 'draft' | 'in_progress' | 'done'
+    wordCount: integer('word_count').notNull().default(0),
+    orderIndex: integer('order_index').notNull().default(0),
     icon: text('icon').default('FileText'),
-    sortOrder: integer('sort_order').notNull().default(0),
-    status: text('status').notNull().default('draft'), // 'draft' | 'in_progress' | 'completed'
     isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -29,8 +35,8 @@ export const folios = sqliteTable(
   },
   (table) => [
     index('idx_folios_project_id').on(table.projectId),
-    index('idx_folios_parent_id').on(table.parentId),
     index('idx_folios_type').on(table.type),
+    index('idx_folios_order_index').on(table.orderIndex),
     index('idx_folios_is_archived').on(table.isArchived)
   ]
 )
@@ -40,11 +46,11 @@ export const loreItems = sqliteTable(
   {
     id: text('id').primaryKey(),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-    category: text('category').notNull().default('personaje'), // 'personaje' | 'lugar' | 'objeto' | 'idea' | 'pensamiento' | custom
+    category: text('category').notNull().default('personaje'),
     name: text('name').notNull(),
     summary: text('summary').notNull().default(''),
     content: text('content').notNull().default(''),
-    attributes: text('attributes').notNull().default('{}'), // JSON: { "Rol": "Protagonista", ... }
+    attributes: text('attributes').notNull().default('{}'),
     icon: text('icon').default('User'),
     isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
@@ -75,7 +81,7 @@ export const scratchpadNotes = sqliteTable(
     title: text('title').notNull().default(''),
     content: text('content').notNull().default(''),
     isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
-    colorTag: text('color_tag'), // 'idea' | 'duda' | 'pendiente' | null
+    colorTag: text('color_tag'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
   },
@@ -93,11 +99,11 @@ export const worldRules = sqliteTable(
   {
     id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-    category: text('category').notNull(), // Texto libre dinámico (ej. 'Leyes Penales', 'Sistemas de Magia', etc.)
+    category: text('category').notNull(),
     title: text('title').notNull(),
-    axiom: text('axiom').notNull(), // Verdad fundamental / declaración en 1-2 frases
-    details: text('details'), // Explicación profunda, precedentes, excepciones en texto/Markdown
-    limitations: text('limitations'), // Costes, tabúes, penalizaciones o qué ocurre al transgredir la regla
+    axiom: text('axiom').notNull(),
+    details: text('details'),
+    limitations: text('limitations'),
     orderIndex: integer('order_index').notNull().default(0),
     isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -120,7 +126,6 @@ export const projectGoals = sqliteTable('project_goals', {
     .references(() => projects.id, { onDelete: 'cascade' }),
   targetTotalWords: integer('target_total_words').notNull().default(50000),
   dailyWordGoal: integer('daily_word_goal').notNull().default(500),
-  dailySceneGoal: integer('daily_scene_goal').notNull().default(1),
   dailyChapterGoal: integer('daily_chapter_goal').notNull().default(0),
   deadlineDate: text('deadline_date'),
   askSessionGoalOnStartup: integer('ask_session_goal_on_startup', { mode: 'boolean' })
@@ -138,7 +143,6 @@ export const dailyWritingLogs = sqliteTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     date: text('date').notNull(), // Formato YYYY-MM-DD
     wordsWritten: integer('words_written').notNull().default(0),
-    scenesCompleted: integer('scenes_completed').notNull().default(0),
     chaptersCompleted: integer('chapters_completed').notNull().default(0),
     sessionGoalsHit: integer('session_goals_hit').notNull().default(0),
     goalMet: integer('goal_met', { mode: 'boolean' }).notNull().default(false)

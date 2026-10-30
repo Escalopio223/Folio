@@ -11,6 +11,8 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   Folio,
+  FolioType,
+  FolioStatus,
   CreateFolioInput,
   UpdateFolioInput,
   LoreItem,
@@ -31,13 +33,33 @@ let sqliteInstance: Database.Database | null = null
 let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null
 let activeDbPath = ''
 
+export function computeWordCount(htmlOrText: string): number {
+  const withoutBreaks = (htmlOrText || '').replace(
+    /<div[^>]*data-type=["']scene-break["'][^>]*>[\s\S]*?<\/div>/gi,
+    ' '
+  )
+  const clean = withoutBreaks.replace(/<[^>]*>/g, ' ').trim()
+  if (!clean) return 0
+  return clean.split(/\s+/).length
+}
+
+function normalizeFolioType(rawType?: string | null): FolioType {
+  if (rawType === 'frontmatter' || rawType === 'backmatter') return rawType
+  return 'chapter'
+}
+
+function normalizeFolioStatus(rawStatus?: string | null): FolioStatus {
+  if (rawStatus === 'done' || rawStatus === 'completed') return 'done'
+  if (rawStatus === 'in_progress') return 'in_progress'
+  return 'draft'
+}
+
 // Mappers
 function mapProjectGoals(row: schema.ProjectGoalsSelect): ProjectGoals {
   return {
     projectId: row.projectId,
     targetTotalWords: row.targetTotalWords,
     dailyWordGoal: row.dailyWordGoal,
-    dailySceneGoal: row.dailySceneGoal,
     dailyChapterGoal: row.dailyChapterGoal,
     deadlineDate: row.deadlineDate,
     askSessionGoalOnStartup:
@@ -52,7 +74,6 @@ function mapDailyWritingLog(row: schema.DailyWritingLogSelect): DailyWritingLog 
     projectId: row.projectId,
     date: row.date,
     wordsWritten: row.wordsWritten ?? 0,
-    scenesCompleted: row.scenesCompleted ?? 0,
     chaptersCompleted: row.chaptersCompleted ?? 0,
     sessionGoalsHit: row.sessionGoalsHit ?? 0,
     goalMet: Boolean(row.goalMet)
@@ -110,17 +131,29 @@ function mapProject(row: schema.ProjectSelect): Project {
 }
 
 function mapFolio(row: schema.FolioSelect): Folio {
+  const content = row.content || ''
+  const wordCount =
+    typeof row.wordCount === 'number' && row.wordCount > 0
+      ? row.wordCount
+      : computeWordCount(content)
+
   return {
     id: row.id,
     projectId: row.projectId,
-    parentId: row.parentId,
-    type: row.type as 'chapter' | 'scene',
+    type: normalizeFolioType(row.type),
     title: row.title,
-    content: row.content,
-    synopsis: row.synopsis,
+    subtitle: row.subtitle || '',
+    synopsis: row.synopsis || '',
+    povTag: row.povTag || '',
+    timeline: row.timeline ?? null,
+    location: row.location ?? null,
+    targetWords: row.targetWords ?? 0,
+    includeInExport: row.includeInExport === undefined ? true : Boolean(row.includeInExport),
+    content,
+    status: normalizeFolioStatus(row.status),
+    wordCount,
+    orderIndex: row.orderIndex ?? 0,
     icon: row.icon || 'FileText',
-    sortOrder: row.sortOrder,
-    status: row.status,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
     createdAt: row.createdAt,
@@ -176,7 +209,7 @@ export function initDatabase(): {
   sqliteInstance.pragma('journal_mode = WAL')
   sqliteInstance.pragma('foreign_keys = ON')
 
-  // Create tables & indexes
+  // 1. Crear tablas base si no existen (sin índices sobre columnas migradas aún)
   sqliteInstance.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY NOT NULL,
@@ -190,24 +223,26 @@ export function initDatabase(): {
     CREATE TABLE IF NOT EXISTS folios (
       id TEXT PRIMARY KEY NOT NULL,
       project_id TEXT NOT NULL,
-      parent_id TEXT,
       type TEXT NOT NULL DEFAULT 'chapter',
       title TEXT NOT NULL DEFAULT 'Sin título',
-      content TEXT NOT NULL DEFAULT '',
+      subtitle TEXT NOT NULL DEFAULT '',
       synopsis TEXT NOT NULL DEFAULT '',
-      icon TEXT DEFAULT 'FileText',
-      sort_order INTEGER NOT NULL DEFAULT 0,
+      pov_tag TEXT NOT NULL DEFAULT '',
+      timeline TEXT,
+      location TEXT,
+      target_words INTEGER NOT NULL DEFAULT 0,
+      include_in_export INTEGER NOT NULL DEFAULT 1,
+      content TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'draft',
+      word_count INTEGER NOT NULL DEFAULT 0,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      icon TEXT DEFAULT 'FileText',
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_folios_project_id ON folios(project_id);
-    CREATE INDEX IF NOT EXISTS idx_folios_parent_id ON folios(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_folios_type ON folios(type);
-    CREATE INDEX IF NOT EXISTS idx_folios_is_archived ON folios(is_archived);
 
     CREATE TABLE IF NOT EXISTS lore_items (
       id TEXT PRIMARY KEY NOT NULL,
@@ -224,9 +259,6 @@ export function initDatabase(): {
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_lore_project_id ON lore_items(project_id);
-    CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
-    CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
 
     CREATE TABLE IF NOT EXISTS scratchpad_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -239,8 +271,6 @@ export function initDatabase(): {
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
-    CREATE INDEX IF NOT EXISTS idx_scratchpad_is_pinned ON scratchpad_notes(is_pinned);
 
     CREATE TABLE IF NOT EXISTS world_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -256,16 +286,11 @@ export function initDatabase(): {
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_rules_project_id ON world_rules(project_id);
-    CREATE INDEX IF NOT EXISTS idx_rules_category ON world_rules(category);
-    CREATE INDEX IF NOT EXISTS idx_rules_is_pinned ON world_rules(is_pinned);
-    CREATE INDEX IF NOT EXISTS idx_rules_order ON world_rules(order_index);
 
     CREATE TABLE IF NOT EXISTS project_goals (
       project_id TEXT PRIMARY KEY NOT NULL,
       target_total_words INTEGER NOT NULL DEFAULT 50000,
       daily_word_goal INTEGER NOT NULL DEFAULT 500,
-      daily_scene_goal INTEGER NOT NULL DEFAULT 1,
       daily_chapter_goal INTEGER NOT NULL DEFAULT 0,
       deadline_date TEXT,
       ask_session_goal_on_startup INTEGER NOT NULL DEFAULT 1,
@@ -278,14 +303,12 @@ export function initDatabase(): {
       project_id TEXT NOT NULL,
       date TEXT NOT NULL,
       words_written INTEGER NOT NULL DEFAULT 0,
-      scenes_completed INTEGER NOT NULL DEFAULT 0,
       chapters_completed INTEGER NOT NULL DEFAULT 0,
       session_goals_hit INTEGER NOT NULL DEFAULT 0,
       goal_met INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, date)
     );
-    CREATE INDEX IF NOT EXISTS idx_daily_logs_project_date ON daily_writing_logs(project_id, date);
 
     CREATE TABLE IF NOT EXISTS unlocked_achievements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -296,65 +319,265 @@ export function initDatabase(): {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, achievement_key)
     );
-    CREATE INDEX IF NOT EXISTS idx_unlocked_achievements_project ON unlocked_achievements(project_id);
   `)
 
-  // Migraciones ligeras y seguras para bases de datos ya inicializadas
+  // =========================================================================
+  // 2. MIGRACIÓN AUTOMÁTICA NO DESTRUCTIVA Y CONSOLIDACIÓN DE ESCENAS EN CAPÍTULOS
+  // =========================================================================
   try {
-    const scratchpadCols = sqliteInstance
-      .prepare('PRAGMA table_info(scratchpad_notes)')
-      .all() as Array<{ name: string }>
-    if (!scratchpadCols.some((c) => c.name === 'title')) {
-      sqliteInstance.exec('ALTER TABLE scratchpad_notes ADD COLUMN title TEXT NOT NULL DEFAULT "";')
+    const getTableCols = (tableName: string): Set<string> => {
+      const cols = sqliteInstance!
+        .prepare(`PRAGMA table_info(${tableName})`)
+        .all() as Array<{ name: string }>
+      return new Set(cols.map((c) => c.name))
     }
 
-    const goalsCols = sqliteInstance.prepare('PRAGMA table_info(project_goals)').all() as Array<{
-      name: string
-    }>
-    if (!goalsCols.some((c) => c.name === 'ask_session_goal_on_startup')) {
+    const folioCols = getTableCols('folios')
+
+    if (!folioCols.has('subtitle')) {
+      sqliteInstance.exec("ALTER TABLE folios ADD COLUMN subtitle TEXT NOT NULL DEFAULT '';")
+    }
+    if (!folioCols.has('synopsis')) {
+      sqliteInstance.exec("ALTER TABLE folios ADD COLUMN synopsis TEXT NOT NULL DEFAULT '';")
+    }
+    if (!folioCols.has('pov_tag')) {
+      sqliteInstance.exec("ALTER TABLE folios ADD COLUMN pov_tag TEXT NOT NULL DEFAULT '';")
+    }
+    if (!folioCols.has('timeline')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN timeline TEXT;')
+    }
+    if (!folioCols.has('location')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN location TEXT;')
+    }
+    if (!folioCols.has('target_words')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN target_words INTEGER NOT NULL DEFAULT 0;')
+    }
+    if (!folioCols.has('include_in_export')) {
+      sqliteInstance.exec(
+        'ALTER TABLE folios ADD COLUMN include_in_export INTEGER NOT NULL DEFAULT 1;'
+      )
+    }
+    if (!folioCols.has('word_count')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0;')
+    }
+    if (!folioCols.has('order_index')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0;')
+      if (folioCols.has('sort_order')) {
+        sqliteInstance.exec('UPDATE folios SET order_index = sort_order;')
+      }
+    } else if (folioCols.has('sort_order')) {
+      sqliteInstance.exec(
+        'UPDATE folios SET order_index = sort_order WHERE order_index = 0 AND sort_order != 0;'
+      )
+    }
+
+    // Normalizar estados heredados ('completed' -> 'done')
+    sqliteInstance.exec("UPDATE folios SET status = 'done' WHERE status = 'completed';")
+
+    // Consolidar escenas hijas (parent_id IS NOT NULL) dentro de su capítulo padre sin perder texto
+    if (folioCols.has('parent_id')) {
+      const orderColumn = folioCols.has('sort_order')
+        ? 'order_index ASC, sort_order ASC'
+        : 'order_index ASC'
+      const childRows = sqliteInstance
+        .prepare(
+          `SELECT id, parent_id, title, content, synopsis, is_archived as isArchived
+           FROM folios
+           WHERE parent_id IS NOT NULL
+           ORDER BY ${orderColumn}, created_at ASC`
+        )
+        .all() as Array<{
+        id: string
+        parent_id: string
+        title: string
+        content: string
+        synopsis: string
+        isArchived: number
+      }>
+
+      if (childRows.length > 0) {
+        const consolidateTx = sqliteInstance.transaction(() => {
+          const childrenByParent = new Map<string, typeof childRows>()
+          for (const child of childRows) {
+            const list = childrenByParent.get(child.parent_id) || []
+            list.push(child)
+            childrenByParent.set(child.parent_id, list)
+          }
+
+          for (const [parentChapterId, children] of childrenByParent.entries()) {
+            const parent = sqliteInstance!
+              .prepare(
+                'SELECT id, content, synopsis, is_archived as isArchived FROM folios WHERE id = ?'
+              )
+              .get(parentChapterId) as
+              | { id: string; content: string; synopsis: string; isArchived: number }
+              | undefined
+
+            if (parent) {
+              const activeBlocks: string[] = []
+              if (parent.content && parent.content.trim()) {
+                activeBlocks.push(parent.content.trim())
+              }
+
+              for (const child of children) {
+                if (child.isArchived && !parent.isArchived) {
+                  // Mantener en la papelera como capítulo independiente para que no se pierda ni ensucie el capítulo activo
+                  const childWords = computeWordCount(child.content || '')
+                  sqliteInstance!
+                    .prepare(
+                      "UPDATE folios SET parent_id = NULL, type = 'chapter', word_count = ? WHERE id = ?"
+                    )
+                    .run(childWords, child.id)
+                } else {
+                  const trimmed = (child.content || '').trim()
+                  if (trimmed) {
+                    const wrapped = /^<(p|h[1-6]|blockquote|div|ul|ol)/i.test(trimmed)
+                      ? trimmed
+                      : `<p>${trimmed}</p>`
+                    activeBlocks.push(wrapped)
+                  }
+                  sqliteInstance!.prepare('DELETE FROM folios WHERE id = ?').run(child.id)
+                }
+              }
+
+              const mergedContent = activeBlocks.join('<hr data-type="scene-break">')
+              const mergedWords = computeWordCount(mergedContent)
+              sqliteInstance!
+                .prepare(
+                  "UPDATE folios SET content = ?, word_count = ?, type = 'chapter' WHERE id = ?"
+                )
+                .run(mergedContent, mergedWords, parent.id)
+            } else {
+              // Huérfanas sin padre: promover a capítulo plano
+              for (const orphan of children) {
+                const w = computeWordCount(orphan.content || '')
+                sqliteInstance!
+                  .prepare(
+                    "UPDATE folios SET parent_id = NULL, type = 'chapter', word_count = ? WHERE id = ?"
+                  )
+                  .run(w, orphan.id)
+              }
+            }
+          }
+        })
+        consolidateTx()
+      }
+
+      // Asegurar que ningún registro quede con type = 'scene'
+      sqliteInstance.exec(
+        "UPDATE folios SET type = 'chapter' WHERE type NOT IN ('frontmatter', 'chapter', 'backmatter');"
+      )
+    }
+
+    // Recalcular word_count para todos los folios existentes
+    const allFoliosForCount = sqliteInstance
+      .prepare('SELECT id, content, word_count as wordCount FROM folios')
+      .all() as Array<{ id: string; content: string; wordCount: number }>
+    const updateWordCountStmt = sqliteInstance.prepare(
+      'UPDATE folios SET word_count = ? WHERE id = ?'
+    )
+    for (const f of allFoliosForCount) {
+      const actual = computeWordCount(f.content || '')
+      if (f.wordCount !== actual) {
+        updateWordCountStmt.run(actual, f.id)
+      }
+    }
+
+    const scratchpadCols = getTableCols('scratchpad_notes')
+    if (!scratchpadCols.has('title')) {
+      sqliteInstance.exec("ALTER TABLE scratchpad_notes ADD COLUMN title TEXT NOT NULL DEFAULT '';")
+    }
+    if (!scratchpadCols.has('is_pinned')) {
+      sqliteInstance.exec(
+        'ALTER TABLE scratchpad_notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;'
+      )
+    }
+    if (!scratchpadCols.has('color_tag')) {
+      sqliteInstance.exec('ALTER TABLE scratchpad_notes ADD COLUMN color_tag TEXT;')
+    }
+
+    const rulesCols = getTableCols('world_rules')
+    if (!rulesCols.has('details')) {
+      sqliteInstance.exec('ALTER TABLE world_rules ADD COLUMN details TEXT;')
+    }
+    if (!rulesCols.has('limitations')) {
+      sqliteInstance.exec('ALTER TABLE world_rules ADD COLUMN limitations TEXT;')
+    }
+    if (!rulesCols.has('order_index')) {
+      sqliteInstance.exec(
+        'ALTER TABLE world_rules ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0;'
+      )
+    }
+    if (!rulesCols.has('is_pinned')) {
+      sqliteInstance.exec(
+        'ALTER TABLE world_rules ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;'
+      )
+    }
+
+    const goalsCols = getTableCols('project_goals')
+    if (!goalsCols.has('daily_chapter_goal')) {
+      sqliteInstance.exec(
+        'ALTER TABLE project_goals ADD COLUMN daily_chapter_goal INTEGER NOT NULL DEFAULT 0;'
+      )
+    }
+    if (!goalsCols.has('deadline_date')) {
+      sqliteInstance.exec('ALTER TABLE project_goals ADD COLUMN deadline_date TEXT;')
+    }
+    if (!goalsCols.has('ask_session_goal_on_startup')) {
       sqliteInstance.exec(
         'ALTER TABLE project_goals ADD COLUMN ask_session_goal_on_startup INTEGER NOT NULL DEFAULT 1;'
       )
     }
 
-    const logsCols = sqliteInstance
-      .prepare('PRAGMA table_info(daily_writing_logs)')
-      .all() as Array<{ name: string }>
-    if (!logsCols.some((c) => c.name === 'scenes_completed')) {
-      sqliteInstance.exec(
-        'ALTER TABLE daily_writing_logs ADD COLUMN scenes_completed INTEGER NOT NULL DEFAULT 0;'
-      )
-      if (logsCols.some((c) => c.name === 'scenes_created')) {
-        sqliteInstance.exec('UPDATE daily_writing_logs SET scenes_completed = scenes_created;')
-      }
-    }
-    if (!logsCols.some((c) => c.name === 'chapters_completed')) {
+    const logsCols = getTableCols('daily_writing_logs')
+    if (!logsCols.has('chapters_completed')) {
       sqliteInstance.exec(
         'ALTER TABLE daily_writing_logs ADD COLUMN chapters_completed INTEGER NOT NULL DEFAULT 0;'
       )
-      if (logsCols.some((c) => c.name === 'chapters_created')) {
+      if (logsCols.has('chapters_created')) {
         sqliteInstance.exec('UPDATE daily_writing_logs SET chapters_completed = chapters_created;')
       }
     }
-    if (!logsCols.some((c) => c.name === 'session_goals_hit')) {
+    if (!logsCols.has('session_goals_hit')) {
       sqliteInstance.exec(
         'ALTER TABLE daily_writing_logs ADD COLUMN session_goals_hit INTEGER NOT NULL DEFAULT 0;'
       )
     }
 
-    const achCols = sqliteInstance
-      .prepare('PRAGMA table_info(unlocked_achievements)')
-      .all() as Array<{ name: string }>
-    if (!achCols.some((c) => c.name === 'custom_label')) {
+    const achCols = getTableCols('unlocked_achievements')
+    if (!achCols.has('custom_label')) {
       sqliteInstance.exec('ALTER TABLE unlocked_achievements ADD COLUMN custom_label TEXT;')
     }
   } catch (err) {
     console.warn('[Folio DB] column migration check:', err)
   }
 
+  // 3. Crear índices una vez que todas las columnas (incluyendo order_index) están garantizadas
+  sqliteInstance.exec(`
+    CREATE INDEX IF NOT EXISTS idx_folios_project_id ON folios(project_id);
+    CREATE INDEX IF NOT EXISTS idx_folios_type ON folios(type);
+    CREATE INDEX IF NOT EXISTS idx_folios_order_index ON folios(order_index);
+    CREATE INDEX IF NOT EXISTS idx_folios_is_archived ON folios(is_archived);
+
+    CREATE INDEX IF NOT EXISTS idx_lore_project_id ON lore_items(project_id);
+    CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
+    CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
+
+    CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_scratchpad_is_pinned ON scratchpad_notes(is_pinned);
+
+    CREATE INDEX IF NOT EXISTS idx_rules_project_id ON world_rules(project_id);
+    CREATE INDEX IF NOT EXISTS idx_rules_category ON world_rules(category);
+    CREATE INDEX IF NOT EXISTS idx_rules_is_pinned ON world_rules(is_pinned);
+    CREATE INDEX IF NOT EXISTS idx_rules_order ON world_rules(order_index);
+
+    CREATE INDEX IF NOT EXISTS idx_daily_logs_project_date ON daily_writing_logs(project_id, date);
+    CREATE INDEX IF NOT EXISTS idx_unlocked_achievements_project ON unlocked_achievements(project_id);
+  `)
+
   drizzleInstance = drizzle(sqliteInstance, { schema })
 
-  // Seed default Project, Chapters/Scenes, and Lore Wiki if empty
+  // Seed default Project, Flat Chapters, and Lore Wiki if empty
   const projectCount = sqliteInstance
     .prepare('SELECT count(*) as count FROM projects')
     .get() as { count: number }
@@ -376,20 +599,53 @@ export function initDatabase(): {
       })
       .run()
 
-    // 2. Chapters & Scenes
-    const chapter1Id = crypto.randomUUID()
+    // 2. Flat Chapters (Frontmatter + Chapters with SceneBreaks)
+    const prologueContent =
+      '<p>«Aquel que transcribe la memoria de los reyes renuncia a escribir la suya propia.»</p><p>En los anales de Oakhaven, ningún custodio pronunciaba su propio nombre al cruzar el umbral de bronce. Las lámparas de aceite ardían día y noche alimentando la penumbra cálida de las siete galerías.</p>'
+
     drizzleInstance
       .insert(schema.folios)
       .values({
-        id: chapter1Id,
+        id: crypto.randomUUID(),
         projectId: defaultProjectId,
-        parentId: null,
+        type: 'frontmatter',
+        title: 'Prólogo: El Juramento de la Cera',
+        subtitle: 'Del Códice de los Silentes, Libro Primero',
+        synopsis: 'Introducción atmosférica a la Orden de la Cera y las leyes del Archivo.',
+        povTag: 'Códice · Primera Era',
+        targetWords: 300,
+        includeInExport: true,
+        content: prologueContent,
+        status: 'done',
+        wordCount: computeWordCount(prologueContent),
+        orderIndex: 1,
+        isFavorite: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
+
+    const chapter1Content =
+      '<p>La tenue luz del amanecer se filtraba entre los vitrales polvorientos del archivo central. Aria sostenía una pluma gastada mientras observaba la inscripción grabada en la mesa de roble.</p><div data-type="scene-break" class="scene-break">* * *</div><p>Un crujido lejano en el pasillo interrumpió la lectura. No era el viento; alguien había burlado las cerraduras de bronce de la torre este.</p>'
+
+    drizzleInstance
+      .insert(schema.folios)
+      .values({
+        id: crypto.randomUUID(),
+        projectId: defaultProjectId,
         type: 'chapter',
         title: 'Capítulo I: El Despertar de la Cera',
-        content: '',
-        synopsis: 'Aria encuentra el primer sello terracota en la torre este.',
-        sortOrder: 1,
+        subtitle: 'Donde el silencio de la torre se quiebra al amanecer',
+        synopsis:
+          'Aria examina los archivos al amanecer cuando un intruso irrumpe en el santuario.',
+        povTag: 'Aria · Presente',
+        targetWords: 1500,
+        includeInExport: true,
+        content: chapter1Content,
         status: 'in_progress',
+        wordCount: computeWordCount(chapter1Content),
+        orderIndex: 2,
         isFavorite: true,
         isArchived: false,
         createdAt: now,
@@ -397,59 +653,25 @@ export function initDatabase(): {
       })
       .run()
 
-    drizzleInstance
-      .insert(schema.folios)
-      .values({
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        parentId: chapter1Id,
-        type: 'scene',
-        title: 'Escena 1: La Torre del Alba',
-        content:
-          'La tenue luz del amanecer se filtraba entre los vitrales polvorientos del archivo central. Aria sostenía una pluma gastada mientras observaba la inscripción grabada en la mesa de roble.',
-        synopsis: 'Aria examina los archivos al amanecer.',
-        sortOrder: 1,
-        status: 'in_progress',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      })
-      .run()
+    const chapter2Content =
+      '<p>Las aguas del lago permanecían inmóviles como un espejo de obsidiana. En la orilla cubierta de bruma, las barcas aguardaban sin barquero.</p>'
 
     drizzleInstance
       .insert(schema.folios)
       .values({
         id: crypto.randomUUID(),
         projectId: defaultProjectId,
-        parentId: chapter1Id,
-        type: 'scene',
-        title: 'Escena 2: El Mensajero Silencioso',
-        content:
-          'Un crujido lejano en el pasillo interrumpió la lectura. No era el viento; alguien había burlado las cerraduras de bronce.',
-        synopsis: 'Alguien irrumpe en el santuario.',
-        sortOrder: 2,
-        status: 'draft',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      })
-      .run()
-
-    const chapter2Id = crypto.randomUUID()
-    drizzleInstance
-      .insert(schema.folios)
-      .values({
-        id: chapter2Id,
-        projectId: defaultProjectId,
-        parentId: null,
         type: 'chapter',
         title: 'Capítulo II: La Ciudad Sumergida',
-        content: '',
-        synopsis: 'La expedición hacia las antiguas ruinas lacustres.',
-        sortOrder: 2,
+        subtitle: 'Las aguas de obsidiana no devuelven sus secretos',
+        synopsis: 'La expedición hacia las antiguas ruinas lacustres en busca del Maestro Kaelen.',
+        povTag: 'Aria · Presente',
+        targetWords: 2000,
+        includeInExport: true,
+        content: chapter2Content,
         status: 'draft',
+        wordCount: computeWordCount(chapter2Content),
+        orderIndex: 3,
         isFavorite: false,
         isArchived: false,
         createdAt: now,
@@ -457,26 +679,7 @@ export function initDatabase(): {
       })
       .run()
 
-    drizzleInstance
-      .insert(schema.folios)
-      .values({
-        id: crypto.randomUUID(),
-        projectId: defaultProjectId,
-        parentId: chapter2Id,
-        type: 'scene',
-        title: 'Escena 1: Orillas de Niebla',
-        content: 'Las aguas del lago permanecían inmóviles como un espejo de obsidiana.',
-        synopsis: 'Llegada a las costas del lago.',
-        sortOrder: 1,
-        status: 'draft',
-        isFavorite: false,
-        isArchived: false,
-        createdAt: now,
-        updatedAt: now
-      })
-      .run()
-
-    // 3. Lore Wiki Items (Characters, Places, Items, Concepts)
+    // 3. Lore Wiki Items
     drizzleInstance
       .insert(schema.loreItems)
       .values([
@@ -573,7 +776,7 @@ export function initDatabase(): {
       ])
       .run()
 
-    console.log(`[Folio DB] Seeded initial novel project with chapters, scenes and lore wiki.`)
+    console.log(`[Folio DB] Seeded initial novel project with flat chapters and lore wiki.`)
   }
 
   return {
@@ -631,13 +834,13 @@ export function createProject(input: CreateProjectInput): Project {
     .returning()
     .get()
 
-  // Create an initial chapter for zero-friction writing
+  // Inicializar únicamente el «Capítulo I» plano con contenido vacío listo para escribir
   createFolio({
     projectId: newId,
-    parentId: null,
     type: 'chapter',
     title: 'Capítulo I',
-    content: ''
+    content: '',
+    orderIndex: 1
   })
 
   return mapProject(inserted)
@@ -675,7 +878,7 @@ export function deleteProject(id: string): boolean {
 }
 
 // -------------------------------------------------------------------------
-// FOLIOS (CHAPTERS & SCENES)
+// FOLIOS (FLAT CHAPTERS)
 // -------------------------------------------------------------------------
 
 export function getAllFolios(projectId?: string): Folio[] {
@@ -685,14 +888,14 @@ export function getAllFolios(projectId?: string): Folio[] {
   if (projectId) {
     const rows = query
       .where(and(eq(schema.folios.projectId, projectId), eq(schema.folios.isArchived, false)))
-      .orderBy(asc(schema.folios.sortOrder), desc(schema.folios.updatedAt))
+      .orderBy(asc(schema.folios.orderIndex), asc(schema.folios.createdAt))
       .all()
     return rows.map(mapFolio)
   }
 
   const rows = query
     .where(eq(schema.folios.isArchived, false))
-    .orderBy(asc(schema.folios.sortOrder), desc(schema.folios.updatedAt))
+    .orderBy(asc(schema.folios.orderIndex), asc(schema.folios.createdAt))
     .all()
   return rows.map(mapFolio)
 }
@@ -721,20 +924,41 @@ export function createFolio(input: CreateFolioInput): Folio {
   const db = getDb()
   const now = new Date()
   const newId = crypto.randomUUID()
+  const content = input.content ?? ''
+  const wordCount =
+    input.wordCount !== undefined ? input.wordCount : computeWordCount(content)
+
+  let nextOrderIndex = input.orderIndex
+  if (nextOrderIndex === undefined) {
+    const existing = db
+      .select({ orderIndex: schema.folios.orderIndex })
+      .from(schema.folios)
+      .where(eq(schema.folios.projectId, input.projectId))
+      .orderBy(desc(schema.folios.orderIndex))
+      .limit(1)
+      .get()
+    nextOrderIndex = existing ? existing.orderIndex + 1 : 1
+  }
 
   const inserted = db
     .insert(schema.folios)
     .values({
       id: newId,
       projectId: input.projectId,
-      parentId: input.parentId ?? null,
-      type: input.type || (input.parentId ? 'scene' : 'chapter'),
-      title: input.title?.trim() || (input.parentId ? 'Nueva Escena' : 'Nuevo Capítulo'),
-      content: input.content ?? '',
+      type: normalizeFolioType(input.type),
+      title: input.title?.trim() || 'Nuevo Capítulo',
+      subtitle: input.subtitle?.trim() ?? '',
       synopsis: input.synopsis ?? '',
+      povTag: input.povTag?.trim() ?? '',
+      timeline: input.timeline?.trim() || null,
+      location: input.location?.trim() || null,
+      targetWords: Math.max(0, input.targetWords ?? 0),
+      includeInExport: input.includeInExport ?? true,
+      content,
+      status: normalizeFolioStatus(input.status),
+      wordCount,
+      orderIndex: nextOrderIndex,
       icon: input.icon || 'FileText',
-      sortOrder: input.sortOrder ?? 0,
-      status: input.status || 'draft',
       isFavorite: false,
       isArchived: false,
       createdAt: now,
@@ -753,13 +977,24 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   const values: Partial<typeof schema.folios.$inferInsert> = {
     updatedAt: now
   }
+  if (input.type !== undefined) values.type = normalizeFolioType(input.type)
   if (input.title !== undefined) values.title = input.title
-  if (input.content !== undefined) values.content = input.content
+  if (input.subtitle !== undefined) values.subtitle = input.subtitle
   if (input.synopsis !== undefined) values.synopsis = input.synopsis
-  if (input.parentId !== undefined) values.parentId = input.parentId
-  if (input.type !== undefined) values.type = input.type
-  if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder
-  if (input.status !== undefined) values.status = input.status
+  if (input.povTag !== undefined) values.povTag = input.povTag
+  if (input.timeline !== undefined) values.timeline = input.timeline?.trim() || null
+  if (input.location !== undefined) values.location = input.location?.trim() || null
+  if (input.targetWords !== undefined) values.targetWords = Math.max(0, input.targetWords)
+  if (input.includeInExport !== undefined) values.includeInExport = input.includeInExport
+  if (input.content !== undefined) {
+    values.content = input.content
+    values.wordCount =
+      input.wordCount !== undefined ? input.wordCount : computeWordCount(input.content)
+  } else if (input.wordCount !== undefined) {
+    values.wordCount = input.wordCount
+  }
+  if (input.orderIndex !== undefined) values.orderIndex = input.orderIndex
+  if (input.status !== undefined) values.status = normalizeFolioStatus(input.status)
   if (input.icon !== undefined) values.icon = input.icon
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
@@ -771,41 +1006,40 @@ export function updateFolio(input: UpdateFolioInput): Folio {
     .returning()
     .get()
 
-  if (!updated) throw new Error(`Folio ${input.id} no encontrado`)
+  if (!updated) throw new Error(`Capítulo ${input.id} no encontrado`)
   return mapFolio(updated)
+}
+
+export function reorderFolios(ids: string[]): boolean {
+  const sqlite = getSqlite()
+  const stmt = sqlite.prepare('UPDATE folios SET order_index = ?, updated_at = ? WHERE id = ?')
+  const now = Date.now()
+  const tx = sqlite.transaction((chapterIds: string[]) => {
+    for (let i = 0; i < chapterIds.length; i++) {
+      stmt.run(i + 1, now, chapterIds[i])
+    }
+  })
+  tx(ids)
+  return true
 }
 
 export function restoreFolio(id: string): Folio {
   const db = getDb()
   const now = new Date()
   const folio = getFolioById(id)
-  if (!folio) throw new Error(`Folio ${id} no encontrado`)
-
-  let parentId = folio.parentId
-  let type = folio.type
-
-  // Si tiene capítulo padre, verificar que aún exista y no esté archivado
-  if (parentId) {
-    const parent = db.select().from(schema.folios).where(eq(schema.folios.id, parentId)).get()
-    if (!parent || parent.isArchived) {
-      parentId = null
-      type = 'chapter'
-    }
-  }
+  if (!folio) throw new Error(`Capítulo ${id} no encontrado`)
 
   const updated = db
     .update(schema.folios)
     .set({
       isArchived: false,
-      parentId,
-      type,
       updatedAt: now
     })
     .where(eq(schema.folios.id, id))
     .returning()
     .get()
 
-  if (!updated) throw new Error(`Error al restaurar folio ${id}`)
+  if (!updated) throw new Error(`Error al restaurar capítulo ${id}`)
   return mapFolio(updated)
 }
 
@@ -1004,7 +1238,6 @@ export function saveScratchpadNote(input: SaveScratchpadNoteInput): ScratchpadNo
     }
   }
 
-  // Crear nueva nota rápida
   const inserted = db
     .insert(schema.scratchpadNotes)
     .values({
@@ -1084,7 +1317,6 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
     }
   }
 
-  // Si no se especifica orderIndex, calculamos el siguiente
   let nextOrderIndex = input.orderIndex ?? 0
   if (input.orderIndex === undefined) {
     const highest = db
@@ -1097,7 +1329,6 @@ export function saveWorldRule(input: SaveWorldRuleInput): WorldRule {
     nextOrderIndex = highest?.maxOrder !== undefined ? highest.maxOrder + 1 : 0
   }
 
-  // Insertar nueva regla del mundo
   const inserted = db
     .insert(schema.worldRules)
     .values({
@@ -1171,7 +1402,6 @@ export function getProjectGoals(projectId: string): ProjectGoals {
       projectId,
       targetTotalWords: 50000,
       dailyWordGoal: 500,
-      dailySceneGoal: 1,
       dailyChapterGoal: 0,
       deadlineDate: null,
       askSessionGoalOnStartup: true,
@@ -1186,7 +1416,6 @@ export function getProjectGoals(projectId: string): ProjectGoals {
 function evaluateDailyGoalMet(
   log: {
     wordsWritten: number
-    scenesCompleted: number
     chaptersCompleted: number
     sessionGoalsHit: number
   },
@@ -1194,7 +1423,6 @@ function evaluateDailyGoalMet(
 ): boolean {
   if (log.sessionGoalsHit > 0) return true
   if (goals.dailyWordGoal > 0 && log.wordsWritten >= goals.dailyWordGoal) return true
-  if (goals.dailySceneGoal > 0 && log.scenesCompleted >= goals.dailySceneGoal) return true
   if (goals.dailyChapterGoal > 0 && log.chaptersCompleted >= goals.dailyChapterGoal) return true
   return false
 }
@@ -1210,7 +1438,6 @@ export function updateProjectGoals(projectId: string, input: Partial<ProjectGoal
     .set({
       targetTotalWords: input.targetTotalWords ?? current.targetTotalWords,
       dailyWordGoal: input.dailyWordGoal ?? current.dailyWordGoal,
-      dailySceneGoal: input.dailySceneGoal ?? current.dailySceneGoal,
       dailyChapterGoal: input.dailyChapterGoal ?? current.dailyChapterGoal,
       deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : current.deadlineDate,
       askSessionGoalOnStartup:
@@ -1225,7 +1452,6 @@ export function updateProjectGoals(projectId: string, input: Partial<ProjectGoal
 
   const mappedGoals = mapProjectGoals(updated)
 
-  // Re-evaluar si el log de hoy cumple la nueva meta configurada
   const todayStr = getLocalDateStr()
   const todayRow = db
     .select()
@@ -1242,7 +1468,6 @@ export function updateProjectGoals(projectId: string, input: Partial<ProjectGoal
     const newGoalMet = evaluateDailyGoalMet(
       {
         wordsWritten: todayRow.wordsWritten,
-        scenesCompleted: todayRow.scenesCompleted,
         chaptersCompleted: todayRow.chaptersCompleted,
         sessionGoalsHit: todayRow.sessionGoalsHit
       },
@@ -1281,7 +1506,6 @@ export function getTodayWritingLog(projectId: string, dateStr?: string): DailyWr
     projectId,
     date: targetDate,
     wordsWritten: 0,
-    scenesCompleted: 0,
     chaptersCompleted: 0,
     sessionGoalsHit: 0,
     goalMet: false
@@ -1297,24 +1521,20 @@ export function recordWritingProgress(
   const goals = getProjectGoals(projectId)
 
   const wordDelta = payload.wordDelta ?? 0
-  const sceneDelta = payload.sceneDelta ?? 0
   const chapterDelta = payload.chapterDelta ?? 0
   const sessionGoalHitDelta = payload.sessionGoalHitDelta ?? 0
 
-  // Atomic UPSERT usando ON CONFLICT nativo de SQLite
   const upsertStmt = sqlite.prepare(`
     INSERT INTO daily_writing_logs (
-      project_id, date, words_written, scenes_completed, chapters_completed, session_goals_hit, goal_met
+      project_id, date, words_written, chapters_completed, session_goals_hit, goal_met
     )
-    VALUES (?, ?, MAX(0, ?), MAX(0, ?), MAX(0, ?), MAX(0, ?), 0)
+    VALUES (?, ?, MAX(0, ?), MAX(0, ?), MAX(0, ?), 0)
     ON CONFLICT(project_id, date) DO UPDATE SET
       words_written = MAX(0, daily_writing_logs.words_written + ?),
-      scenes_completed = MAX(0, daily_writing_logs.scenes_completed + ?),
       chapters_completed = MAX(0, daily_writing_logs.chapters_completed + ?),
       session_goals_hit = MAX(0, daily_writing_logs.session_goals_hit + ?)
     RETURNING id, project_id as projectId, date,
               words_written as wordsWritten,
-              scenes_completed as scenesCompleted,
               chapters_completed as chaptersCompleted,
               session_goals_hit as sessionGoalsHit,
               goal_met as goalMet
@@ -1324,11 +1544,9 @@ export function recordWritingProgress(
     projectId,
     todayStr,
     wordDelta,
-    sceneDelta,
     chapterDelta,
     sessionGoalHitDelta,
     wordDelta,
-    sceneDelta,
     chapterDelta,
     sessionGoalHitDelta
   ) as schema.DailyWritingLogSelect
@@ -1336,7 +1554,6 @@ export function recordWritingProgress(
   const isGoalMet = evaluateDailyGoalMet(
     {
       wordsWritten: row.wordsWritten,
-      scenesCompleted: row.scenesCompleted,
       chaptersCompleted: row.chaptersCompleted,
       sessionGoalsHit: row.sessionGoalsHit
     },
@@ -1385,7 +1602,6 @@ export function unlockAchievement(
 ): UnlockedAchievement | null {
   const db = getDb()
 
-  // Evitar duplicados si ya fue desbloqueado
   const existing = db
     .select()
     .from(schema.unlockedAchievements)
@@ -1424,22 +1640,16 @@ export function unlockAchievement(
 
 export function getTotalManuscriptWords(projectId: string): number {
   const sqlite = getSqlite()
-  // Excluye folios en papelera y escenas cuyo capítulo padre esté en papelera
   const stmt = sqlite.prepare(`
-    SELECT f.content FROM folios f
-    LEFT JOIN folios p ON f.parent_id = p.id
-    WHERE f.project_id = ?
-      AND f.is_archived = 0
-      AND (f.parent_id IS NULL OR p.is_archived = 0)
+    SELECT content FROM folios
+    WHERE project_id = ?
+      AND is_archived = 0
   `)
   const rows = stmt.all(projectId) as Array<{ content: string }>
 
   let totalWords = 0
   for (const row of rows) {
-    const clean = (row.content || '').replace(/<[^>]*>/g, ' ').trim()
-    if (clean) {
-      totalWords += clean.split(/\s+/).length
-    }
+    totalWords += computeWordCount(row.content || '')
   }
   return totalWords
 }
@@ -1461,8 +1671,6 @@ export function calculateCurrentStreak(logs: DailyWritingLog[]): number {
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = getLocalDateStr(yesterday)
 
-  // Si hoy ya cumplió la meta, la racha cuenta desde hoy.
-  // Si hoy aún no la cumple, pero ayer sí, la racha sigue viva desde ayer.
   let checkDate: Date
   if (logMap.get(todayStr)) {
     checkDate = new Date(today)

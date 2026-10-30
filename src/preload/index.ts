@@ -32,6 +32,7 @@ const api: FolioApi = {
     getById: (id: string): Promise<Folio | null> => ipcRenderer.invoke('folio:getById', id),
     create: (input: CreateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:create', input),
     update: (input: UpdateFolioInput): Promise<Folio> => ipcRenderer.invoke('folio:update', input),
+    reorder: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('folio:reorder', ids),
     restore: (id: string): Promise<Folio> => ipcRenderer.invoke('folio:restore', id),
     deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('folio:deletePermanent', id),
     emptyTrash: (projectId: string): Promise<{ purgedFolios: number; purgedLore: number }> =>
@@ -67,6 +68,10 @@ const api: FolioApi = {
   },
   window: {
     action: (action: WindowAction): Promise<boolean | void> => ipcRenderer.invoke('window:action', action)
+  },
+  export: {
+    htmlToPdfBuffer: (html: string): Promise<Uint8Array> =>
+      ipcRenderer.invoke('export:htmlToPdfBuffer', html)
   }
 }
 
