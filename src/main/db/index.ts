@@ -13,6 +13,7 @@ import type {
   Folio,
   FolioType,
   FolioStatus,
+  ChapterTitleFormat,
   CreateFolioInput,
   UpdateFolioInput,
   LoreItem,
@@ -130,6 +131,30 @@ function mapProject(row: schema.ProjectSelect): Project {
   }
 }
 
+function parseTitleFormat(raw?: string | null): ChapterTitleFormat | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const alignment =
+      parsed.alignment === 'center' || parsed.alignment === 'right' ? parsed.alignment : 'left'
+    const showDivider = parsed.showDivider === undefined ? true : Boolean(parsed.showDivider)
+    const fontFamily = typeof parsed.fontFamily === 'string' ? parsed.fontFamily : ''
+    const color = typeof parsed.color === 'string' ? parsed.color : ''
+    const parsedSize = Number(parsed.fontSize)
+    const fontSize = !isNaN(parsedSize) && parsedSize >= 6 && parsedSize <= 96 ? parsedSize : 32
+    return {
+      alignment,
+      showDivider,
+      fontFamily,
+      color,
+      fontSize
+    }
+  } catch {
+    return null
+  }
+}
+
 function mapFolio(row: schema.FolioSelect): Folio {
   const content = row.content || ''
   const wordCount =
@@ -147,6 +172,7 @@ function mapFolio(row: schema.FolioSelect): Folio {
     povTag: row.povTag || '',
     timeline: row.timeline ?? null,
     location: row.location ?? null,
+    chapterTitleFormat: parseTitleFormat(row.titleFormat),
     targetWords: row.targetWords ?? 0,
     includeInExport: row.includeInExport === undefined ? true : Boolean(row.includeInExport),
     content,
@@ -230,6 +256,7 @@ export function initDatabase(): {
       pov_tag TEXT NOT NULL DEFAULT '',
       timeline TEXT,
       location TEXT,
+      title_format TEXT,
       target_words INTEGER NOT NULL DEFAULT 0,
       include_in_export INTEGER NOT NULL DEFAULT 1,
       content TEXT NOT NULL DEFAULT '',
@@ -348,6 +375,9 @@ export function initDatabase(): {
     }
     if (!folioCols.has('location')) {
       sqliteInstance.exec('ALTER TABLE folios ADD COLUMN location TEXT;')
+    }
+    if (!folioCols.has('title_format')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN title_format TEXT;')
     }
     if (!folioCols.has('target_words')) {
       sqliteInstance.exec('ALTER TABLE folios ADD COLUMN target_words INTEGER NOT NULL DEFAULT 0;')
@@ -952,6 +982,7 @@ export function createFolio(input: CreateFolioInput): Folio {
       povTag: input.povTag?.trim() ?? '',
       timeline: input.timeline?.trim() || null,
       location: input.location?.trim() || null,
+      titleFormat: input.chapterTitleFormat ? JSON.stringify(input.chapterTitleFormat) : null,
       targetWords: Math.max(0, input.targetWords ?? 0),
       includeInExport: input.includeInExport ?? true,
       content,
@@ -984,6 +1015,11 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   if (input.povTag !== undefined) values.povTag = input.povTag
   if (input.timeline !== undefined) values.timeline = input.timeline?.trim() || null
   if (input.location !== undefined) values.location = input.location?.trim() || null
+  if (input.chapterTitleFormat !== undefined) {
+    values.titleFormat = input.chapterTitleFormat
+      ? JSON.stringify(input.chapterTitleFormat)
+      : null
+  }
   if (input.targetWords !== undefined) values.targetWords = Math.max(0, input.targetWords)
   if (input.includeInExport !== undefined) values.includeInExport = input.includeInExport
   if (input.content !== undefined) {

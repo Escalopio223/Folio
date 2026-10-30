@@ -1,5 +1,47 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import type { ChapterTitleFormat } from '@shared/types'
+
+export const DEFAULT_CHAPTER_TITLE_FORMAT: ChapterTitleFormat = {
+  alignment: 'left',
+  showDivider: true,
+  fontFamily: "'Newsreader', 'Playfair Display', Georgia, serif",
+  color: '',
+  fontSize: 32
+}
+
+const CHAPTER_TITLE_FORMAT_STORAGE_KEY = 'folio:chapter_title_format'
+
+function loadSavedChapterTitleFormat(): ChapterTitleFormat {
+  try {
+    const raw = localStorage.getItem(CHAPTER_TITLE_FORMAT_STORAGE_KEY)
+    if (!raw) return { ...DEFAULT_CHAPTER_TITLE_FORMAT }
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_CHAPTER_TITLE_FORMAT }
+    const alignment =
+      parsed.alignment === 'center' || parsed.alignment === 'right' ? parsed.alignment : 'left'
+    const showDivider = parsed.showDivider === undefined ? true : Boolean(parsed.showDivider)
+    const fontFamily =
+      typeof parsed.fontFamily === 'string' && parsed.fontFamily
+        ? parsed.fontFamily
+        : DEFAULT_CHAPTER_TITLE_FORMAT.fontFamily
+    const color = typeof parsed.color === 'string' ? parsed.color : ''
+    const parsedSize = parseFloat(String(parsed.fontSize))
+    const fontSize =
+      !isNaN(parsedSize) && parsedSize >= 6 && parsedSize <= 96
+        ? Math.round(parsedSize * 100) / 100
+        : DEFAULT_CHAPTER_TITLE_FORMAT.fontSize
+    return {
+      alignment,
+      showDivider,
+      fontFamily,
+      color,
+      fontSize
+    }
+  } catch {
+    return { ...DEFAULT_CHAPTER_TITLE_FORMAT }
+  }
+}
 
 export const DEFAULT_LEFT_WIDTH = 260
 export const MIN_LEFT_WIDTH = 200
@@ -552,6 +594,34 @@ export const useUiStore = defineStore('ui', () => {
     resetRightSidebarWidth()
   }
 
+  // =========================================================================
+  // CONFIGURACIÓN DE FORMATO GLOBAL DEL TÍTULO DE CAPÍTULO (chapterTitleFormat)
+  // =========================================================================
+  const chapterTitleFormat = ref<ChapterTitleFormat>(loadSavedChapterTitleFormat())
+
+  function updateChapterTitleFormat(partial: Partial<ChapterTitleFormat>): void {
+    const next: ChapterTitleFormat = {
+      ...chapterTitleFormat.value,
+      ...partial
+    }
+    const parsedSize = parseFloat(String(next.fontSize))
+    next.fontSize =
+      !isNaN(parsedSize)
+        ? Math.max(6, Math.min(96, Math.round(parsedSize * 100) / 100))
+        : DEFAULT_CHAPTER_TITLE_FORMAT.fontSize
+
+    chapterTitleFormat.value = next
+    localStorage.setItem(CHAPTER_TITLE_FORMAT_STORAGE_KEY, JSON.stringify(next))
+  }
+
+  function resetChapterTitleFormat(): void {
+    chapterTitleFormat.value = { ...DEFAULT_CHAPTER_TITLE_FORMAT }
+    localStorage.setItem(
+      CHAPTER_TITLE_FORMAT_STORAGE_KEY,
+      JSON.stringify(chapterTitleFormat.value)
+    )
+  }
+
   return {
     DEFAULT_LEFT_WIDTH,
     MIN_LEFT_WIDTH,
@@ -562,6 +632,10 @@ export const useUiStore = defineStore('ui', () => {
     DEFAULT_BUTTON_COLOR,
     DEFAULT_TEXT_COLOR,
     DEFAULT_BG_COLOR,
+    DEFAULT_CHAPTER_TITLE_FORMAT,
+    chapterTitleFormat,
+    updateChapterTitleFormat,
+    resetChapterTitleFormat,
     leftSidebarWidth,
     rightSidebarWidth,
     setLeftSidebarWidth,

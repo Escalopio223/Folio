@@ -22,6 +22,15 @@ export interface UpdateProjectInput {
 
 export type FolioType = 'frontmatter' | 'chapter' | 'backmatter'
 export type FolioStatus = 'draft' | 'in_progress' | 'done'
+export type ChapterTitleAlignment = 'left' | 'center' | 'right'
+
+export interface ChapterTitleFormat {
+  alignment: ChapterTitleAlignment
+  showDivider: boolean
+  fontFamily: string
+  color: string
+  fontSize: number // admite decimales como 13.5, 28, 32.5
+}
 
 export interface Folio {
   id: string
@@ -33,6 +42,7 @@ export interface Folio {
   povTag: string
   timeline: string | null
   location: string | null
+  chapterTitleFormat: ChapterTitleFormat | null
   targetWords: number
   includeInExport: boolean
   content: string
@@ -55,6 +65,7 @@ export interface CreateFolioInput {
   povTag?: string
   timeline?: string | null
   location?: string | null
+  chapterTitleFormat?: ChapterTitleFormat | null
   targetWords?: number
   includeInExport?: boolean
   content?: string
@@ -73,6 +84,7 @@ export interface UpdateFolioInput {
   povTag?: string
   timeline?: string | null
   location?: string | null
+  chapterTitleFormat?: ChapterTitleFormat | null
   targetWords?: number
   includeInExport?: boolean
   content?: string

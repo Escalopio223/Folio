@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next'
 import { useProjectStore } from '../stores/projectStore'
 import { useFolioStore } from '../stores/folioStore'
+import { useUiStore } from '../stores/uiStore'
 import {
   collectActiveManuscript,
   exportManuscriptToEpub,
@@ -22,6 +23,7 @@ import {
 
 const projectStore = useProjectStore()
 const folioStore = useFolioStore()
+const uiStore = useUiStore()
 
 const isMenuOpen = ref(false)
 const exportingFormat = ref<ExportFormat | null>(null)
@@ -53,7 +55,11 @@ async function handleExportEpub(): Promise<void> {
   exportingFormat.value = 'epub'
 
   try {
-    const manuscript = collectActiveManuscript(projectStore.activeProject, folioStore.chapters)
+    const manuscript = collectActiveManuscript(
+      projectStore.activeProject,
+      folioStore.chapters,
+      uiStore.chapterTitleFormat
+    )
     await new Promise((resolve) => setTimeout(resolve, 180))
     const filename = await exportManuscriptToEpub(manuscript)
     showTransientFeedback(`Descargado: ${filename}`)
@@ -71,7 +77,11 @@ async function handleExportPdf(): Promise<void> {
   exportingFormat.value = 'pdf'
 
   try {
-    const manuscript = collectActiveManuscript(projectStore.activeProject, folioStore.chapters)
+    const manuscript = collectActiveManuscript(
+      projectStore.activeProject,
+      folioStore.chapters,
+      uiStore.chapterTitleFormat
+    )
     const filename = await exportManuscriptToPdf(manuscript)
     showTransientFeedback(`Descargado: ${filename}`)
   } catch (err) {
@@ -88,7 +98,11 @@ async function handleExportDocx(): Promise<void> {
   exportingFormat.value = 'docx'
 
   try {
-    const manuscript = collectActiveManuscript(projectStore.activeProject, folioStore.chapters)
+    const manuscript = collectActiveManuscript(
+      projectStore.activeProject,
+      folioStore.chapters,
+      uiStore.chapterTitleFormat
+    )
     await new Promise((resolve) => setTimeout(resolve, 180))
     const filename = await exportManuscriptToDocx(manuscript)
     showTransientFeedback(`Descargado: ${filename}`)

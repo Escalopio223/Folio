@@ -21,6 +21,7 @@ export const folios = sqliteTable(
     povTag: text('pov_tag').notNull().default(''),
     timeline: text('timeline'),
     location: text('location'),
+    titleFormat: text('title_format'),
     targetWords: integer('target_words').notNull().default(0),
     includeInExport: integer('include_in_export', { mode: 'boolean' }).notNull().default(true),
     content: text('content').notNull().default(''),

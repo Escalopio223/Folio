@@ -26,8 +26,9 @@ import {
 } from 'lucide-vue-next'
 import TiptapEditor, { type SceneBreakAnchor } from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
+import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
 import type { Editor } from '@tiptap/vue-3'
-import type { Folio, FolioType, FolioStatus } from '@shared/types'
+import type { Folio, FolioType, FolioStatus, ChapterTitleFormat } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
 import { useRulesStore } from '../stores/rulesStore'
@@ -81,6 +82,7 @@ const editFolioTitle = ref('')
 const editFolioSubtitle = ref('')
 const editFolioTimeline = ref('')
 const editFolioLocation = ref('')
+const editFolioTitleFormat = ref<ChapterTitleFormat | null>(null)
 const editFolioContent = ref('')
 const editFolioSynopsis = ref('')
 const editFolioPovTag = ref('')
@@ -88,6 +90,20 @@ const editFolioTargetWords = ref<number>(0)
 const editFolioIncludeInExport = ref<boolean>(true)
 const editFolioType = ref<FolioType>('chapter')
 const editFolioStatus = ref<FolioStatus>('draft')
+
+// Formato efectivo del encabezado del capítulo (override del capítulo o global del libro)
+const effectiveChapterTitleFormat = computed<ChapterTitleFormat>(() => {
+  return editFolioTitleFormat.value ?? uiStore.chapterTitleFormat
+})
+
+function handleUpdateGlobalTitleFormat(format: ChapterTitleFormat): void {
+  uiStore.updateChapterTitleFormat(format)
+}
+
+function handleUpdateChapterTitleFormat(format: ChapterTitleFormat | null): void {
+  editFolioTitleFormat.value = format ? { ...format } : null
+  onEditorInput()
+}
 
 // Estado no intrusivo para metadatos inline (Línea temporal y Ubicación)
 const isTimelineFocused = ref(false)
@@ -319,6 +335,9 @@ watch(
       editFolioSubtitle.value = folio.subtitle || ''
       editFolioTimeline.value = folio.timeline || ''
       editFolioLocation.value = folio.location || ''
+      editFolioTitleFormat.value = folio.chapterTitleFormat
+        ? { ...folio.chapterTitleFormat }
+        : null
       isTimelineFocused.value = false
       isLocationFocused.value = false
       editFolioContent.value = folio.content
@@ -342,6 +361,7 @@ watch(
       editFolioSubtitle.value = ''
       editFolioTimeline.value = ''
       editFolioLocation.value = ''
+      editFolioTitleFormat.value = null
       isTimelineFocused.value = false
       isLocationFocused.value = false
       editFolioContent.value = ''
@@ -377,6 +397,9 @@ async function flushSave(): Promise<void> {
       const subtitleToSave = editFolioSubtitle.value.trim()
       const timelineToSave = editFolioTimeline.value.trim() || null
       const locationToSave = editFolioLocation.value.trim() || null
+      const titleFormatToSave = editFolioTitleFormat.value
+        ? { ...editFolioTitleFormat.value }
+        : null
       const contentToSave = tiptapEditorRef.value?.getHTML() ?? editFolioContent.value
       const synopsisToSave = editFolioSynopsis.value
       const povTagToSave = editFolioPovTag.value.trim()
@@ -393,6 +416,7 @@ async function flushSave(): Promise<void> {
         item.subtitle = subtitleToSave
         item.timeline = timelineToSave
         item.location = locationToSave
+        item.chapterTitleFormat = titleFormatToSave
         item.content = contentToSave
         item.synopsis = synopsisToSave
         item.povTag = povTagToSave
@@ -415,6 +439,7 @@ async function flushSave(): Promise<void> {
         subtitle: subtitleToSave,
         timeline: timelineToSave,
         location: locationToSave,
+        chapterTitleFormat: titleFormatToSave,
         content: contentToSave,
         wordCount: currentWords,
         synopsis: synopsisToSave,
@@ -458,6 +483,9 @@ function onEditorInput(): void {
       target.subtitle = editFolioSubtitle.value
       target.timeline = editFolioTimeline.value.trim() || null
       target.location = editFolioLocation.value.trim() || null
+      target.chapterTitleFormat = editFolioTitleFormat.value
+        ? { ...editFolioTitleFormat.value }
+        : null
       target.synopsis = editFolioSynopsis.value
       target.povTag = editFolioPovTag.value
       target.targetWords = Math.max(0, Number(editFolioTargetWords.value) || 0)
@@ -982,18 +1010,29 @@ onBeforeUnmount(async () => {
 
         <!-- Papel / Lienzo Hundido Editorial -->
         <div class="flex-1 flex flex-col neu-well overflow-hidden relative min-h-0">
-          <!-- Cabecera Editorial de Capítulo Integrada -->
+          <!-- Cabecera Editorial de Capítulo Integrada (con formato sincronizado con PDF) -->
           <div
-            class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 border-b border-[var(--groove-dark)]/40 bg-[var(--bg-base)]"
+            class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 bg-[var(--bg-base)] transition-colors"
+            :class="
+              effectiveChapterTitleFormat.showDivider
+                ? 'border-b border-[var(--groove-dark)]/40'
+                : 'border-b-0'
+            "
           >
             <div class="max-w-3xl mx-auto w-full relative space-y-2">
-              <!-- 1. Título del Capítulo (Tipografía serif grande, siempre 100% visible en Focus Mode) -->
+              <!-- 1. Título del Capítulo (Alineación, Fuente, Tamaño decimal y Color configurables) -->
               <input
                 ref="titleInputRef"
                 v-model="editFolioTitle"
                 type="text"
                 placeholder="Título del capítulo..."
-                class="chapter-title font-editorial text-3xl md:text-4xl font-bold text-[var(--text-primary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50 w-full tracking-tight"
+                class="chapter-title font-editorial font-bold bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50 w-full tracking-tight leading-tight transition-all"
+                :style="{
+                  textAlign: effectiveChapterTitleFormat.alignment,
+                  fontFamily: effectiveChapterTitleFormat.fontFamily || undefined,
+                  fontSize: `${effectiveChapterTitleFormat.fontSize}px`,
+                  color: effectiveChapterTitleFormat.color || 'var(--text-primary)'
+                }"
                 @input="onEditorInput"
                 @keydown.enter.prevent="tiptapEditorRef?.focus()"
                 @keydown.down="tiptapEditorRef?.focus()"
@@ -1004,13 +1043,23 @@ onBeforeUnmount(async () => {
                 v-model="editFolioSubtitle"
                 type="text"
                 placeholder="Subtítulo o epígrafe opcional (ej. «Donde las cenizas hablan...»)"
-                class="editor-metadata font-editorial italic text-sm md:text-base text-[var(--text-secondary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/45 w-full"
+                class="editor-metadata font-editorial italic text-sm md:text-base text-[var(--text-secondary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/45 w-full transition-all"
+                :style="{
+                  textAlign: effectiveChapterTitleFormat.alignment
+                }"
                 @input="onEditorInput"
                 @keydown.enter.prevent="tiptapEditorRef?.focus()"
               />
 
-              <!-- 3. Fila de Estado y Metadatos Discretos (Línea temporal / Fecha y Ubicación) -->
-              <div class="editor-metadata flex flex-wrap items-center gap-2 pt-0.5 select-none">
+              <!-- 3. Fila de Estado, Diseño de Título y Metadatos Discretos (Línea temporal / Fecha y Ubicación) -->
+              <div
+                class="editor-metadata flex flex-wrap items-center gap-2 pt-0.5 select-none"
+                :class="{
+                  'justify-start': effectiveChapterTitleFormat.alignment === 'left',
+                  'justify-center': effectiveChapterTitleFormat.alignment === 'center',
+                  'justify-end': effectiveChapterTitleFormat.alignment === 'right'
+                }"
+              >
                 <div ref="statusDropdownRef" class="relative inline-flex items-center">
                   <button
                     type="button"
@@ -1070,6 +1119,14 @@ onBeforeUnmount(async () => {
                     </div>
                   </Transition>
                 </div>
+
+                <!-- Ajustes de Formato para el Título del Capítulo (Libro Global / Capítulo Individual) -->
+                <ChapterTitleFormatPopover
+                  :global-format="uiStore.chapterTitleFormat"
+                  :chapter-override="editFolioTitleFormat"
+                  @update:global-format="handleUpdateGlobalTitleFormat"
+                  @update:chapter-override="handleUpdateChapterTitleFormat"
+                />
 
                 <!-- Separador sutil -->
                 <span class="text-[var(--text-muted)]/35 font-mono text-xs select-none">·</span>

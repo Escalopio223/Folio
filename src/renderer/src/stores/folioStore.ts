@@ -4,6 +4,7 @@ import type {
   Folio,
   FolioType,
   FolioStatus,
+  ChapterTitleFormat,
   CreateFolioInput,
   UpdateFolioInput
 } from '@shared/types'
@@ -19,6 +20,7 @@ export interface CreateChapterOptions {
   povTag?: string
   timeline?: string | null
   location?: string | null
+  chapterTitleFormat?: ChapterTitleFormat | null
   targetWords?: number
   includeInExport?: boolean
   content?: string
@@ -175,6 +177,7 @@ export const useFolioStore = defineStore('folio', () => {
       povTag: opts.povTag ?? '',
       timeline: opts.timeline ?? null,
       location: opts.location ?? null,
+      chapterTitleFormat: opts.chapterTitleFormat ?? null,
       targetWords: opts.targetWords ?? 0,
       includeInExport: opts.includeInExport ?? true,
       content,
@@ -216,6 +219,7 @@ export const useFolioStore = defineStore('folio', () => {
         | 'povTag'
         | 'timeline'
         | 'location'
+        | 'chapterTitleFormat'
         | 'type'
         | 'status'
         | 'targetWords'
@@ -384,6 +388,7 @@ export const useFolioStore = defineStore('folio', () => {
         | 'povTag'
         | 'timeline'
         | 'location'
+        | 'chapterTitleFormat'
         | 'type'
         | 'status'
         | 'targetWords'

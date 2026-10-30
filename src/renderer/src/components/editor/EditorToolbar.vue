@@ -29,19 +29,21 @@ import {
   RotateCcw
 } from 'lucide-vue-next'
 import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/blockFormatting'
+import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
 
 const props = defineProps<{
   editor: Editor | null | undefined
 }>()
 
-// Minimodales: Fuente, Tamaño, Color, Resaltado
-type ActiveModal = 'font' | 'size' | 'color' | 'highlight' | null
+// Minimodales: Fuente, Color, Resaltado
+type ActiveModal = 'font' | 'color' | 'highlight' | null
 const activeModal = ref<ActiveModal>(null)
 
 const fontModalRef = ref<HTMLElement | null>(null)
-const sizeModalRef = ref<HTMLElement | null>(null)
 const colorModalRef = ref<HTMLElement | null>(null)
 const highlightModalRef = ref<HTMLElement | null>(null)
+
+const currentBodyFontSize = ref<number>(18)
 
 function toggleModal(name: ActiveModal): void {
   activeModal.value = activeModal.value === name ? null : name
@@ -53,9 +55,6 @@ function closeModal(): void {
 
 onClickOutside(fontModalRef, () => {
   if (activeModal.value === 'font') closeModal()
-})
-onClickOutside(sizeModalRef, () => {
-  if (activeModal.value === 'size') closeModal()
 })
 onClickOutside(colorModalRef, () => {
   if (activeModal.value === 'color') closeModal()
@@ -83,26 +82,22 @@ function selectFontFamily(fontValue: string): void {
   closeModal()
 }
 
-// Tamaños de fuente disponibles
-const fontSizes = [
-  { label: '14px · Pequeño', value: '14px' },
-  { label: '16px · Estándar', value: '16px' },
-  { label: '18px · Editorial', value: '18px' },
-  { label: '20px · Lectura', value: '20px' },
-  { label: '24px · Subtítulo', value: '24px' },
-  { label: '28px · Título', value: '28px' },
-  { label: '32px · Titular', value: '32px' },
-  { label: 'Por Defecto', value: '' }
-]
-
-function selectFontSize(sizeValue: string): void {
+function selectFontSize(sizeValue: string, numericVal?: number): void {
   if (!props.editor) return
   if (!sizeValue) {
     props.editor.chain().focus().unsetFontSize().run()
   } else {
+    if (numericVal !== undefined) {
+      currentBodyFontSize.value = numericVal
+    }
     props.editor.chain().focus().setFontSize(sizeValue).run()
   }
-  closeModal()
+}
+
+function resetFontSize(): void {
+  if (!props.editor) return
+  currentBodyFontSize.value = 18
+  props.editor.chain().focus().unsetFontSize().run()
 }
 
 // Paleta de colores cálidos de texto
@@ -252,50 +247,19 @@ function insertSceneBreak(): void {
         </Transition>
       </div>
 
-      <!-- 3. Minimodal de Tamaño de Letra -->
-      <div ref="sizeModalRef" class="relative shrink-0">
-        <button
-          type="button"
-          class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
-          :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'size' }"
-          title="Elegir tamaño de letra"
-          @mousedown.prevent
-          @click="toggleModal('size')"
-        >
-          <span class="text-[11px] font-mono font-medium">T</span>
-          <span class="text-[11px] font-medium hidden sm:inline">Tamaño</span>
-          <ChevronDown :size="11" class="opacity-70" />
-        </button>
-
-        <!-- Minimodal Flotante de Tamaños -->
-        <Transition
-          enter-active-class="transition duration-100 ease-out"
-          enter-from-class="opacity-0 translate-y-1 scale-95"
-          enter-to-class="opacity-100 translate-y-0 scale-100"
-          leave-active-class="transition duration-75 ease-in"
-          leave-from-class="opacity-100 translate-y-0 scale-100"
-          leave-to-class="opacity-0 translate-y-1 scale-95"
-        >
-          <div
-            v-if="activeModal === 'size'"
-            class="absolute left-0 top-full mt-2 z-50 neu-surface p-1.5 min-w-[160px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)]"
-          >
-            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--groove-dark)]/30 mb-1">
-              Tamaño de Fuente
-            </div>
-            <button
-              v-for="size in fontSizes"
-              :key="size.label"
-              type="button"
-              class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-mono hover:bg-[var(--bg-base)] transition-colors cursor-pointer text-[var(--text-primary)]"
-              @mousedown.prevent
-              @click="selectFontSize(size.value)"
-            >
-              <span>{{ size.label }}</span>
-            </button>
-          </div>
-        </Transition>
-      </div>
+      <!-- 3. Selector de Tamaño de Fuente Híbrido (Preset + Input Manual con decimales) -->
+      <HybridFontSizeSelect
+        v-model="currentBodyFontSize"
+        unit="px"
+        :min="6"
+        :max="96"
+        :presets="[10, 11, 12, 13.5, 14, 16, 18, 20, 24, 28, 32, 36, 48]"
+        :allow-reset="true"
+        placeholder="18"
+        title="Tamaño de letra del cuerpo (escribe cualquier valor, ej. 13.5, o elige de la lista)"
+        @apply="(cssVal, numVal) => selectFontSize(cssVal, numVal)"
+        @reset="resetFontSize"
+      />
 
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 

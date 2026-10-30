@@ -1,4 +1,5 @@
-import type { Folio, Project } from '@shared/types'
+import type { Folio, Project, ChapterTitleFormat } from '@shared/types'
+import { DEFAULT_CHAPTER_TITLE_FORMAT } from '../stores/uiStore'
 
 export type ExportFormat = 'epub' | 'pdf' | 'docx'
 
@@ -8,7 +9,9 @@ export interface CompiledChapter {
   subtitle: string
   timeline: string
   location: string
+  titleFormat: ChapterTitleFormat
   htmlContent: string
+  printableHtmlContent: string
   xhtmlContent: string
   blocks: Array<{
     type: 'p' | 'h1' | 'h2' | 'h3' | 'blockquote' | 'scenebreak'
@@ -55,6 +58,7 @@ function escapeXml(str: string): string {
  */
 function parseChapterHtml(rawHtml: string): {
   xhtmlContent: string
+  printableHtmlContent: string
   blocks: CompiledChapter['blocks']
 } {
   const parser = new DOMParser()
@@ -63,22 +67,27 @@ function parseChapterHtml(rawHtml: string): {
 
   const blocks: CompiledChapter['blocks'] = []
   const xhtmlParts: string[] = []
+  const printableParts: string[] = []
 
   if (!container) {
-    return { xhtmlContent: '<p></p>', blocks: [] }
+    return { xhtmlContent: '<p></p>', printableHtmlContent: '<p></p>', blocks: [] }
   }
 
   for (const node of Array.from(container.children)) {
     const tag = node.tagName.toLowerCase()
 
-    if (tag === 'hr') {
+    if (tag === 'hr' || (tag === 'div' && node.getAttribute('data-type') === 'scene-break')) {
       blocks.push({ type: 'scenebreak', text: '* * *' })
       xhtmlParts.push('<p class="scene-break">* * *</p>')
+      printableParts.push('<p class="scene-break">* * *</p>')
       continue
     }
 
     const text = (node.textContent || '').trim()
     if (!text) continue
+
+    // Preservar HTML interno con estilos inline (font-size decimal, font-family, color, text-align) para PDF
+    printableParts.push(node.outerHTML)
 
     if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
       blocks.push({ type: tag, text })
@@ -108,23 +117,28 @@ function parseChapterHtml(rawHtml: string): {
     if (fallbackText) {
       blocks.push({ type: 'p', text: fallbackText })
       xhtmlParts.push(`<p>${escapeXml(fallbackText)}</p>`)
+      printableParts.push(`<p>${escapeXml(fallbackText)}</p>`)
     } else {
       xhtmlParts.push('<p>&#160;</p>')
+      printableParts.push('<p>&#160;</p>')
     }
   }
 
   return {
     xhtmlContent: xhtmlParts.join('\n'),
+    printableHtmlContent: printableParts.join('\n'),
     blocks
   }
 }
 
 /**
- * Recopila en orden secuencial todos los capítulos activos del manuscrito.
+ * Recopila en orden secuencial todos los capítulos activos del manuscrito,
+ * aplicando el formato de encabezado por capítulo o el global del libro.
  */
 export function collectActiveManuscript(
   project: Project | null | undefined,
-  chapters: Folio[]
+  chapters: Folio[],
+  globalTitleFormat: ChapterTitleFormat = DEFAULT_CHAPTER_TITLE_FORMAT
 ): CompiledManuscript {
   const projectTitle = project?.title?.trim() || 'Manuscrito sin título'
   const projectSynopsis = project?.synopsis?.trim() || ''
@@ -135,14 +149,20 @@ export function collectActiveManuscript(
     .sort((a, b) => a.orderIndex - b.orderIndex)
 
   const compiledChapters: CompiledChapter[] = sortedActive.map((chap, idx) => {
-    const { xhtmlContent, blocks } = parseChapterHtml(chap.content || '')
+    const { xhtmlContent, printableHtmlContent, blocks } = parseChapterHtml(chap.content || '')
+    const resolvedFormat: ChapterTitleFormat = chap.chapterTitleFormat
+      ? { ...chap.chapterTitleFormat }
+      : { ...globalTitleFormat }
+
     return {
       index: idx + 1,
       title: chap.title?.trim() || `Capítulo ${idx + 1}`,
       subtitle: chap.subtitle?.trim() || '',
       timeline: chap.timeline?.trim() || '',
       location: chap.location?.trim() || '',
+      titleFormat: resolvedFormat,
       htmlContent: chap.content || '',
+      printableHtmlContent,
       xhtmlContent,
       blocks
     }
@@ -432,20 +452,36 @@ blockquote { margin: 1.2em 1.5em; font-style: italic; color: #4a453e; }`
 
 /**
  * 2. Generador PDF (.pdf) maquetado para lectura o impresión
+ * Sincroniza de forma idéntica las propiedades CSS del encabezado del capítulo (chapterTitleFormat)
+ * y los tamaños tipográficos decimales del cuerpo del editor.
  */
 export async function exportManuscriptToPdf(manuscript: CompiledManuscript): Promise<string> {
   const chaptersHtml = manuscript.chapters
     .map((chap) => {
       const metaParts = [chap.timeline, chap.location].filter(Boolean).join(' · ')
+      const fmt = chap.titleFormat
+      const alignCss = fmt.alignment || 'left'
+      const borderCss = fmt.showDivider ? '1px solid #d6d3d1' : 'none'
+      const paddingBottomCss = fmt.showDivider ? '14pt' : '4pt'
+      const fontFamilyCss = fmt.fontFamily || "Georgia, 'Times New Roman', serif"
+      const fontSizeCss = `${fmt.fontSize || 32}px`
+      const colorCss = fmt.color || '#1c1917'
+
       return `
       <section class="chapter-page">
-        <header class="chapter-header">
-          <h2 class="chapter-title">${escapeXml(chap.title)}</h2>
-          ${chap.subtitle ? `<p class="chapter-subtitle">${escapeXml(chap.subtitle)}</p>` : ''}
-          ${metaParts ? `<p class="chapter-meta">${escapeXml(metaParts)}</p>` : ''}
+        <header
+          class="chapter-header"
+          style="text-align: ${alignCss}; border-bottom: ${borderCss}; padding-bottom: ${paddingBottomCss};"
+        >
+          <h2
+            class="chapter-title"
+            style="text-align: ${alignCss}; font-family: ${escapeXml(fontFamilyCss)}; font-size: ${fontSizeCss}; color: ${escapeXml(colorCss)};"
+          >${escapeXml(chap.title)}</h2>
+          ${chap.subtitle ? `<p class="chapter-subtitle" style="text-align: ${alignCss};">${escapeXml(chap.subtitle)}</p>` : ''}
+          ${metaParts ? `<p class="chapter-meta" style="text-align: ${alignCss};">${escapeXml(metaParts)}</p>` : ''}
         </header>
         <div class="chapter-body">
-          ${chap.xhtmlContent}
+          ${chap.printableHtmlContent}
         </div>
       </section>`
     })
