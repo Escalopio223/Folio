@@ -16,7 +16,7 @@ import { SearchHighlight } from './extensions/SearchHighlight'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
 import { EchoRadar } from './extensions/EchoRadar'
 import { useEchoRadar } from '../../composables/useEchoRadar'
-import { resolveLanguagePack } from '../../nlp/languageDetector'
+import { resolveLanguagePack, detectLanguage } from '../../nlp/languageDetector'
 import type { EchoCluster, EchoOccurrence } from '../../composables/useEchoDetector'
 import type { LanguagePack } from '../../nlp/types'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
@@ -164,6 +164,13 @@ const wikiExcludedStems = computed<Set<string>>(() => {
   return set
 })
 
+const currentLanguageCode = computed<'en-US' | 'es-ES'>(() => {
+  if (radarLanguage.value === 'en') return 'en-US'
+  if (radarLanguage.value === 'es') return 'es-ES'
+  const detected = detectLanguage(props.content || '')
+  return detected === 'en' ? 'en-US' : 'es-ES'
+})
+
 const editor = useEditor({
   content: normalizeHtml(props.content),
   extensions: [
@@ -210,11 +217,12 @@ const editor = useEditor({
     })
   ],
   editorProps: {
-    attributes: {
+    attributes: () => ({
       class:
         'ProseMirror font-editorial text-lg md:text-[19px] leading-relaxed md:leading-loose text-[var(--text-primary)] focus:outline-none min-h-[350px] w-full select-text caret-[var(--accent)]',
+      lang: currentLanguageCode.value,
       spellcheck: 'true'
-    },
+    }),
     handleKeyDown(_view, event) {
       const isCtrlOrCmd = event.ctrlKey || event.metaKey
 
@@ -237,6 +245,27 @@ const editor = useEditor({
   onUpdate: ({ editor: ed }) => {
     const html = ed.getHTML()
     const text = ed.getText()
+
+    // Sincronizar automáticamente el atributo lang para que Chromium aplique el corrector adecuado
+    if (ed.view?.dom) {
+      const targetLang =
+        radarLanguage.value === 'en'
+          ? 'en-US'
+          : radarLanguage.value === 'es'
+            ? 'es-ES'
+            : detectLanguage(text) === 'en'
+              ? 'en-US'
+              : 'es-ES'
+
+      if (ed.view.dom.getAttribute('lang') !== targetLang) {
+        ed.view.dom.setAttribute('lang', targetLang)
+        ed.view.dom.setAttribute('spellcheck', 'true')
+        if (window.api?.spellcheck) {
+          const primary = targetLang === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
+          window.api.spellcheck.setLanguages(primary).catch(() => {})
+        }
+      }
+    }
 
     // 1. Emitir estadísticas y tramos (* * *) en tiempo real (Zero-Lag)
     emit('stats', calculateStats(text))
@@ -300,6 +329,21 @@ watch(
     })
   },
   { deep: true }
+)
+
+// Sincronizar idioma del corrector ortográfico en el DOM
+watch(
+  [currentLanguageCode, editor],
+  ([langCode, ed]) => {
+    if (!ed || !ed.view || !ed.view.dom) return
+    ed.view.dom.setAttribute('lang', langCode)
+    ed.view.dom.setAttribute('spellcheck', 'true')
+    if (window.api?.spellcheck) {
+      const primary = langCode === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
+      window.api.spellcheck.setLanguages(primary).catch(() => {})
+    }
+  },
+  { immediate: true }
 )
 
 // Delegación de eventos mouseover y mouseout en el DOM de ProseMirror para Hover Preview

@@ -65,15 +65,20 @@ async function handleSelectLanguage(lang: SupportedLanguageCode): Promise<void> 
     props.editor.commands.setEchoRadarConfig({
       language: lang
     })
+    if (props.editor.view?.dom) {
+      const targetLang = lang === 'en' ? 'en-US' : 'es-ES'
+      props.editor.view.dom.setAttribute('lang', targetLang)
+      props.editor.view.dom.setAttribute('spellcheck', 'true')
+    }
   }
 
   // Sincronizar corrector ortográfico nativo multilingüe
   if (window.api?.spellcheck) {
     try {
       if (lang === 'en') {
-        await window.api.spellcheck.setLanguages(['en-US'])
+        await window.api.spellcheck.setLanguages(['en-US', 'es-ES'])
       } else if (lang === 'es') {
-        await window.api.spellcheck.setLanguages(['es-ES'])
+        await window.api.spellcheck.setLanguages(['es-ES', 'en-US'])
       } else {
         await window.api.spellcheck.setLanguages(['es-ES', 'en-US'])
       }
@@ -239,11 +244,12 @@ async function handleSelectLanguage(lang: SupportedLanguageCode): Promise<void> 
               {{ detectedLanguageName }}
             </span>
           </label>
-          <div class="grid grid-cols-2 gap-1">
+          <div class="grid grid-cols-3 gap-1">
             <button
               type="button"
-              class="neu-btn px-2 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-between"
+              class="neu-btn px-1.5 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-center gap-1"
               :class="{ 'neu-well !text-[var(--accent)] font-bold': radarLanguage === 'auto' }"
+              title="Detectar idioma automáticamente del texto"
               @click="handleSelectLanguage('auto')"
             >
               <span>Auto</span>
@@ -251,8 +257,9 @@ async function handleSelectLanguage(lang: SupportedLanguageCode): Promise<void> 
             </button>
             <button
               type="button"
-              class="neu-btn px-2 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-between"
+              class="neu-btn px-1.5 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-center gap-1"
               :class="{ 'neu-well !text-[var(--accent)] font-bold': radarLanguage === 'es' }"
+              title="Forzar Español (es-ES)"
               @click="handleSelectLanguage('es')"
             >
               <span>Español</span>
@@ -260,21 +267,13 @@ async function handleSelectLanguage(lang: SupportedLanguageCode): Promise<void> 
             </button>
             <button
               type="button"
-              class="neu-btn px-2 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-between"
+              class="neu-btn px-1.5 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-center gap-1"
               :class="{ 'neu-well !text-[var(--accent)] font-bold': radarLanguage === 'en' }"
+              title="Forzar English (en-US)"
               @click="handleSelectLanguage('en')"
             >
               <span>English</span>
               <Check v-if="radarLanguage === 'en'" :size="10" />
-            </button>
-            <button
-              type="button"
-              class="neu-btn px-2 py-1 text-[10px] rounded-md transition-all cursor-pointer flex items-center justify-between"
-              :class="{ 'neu-well !text-[var(--accent)] font-bold': radarLanguage === 'universal' }"
-              @click="handleSelectLanguage('universal')"
-            >
-              <span>Universal</span>
-              <Check v-if="radarLanguage === 'universal'" :size="10" />
             </button>
           </div>
         </div>
