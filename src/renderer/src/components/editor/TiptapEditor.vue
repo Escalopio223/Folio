@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, onBeforeUnmount, onMounted } from 'vue'
+import { watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import type { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -44,6 +44,7 @@ const emit = defineEmits<{
   (e: 'update:content', value: string): void
   (e: 'change'): void
   (e: 'save'): void
+  (e: 'open-find'): void
   (e: 'stats', value: ChapterMetricsSnapshot): void
   (e: 'scene-breaks', value: SceneBreakAnchor[]): void
   (e: 'ready', editor: Editor): void
@@ -153,7 +154,14 @@ const editor = useEditor({
     handleKeyDown(_view, event) {
       const isCtrlOrCmd = event.ctrlKey || event.metaKey
 
-      // Atajo de Modo Enfoque dentro del editor
+      // Atajo de Búsqueda rápida (Ctrl+F) en el capítulo activo
+      if (isCtrlOrCmd && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        emit('open-find')
+        return true
+      }
+
+      // Atajo de Modo Enfoque dentro del editor (Ctrl+Shift+F)
       if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
         uiStore.toggleFocusMode()
@@ -234,12 +242,72 @@ function scrollToSceneBreak(anchorIndex: number): void {
   }
 }
 
+/**
+ * Selecciona una posición o término específico, hace scroll suave hacia él y aplica feedback visual temporal
+ */
+function navigateToMatch(options: { from?: number; to?: number; query?: string }): void {
+  if (!editor.value) return
+  const ed = editor.value
+
+  let targetFrom = options.from
+  let targetTo = options.to
+
+  // Si no disponemos de posiciones absolutas o han cambiado, buscar la primera ocurrencia en el documento
+  if (typeof targetFrom !== 'number' || typeof targetTo !== 'number') {
+    if (options.query) {
+      const q = options.query.toLowerCase()
+      ed.state.doc.descendants((node, pos) => {
+        if (targetFrom !== undefined) return false
+        if (node.isText && node.text) {
+          const idx = node.text.toLowerCase().indexOf(q)
+          if (idx !== -1) {
+            targetFrom = pos + idx
+            targetTo = targetFrom + options.query!.length
+            return false
+          }
+        }
+        return true
+      })
+    }
+  }
+
+  if (typeof targetFrom === 'number' && typeof targetTo === 'number') {
+    const docSize = ed.state.doc.content.size
+    const safeFrom = Math.max(0, Math.min(docSize, targetFrom))
+    const safeTo = Math.max(safeFrom, Math.min(docSize, targetTo))
+
+    // 1. Establecer selección de texto y enfocar
+    ed.chain().focus().setTextSelection({ from: safeFrom, to: safeTo }).run()
+
+    // 2. Scroll suave centrado
+    nextTick(() => {
+      try {
+        const domAtPos = ed.view.nodeDOM(safeFrom) || ed.view.domAtPos(safeFrom).node
+        const targetElement = domAtPos instanceof HTMLElement ? domAtPos : domAtPos?.parentElement
+
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+          // 3. Highlight temporal / feedback visual
+          targetElement.classList.add('search-highlight-flash')
+          setTimeout(() => {
+            targetElement.classList.remove('search-highlight-flash')
+          }, 2000)
+        }
+      } catch (e) {
+        console.warn('[TiptapEditor] Error al centrar nodo encontrado:', e)
+      }
+    })
+  }
+}
+
 defineExpose({
   editor,
   getHTML: () => editor.value?.getHTML() || '',
   getText: () => editor.value?.getText() || '',
   focus: () => editor.value?.commands.focus(),
-  scrollToSceneBreak
+  scrollToSceneBreak,
+  navigateToMatch
 })
 </script>
 
@@ -408,5 +476,26 @@ defineExpose({
 .focus-mode-active .ProseMirror > .is-active-node,
 .focus-mode-active .ProseMirror > .is-active-paragraph {
   opacity: 1 !important;
+}
+
+/* Feedback visual de búsqueda profunda */
+.search-highlight-flash {
+  animation: searchFlash 2s ease-out;
+  border-radius: 4px;
+}
+
+@keyframes searchFlash {
+  0% {
+    background-color: color-mix(in oklab, var(--accent) 38%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+  50% {
+    background-color: color-mix(in oklab, var(--accent) 22%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 15%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
 </style>

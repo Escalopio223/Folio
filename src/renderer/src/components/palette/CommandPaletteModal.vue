@@ -12,7 +12,8 @@ import {
   Command,
   CornerDownLeft,
   ArrowUpDown,
-  Scale
+  Scale,
+  AlignLeft
 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
 import { usePaletteStore } from '../../stores/paletteStore'
@@ -24,6 +25,7 @@ import { useTrashStore } from '../../stores/trashStore'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
 import { useRulesStore } from '../../stores/rulesStore'
 import { getSystemCommands, type CommandAction } from './commandsRegistry'
+import { useDocumentSearch, type SearchMatch } from '../../composables/useDocumentSearch'
 
 const paletteStore = usePaletteStore()
 const uiStore = useUiStore()
@@ -94,12 +96,66 @@ export interface PaletteItem {
   title: string
   description?: string
   snippet?: string
-  section: 'action' | 'manuscript' | 'lore' | 'rule'
+  matchPrefix?: string
+  matchText?: string
+  matchSuffix?: string
+  matchOrdinal?: string
+  section: 'search' | 'action' | 'manuscript' | 'lore' | 'rule'
   badge: string
   icon: Component
   shortcut?: string
   execute: () => void | Promise<void>
 }
+
+// Inicializar composable de búsqueda profunda
+const { search: performDocumentSearch } = useDocumentSearch({
+  chapters: computed(() => folioStore.chapters),
+  activeFolioId: computed(() => folioStore.activeFolioId)
+})
+
+// Resultados reactivos de búsqueda profunda de texto
+const deepSearchResults = computed<{ matches: SearchMatch[]; totalCount: number }>(() => {
+  const q = paletteStore.query.trim()
+  if (!q || q.length < 2) {
+    return { matches: [], totalCount: 0 }
+  }
+  return performDocumentSearch(q)
+})
+
+// Mapeo a PaletteItem para renderizado y navegación fluida
+const filteredDeepSearchItems = computed<PaletteItem[]>(() => {
+  const { matches, totalCount } = deepSearchResults.value
+  if (matches.length === 0) return []
+
+  return matches.map((match) => ({
+    id: `deep-${match.id}`,
+    title: match.chapterTitle,
+    description: `Capítulo #${match.chapterOrderIndex}`,
+    matchPrefix: match.prefix,
+    matchText: match.matchText,
+    matchSuffix: match.suffix,
+    matchOrdinal: `${match.matchIndex} de ${totalCount}`,
+    section: 'search',
+    badge: 'Texto',
+    icon: AlignLeft,
+    execute: async () => {
+      // 1. Si no es el capítulo activo, seleccionarlo en el store
+      const isDifferentChapter = folioStore.activeFolioId !== match.chapterId
+      if (isDifferentChapter) {
+        folioStore.selectFolio(match.chapterId)
+      }
+      uiStore.setLeftSidebar(true)
+
+      // 2. Notificar la navegación pendiente para selección, scroll suave y highlight
+      paletteStore.setPendingNavigation({
+        chapterId: match.chapterId,
+        from: match.from,
+        to: match.to,
+        query: match.matchText || paletteStore.query.trim()
+      })
+    }
+  }))
+})
 
 // 1. Acciones del sistema
 const systemCommands = computed<CommandAction[]>(() => {
@@ -305,6 +361,7 @@ const filteredWorldRules = computed<PaletteItem[]>(() => {
 // Lista aplanada para navegación secuencial con flechas (ArrowDown / ArrowUp)
 const allResults = computed<PaletteItem[]>(() => {
   return [
+    ...filteredDeepSearchItems.value,
     ...filteredActions.value,
     ...filteredManuscript.value,
     ...filteredWorldRules.value,
@@ -433,11 +490,21 @@ onUnmounted(() => {
                 :value="paletteStore.query"
                 type="text"
                 class="bg-transparent border-none outline-none w-full text-xs md:text-sm font-sans placeholder-[var(--text-muted)] text-[var(--text-primary)] caret-[var(--accent)]"
-                placeholder="Escribe una acción, capítulo, personaje o regla..."
+                placeholder="Busca texto en el manuscrito, acciones, personajes o reglas..."
                 autocomplete="off"
                 spellcheck="false"
                 @input="paletteStore.setQuery(($event.target as HTMLInputElement).value)"
               />
+
+              <!-- Badge con conteo total de coincidencias encontradas -->
+              <div
+                v-if="deepSearchResults.totalCount > 0"
+                class="neu-well-sm px-2 py-0.5 text-[10px] font-mono text-[var(--accent)] font-semibold rounded-lg shrink-0 whitespace-nowrap"
+                title="Total de coincidencias de texto en el manuscrito"
+              >
+                {{ deepSearchResults.totalCount }}
+                {{ deepSearchResults.totalCount === 1 ? 'coincidencia' : 'coincidencias' }}
+              </div>
 
               <kbd
                 class="neu-btn px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)] rounded shrink-0 cursor-pointer hover:text-[var(--text-primary)]"
@@ -466,6 +533,82 @@ onUnmounted(() => {
                 Prueba buscando nombres de personajes, palabras de capítulos o comandos como "modo"
                 o "nuevo".
               </p>
+            </div>
+
+            <!-- 0. SECCIÓN: BÚSQUEDA PROFUNDA DE TEXTO EN EL MANUSCRITO -->
+            <div v-if="filteredDeepSearchItems.length > 0" class="space-y-1">
+              <div
+                class="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--accent)] font-semibold flex items-center justify-between"
+              >
+                <div class="flex items-center gap-1.5">
+                  <AlignLeft :size="12" class="opacity-80" />
+                  <span>Coincidencias en el Manuscrito</span>
+                </div>
+                <span>{{ deepSearchResults.totalCount }} encontradas</span>
+              </div>
+
+              <div
+                v-for="item in filteredDeepSearchItems"
+                :key="item.id"
+                class="px-2.5 py-2 rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer transition-all"
+                :class="{
+                  'neu-well border-l-4 !border-l-[var(--accent)] font-semibold text-[var(--text-primary)] shadow-sm palette-item-active':
+                    allResults[paletteStore.selectedIndex]?.id === item.id,
+                  'hover:bg-[var(--bg-base)]/50 text-[var(--text-secondary)]':
+                    allResults[paletteStore.selectedIndex]?.id !== item.id
+                }"
+                @mouseenter="
+                  paletteStore.setSelectedIndex(allResults.findIndex((r) => r.id === item.id))
+                "
+                @click="executeItem(item)"
+              >
+                <div class="flex items-start gap-2.5 min-w-0">
+                  <div
+                    class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                    :class="
+                      allResults[paletteStore.selectedIndex]?.id === item.id
+                        ? 'text-[var(--accent)] neu-well-sm'
+                        : 'text-[var(--text-muted)] neu-surface'
+                    "
+                  >
+                    <component :is="item.icon" :size="13" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate text-xs font-editorial font-bold text-[var(--text-primary)]">
+                        {{ item.title }}
+                      </span>
+                      <span class="text-[10px] font-mono text-[var(--text-muted)] shrink-0">
+                        {{ item.description }}
+                      </span>
+                    </div>
+
+                    <!-- Snippet contextual con término resaltado -->
+                    <div class="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-relaxed font-sans line-clamp-2">
+                      <span class="text-[var(--text-muted)]">{{ item.matchPrefix }}</span>
+                      <mark class="bg-[var(--accent)]/20 text-[var(--accent)] font-bold px-1 py-0.2 rounded mx-0.5 border border-[var(--accent)]/30">
+                        {{ item.matchText }}
+                      </mark>
+                      <span class="text-[var(--text-muted)]">{{ item.matchSuffix }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
+                  <span
+                    v-if="item.matchOrdinal"
+                    class="neu-well-sm px-1.5 py-0.5 text-[9px] font-mono text-[var(--text-muted)] rounded"
+                    title="Índice ordinal de coincidencia"
+                  >
+                    {{ item.matchOrdinal }}
+                  </span>
+                  <span
+                    class="neu-btn px-1.5 py-0.5 text-[9px] font-mono uppercase text-[var(--accent)] font-semibold"
+                  >
+                    {{ item.badge }}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <!-- 1. SECCIÓN: ACCIONES DEL SISTEMA -->

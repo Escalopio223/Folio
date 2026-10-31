@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+export interface PendingSearchTarget {
+  chapterId: string
+  from?: number
+  to?: number
+  query?: string
+}
+
 export const usePaletteStore = defineStore('palette', () => {
   const isOpen = ref(false)
   const query = ref('')
   const selectedIndex = ref(0)
   const previousActiveElement = ref<HTMLElement | null>(null)
+  const pendingNavigation = ref<PendingSearchTarget | null>(null)
 
   function open(): void {
     if (isOpen.value) return
@@ -62,16 +70,27 @@ export const usePaletteStore = defineStore('palette', () => {
     selectedIndex.value = (selectedIndex.value - 1 + total) % total
   }
 
+  function setPendingNavigation(target: PendingSearchTarget | null): void {
+    pendingNavigation.value = target
+  }
+
+  function clearPendingNavigation(): void {
+    pendingNavigation.value = null
+  }
+
   return {
     isOpen,
     query,
     selectedIndex,
+    pendingNavigation,
     open,
     close,
     toggle,
     setQuery,
     setSelectedIndex,
     selectNext,
-    selectPrev
+    selectPrev,
+    setPendingNavigation,
+    clearPendingNavigation
   }
 })

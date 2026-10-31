@@ -26,6 +26,7 @@ import {
 } from 'lucide-vue-next'
 import TiptapEditor, { type SceneBreakAnchor } from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
+import EditorFindBar from '../components/editor/EditorFindBar.vue'
 import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
 import type { Editor } from '@tiptap/vue-3'
 import type { Folio, FolioType, FolioStatus, ChapterTitleFormat } from '@shared/types'
@@ -33,6 +34,7 @@ import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
 import { useRulesStore } from '../stores/rulesStore'
 import { useGoalsStore } from '../stores/goalsStore'
+import { usePaletteStore } from '../stores/paletteStore'
 import GoalsProgressPill from '../components/goals/GoalsProgressPill.vue'
 import {
   useChapterMetrics,
@@ -47,6 +49,7 @@ const trashStore = useTrashStore()
 const scratchpadStore = useScratchpadStore()
 const rulesStore = useRulesStore()
 const goalsStore = useGoalsStore()
+const paletteStore = usePaletteStore()
 
 const isProjectModalOpen = ref(false)
 
@@ -290,10 +293,15 @@ let isSyncing = false
 const titleInputRef = ref<HTMLInputElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const tiptapEditorRef = ref<InstanceType<typeof TiptapEditor> | null>(null)
+const findBarRef = ref<InstanceType<typeof EditorFindBar> | null>(null)
 const activeEditor = shallowRef<Editor | null>(null)
 
 function onEditorReady(ed: Editor): void {
   activeEditor.value = ed
+}
+
+function handleOpenFindBar(): void {
+  findBarRef.value?.open()
 }
 
 // Métricas reactivas del capítulo activo mediante composable useChapterMetrics
@@ -356,6 +364,21 @@ watch(
       })
       folioStore.recordBaseline(folio.id, folio.content || '')
       updateFromHtmlImmediate(folio.content || '')
+
+      // Comprobar si hay una navegación pendiente desde el Command Palette
+      if (paletteStore.pendingNavigation && paletteStore.pendingNavigation.chapterId === folio.id) {
+        const target = paletteStore.pendingNavigation
+        paletteStore.clearPendingNavigation()
+        nextTick(() => {
+          setTimeout(() => {
+            tiptapEditorRef.value?.navigateToMatch({
+              from: target.from,
+              to: target.to,
+              query: target.query
+            })
+          }, 80)
+        })
+      }
     } else {
       editFolioTitle.value = ''
       editFolioSubtitle.value = ''
@@ -505,6 +528,24 @@ function onEditorInput(): void {
 async function handleManualSave(): Promise<void> {
   await flushSave()
 }
+
+// Escuchar solicitudes de navegación inmediata en el capítulo actual si ya está montado
+watch(
+  () => paletteStore.pendingNavigation,
+  (nav) => {
+    if (nav && nav.chapterId === folioStore.activeFolioId) {
+      const target = { ...nav }
+      paletteStore.clearPendingNavigation()
+      nextTick(() => {
+        tiptapEditorRef.value?.navigateToMatch({
+          from: target.from,
+          to: target.to,
+          query: target.query
+        })
+      })
+    }
+  }
+)
 
 // Crear nuevo capítulo rápido con el teclado (Ctrl+Alt+N / Cmd+Alt+N)
 async function handleQuickNewChapter(): Promise<void> {
@@ -945,6 +986,21 @@ onBeforeUnmount(async () => {
               <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
             </button>
 
+            <!-- Botón Buscar en capítulo (Ctrl+F) -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold': findBarRef?.isVisible
+              }"
+              title="Buscar palabra en el capítulo actual (Ctrl+F)"
+              @click="handleOpenFindBar"
+            >
+              <Search :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Buscar</span>
+              <kbd class="neu-well-sm text-[9px] font-mono px-1 text-[var(--text-muted)]">Ctrl+F</kbd>
+            </button>
+
             <button
               type="button"
               class="neu-btn p-2 text-[var(--text-secondary)] hover:!text-rose-400 cursor-pointer"
@@ -1010,6 +1066,9 @@ onBeforeUnmount(async () => {
 
         <!-- Papel / Lienzo Hundido Editorial -->
         <div class="flex-1 flex flex-col neu-well overflow-hidden relative min-h-0">
+          <!-- Barra de Búsqueda Rápida en Capítulo (Ctrl+F estilo VS Code) -->
+          <EditorFindBar ref="findBarRef" :editor="activeEditor" />
+
           <!-- Cabecera Editorial de Capítulo Integrada (con formato sincronizado con PDF) -->
           <div
             class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 bg-[var(--bg-base)] transition-colors"
@@ -1220,6 +1279,7 @@ onBeforeUnmount(async () => {
                 @scene-breaks="handleSceneBreakAnchors"
                 @change="onEditorInput"
                 @save="handleManualSave"
+                @open-find="handleOpenFindBar"
               />
             </div>
           </div>
