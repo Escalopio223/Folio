@@ -12,6 +12,7 @@ import { SceneBreak } from './extensions/SceneBreak'
 import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
+import { SearchHighlight } from './extensions/SearchHighlight'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
@@ -144,7 +145,8 @@ const editor = useEditor({
     SceneBreak,
     TabIndent,
     FocusMode,
-    Indent
+    Indent,
+    SearchHighlight
   ],
   editorProps: {
     attributes: {
@@ -476,6 +478,23 @@ defineExpose({
 .focus-mode-active .ProseMirror > .is-active-node,
 .focus-mode-active .ProseMirror > .is-active-paragraph {
   opacity: 1 !important;
+}
+
+/* Remarcado de coincidencias estilo VS Code */
+.ProseMirror .search-match {
+  background-color: color-mix(in oklab, #fef08a 65%, transparent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px color-mix(in oklab, #ca8a04 40%, transparent);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Coincidencia activa/enfocada actual (Destacado naranja cálido editorial) */
+.ProseMirror .search-match.search-match-current {
+  background-color: var(--accent) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 70%, transparent), 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Feedback visual de búsqueda profunda */

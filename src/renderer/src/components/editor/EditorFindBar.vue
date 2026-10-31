@@ -76,6 +76,14 @@ function updateMatches(): void {
   } else {
     currentIndex.value = -1
   }
+
+  // Sincronizar decoraciones en tiempo real con la extensión ProseMirror
+  props.editor?.commands.setSearchOptions({
+    searchTerm: searchText.value,
+    caseSensitive: caseSensitive.value,
+    wholeWord: wholeWord.value,
+    currentIndex: currentIndex.value
+  })
 }
 
 watch([searchText, caseSensitive, wholeWord], () => {
@@ -89,6 +97,11 @@ watch([searchText, caseSensitive, wholeWord], () => {
 function highlightAndScroll(idx: number): void {
   if (!props.editor || matches.value.length === 0 || idx < 0 || idx >= matches.value.length) return
   const match = matches.value[idx]
+
+  // Actualizar la coincidencia activa en el plugin ProseMirror para que se pinte de color acento
+  props.editor.commands.setSearchOptions({
+    currentIndex: idx
+  })
 
   props.editor
     .chain()
@@ -154,6 +167,8 @@ function open(initialQuery = ''): void {
 
 function close(): void {
   isVisible.value = false
+  // Limpiar decoraciones de búsqueda al cerrar la barra
+  props.editor?.commands.clearSearch()
   props.editor?.commands.focus()
 }
 
