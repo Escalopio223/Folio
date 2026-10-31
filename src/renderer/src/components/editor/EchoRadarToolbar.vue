@@ -59,12 +59,27 @@ function handleSelectTolerance(reps: 2 | 3): void {
   }
 }
 
-function handleSelectLanguage(lang: SupportedLanguageCode): void {
+async function handleSelectLanguage(lang: SupportedLanguageCode): Promise<void> {
   setLanguageState(lang)
   if (props.editor) {
     props.editor.commands.setEchoRadarConfig({
       language: lang
     })
+  }
+
+  // Sincronizar corrector ortográfico nativo multilingüe
+  if (window.api?.spellcheck) {
+    try {
+      if (lang === 'en') {
+        await window.api.spellcheck.setLanguages(['en-US'])
+      } else if (lang === 'es') {
+        await window.api.spellcheck.setLanguages(['es-ES'])
+      } else {
+        await window.api.spellcheck.setLanguages(['es-ES', 'en-US'])
+      }
+    } catch {
+      // Ignorar si el sistema no soporta cambio en caliente
+    }
   }
 }
 </script>

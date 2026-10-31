@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, shell, BrowserWindow, Menu, session } from 'electron'
 import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -20,7 +20,8 @@ function createWindow(): BrowserWindow {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true
+      contextIsolation: true,
+      spellcheck: true
     }
   })
 
@@ -50,6 +51,21 @@ app.whenReady().then(() => {
 
   // Remove native menu bar
   Menu.setApplicationMenu(null)
+
+  // Configurar corrector ortográfico multilingüe (Español e Inglés simultáneos)
+  if (session.defaultSession) {
+    try {
+      const avail = session.defaultSession.availableSpellCheckerLanguages || []
+      const desired = ['es-ES', 'en-US', 'es', 'en'].filter((l) => avail.includes(l))
+      if (desired.length > 0) {
+        session.defaultSession.setSpellCheckerLanguages(desired)
+      } else {
+        session.defaultSession.setSpellCheckerLanguages(['es-ES', 'en-US'])
+      }
+    } catch (err) {
+      console.warn('[Folio Main] Failed to configure spellchecker languages:', err)
+    }
+  }
 
   // Initialize SQLite database and tables
   try {

@@ -72,6 +72,13 @@ const api: FolioApi = {
   export: {
     htmlToPdfBuffer: (html: string): Promise<Uint8Array> =>
       ipcRenderer.invoke('export:htmlToPdfBuffer', html)
+  },
+  spellcheck: {
+    setLanguages: (languages: string[]): Promise<boolean> =>
+      ipcRenderer.invoke('spellcheck:setLanguages', languages),
+    getLanguages: (): Promise<string[]> => ipcRenderer.invoke('spellcheck:getLanguages'),
+    getAvailableLanguages: (): Promise<string[]> =>
+      ipcRenderer.invoke('spellcheck:getAvailableLanguages')
   }
 }
 

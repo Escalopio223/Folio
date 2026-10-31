@@ -6,6 +6,7 @@ import { registerScratchpadHandlers } from './scratchpadHandler'
 import { registerRulesHandlers } from './rulesHandler'
 import { registerGoalsHandlers } from './goalsHandler'
 import { registerExportHandlers } from './exportHandler'
+import { registerSpellcheckHandlers } from './spellcheckHandler'
 
 export function registerAllIpcHandlers(): void {
   registerProjectHandlers()
@@ -16,4 +17,5 @@ export function registerAllIpcHandlers(): void {
   registerRulesHandlers()
   registerGoalsHandlers()
   registerExportHandlers()
+  registerSpellcheckHandlers()
 }

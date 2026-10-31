@@ -288,4 +288,9 @@ export interface FolioApi {
   export: {
     htmlToPdfBuffer: (html: string) => Promise<Uint8Array>
   }
+  spellcheck: {
+    setLanguages: (languages: string[]) => Promise<boolean>
+    getLanguages: () => Promise<string[]>
+    getAvailableLanguages: () => Promise<string[]>
+  }
 }

@@ -213,7 +213,7 @@ const editor = useEditor({
     attributes: {
       class:
         'ProseMirror font-editorial text-lg md:text-[19px] leading-relaxed md:leading-loose text-[var(--text-primary)] focus:outline-none min-h-[350px] w-full select-text caret-[var(--accent)]',
-      spellcheck: 'false'
+      spellcheck: 'true'
     },
     handleKeyDown(_view, event) {
       const isCtrlOrCmd = event.ctrlKey || event.metaKey
