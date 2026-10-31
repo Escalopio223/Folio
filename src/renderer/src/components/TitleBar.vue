@@ -11,7 +11,8 @@ import {
   PanelRight,
   PanelRightClose,
   Search,
-  Feather
+  Feather,
+  HelpCircle
 } from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import ExportManuscriptMenu from './ExportManuscriptMenu.vue'
@@ -36,6 +37,13 @@ async function handleAction(action: WindowAction): Promise<void> {
 
 function handleKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
+
+  // F1: Abrir Guia y Manual de Usuario
+  if (e.key === 'F1') {
+    e.preventDefault()
+    uiStore.toggleHelpModal()
+    return
+  }
 
   // Ctrl+1 / Cmd+1: Alternar panel izquierdo (Manuscrito)
   if (isCtrlOrCmd && !e.shiftKey && !e.altKey && e.key === '1') {
@@ -116,6 +124,19 @@ onUnmounted(() => {
 
         <!-- Botón y Menú Desplegable de Exportación de Manuscrito (EPUB, PDF, DOCX) -->
         <ExportManuscriptMenu />
+
+        <!-- Boton de Guia y Manual de Usuario / Atajos (F1) -->
+        <button
+          type="button"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isHelpModalOpen }"
+          title="Guía, Manual de Funcionalidades y Atajos de Teclado (F1)"
+          @click="uiStore.toggleHelpModal"
+        >
+          <HelpCircle :size="13" class="opacity-85 text-[var(--accent)]" />
+          <span class="text-[11px] font-medium hidden md:inline">Manual</span>
+          <kbd class="neu-well-sm text-[9px] font-mono px-1 py-0.2 text-[var(--text-muted)]">F1</kbd>
+        </button>
       </div>
 
       <!-- Right: Omnibox, Lore Toggle, Custom 3-Color Theme & Window Controls -->

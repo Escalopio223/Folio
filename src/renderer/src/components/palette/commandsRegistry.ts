@@ -14,7 +14,8 @@ import {
   RotateCcw,
   Target,
   Trophy,
-  BookOpen
+  BookOpen,
+  HelpCircle
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -413,6 +414,19 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       execute: () => {
         uiStore.openWikiRules()
         rulesStore.openCreateModal()
+      }
+    },
+    {
+      id: 'open-help-guide',
+      title: 'Guía y Manual de Usuario',
+      description: 'Consultar atajos de teclado y la guía completa de funcionalidades de Folio',
+      category: 'action',
+      badge: 'Ayuda',
+      icon: HelpCircle,
+      shortcut: 'F1',
+      keywords: ['ayuda', 'manual', 'guia', 'atajos', 'tutorial', 'documentacion', 'shortcuts', 'teclas'],
+      execute: () => {
+        uiStore.openHelpModal()
       }
     },
     {

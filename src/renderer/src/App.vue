@@ -11,6 +11,7 @@ import GoalsAndAchievementsModal from './components/goals/GoalsAndAchievementsMo
 import SessionGoalPromptModal from './components/goals/SessionGoalPromptModal.vue'
 import AchievementToast from './components/goals/AchievementToast.vue'
 import ThemeCustomizerModal from './components/ThemeCustomizerModal.vue'
+import HelpGuideModal from './components/HelpGuideModal.vue'
 import { Feather } from 'lucide-vue-next'
 
 const uiStore = useUiStore()
@@ -88,6 +89,9 @@ onMounted(() => {
 
     <!-- Personalizador de Sistema de 3 Colores y Gamas de Background -->
     <ThemeCustomizerModal />
+
+    <!-- Guia y Manual de Usuario / Atajos de Teclado (F1) -->
+    <HelpGuideModal />
   </div>
 </template>
 

@@ -294,6 +294,19 @@ export const useUiStore = defineStore('ui', () => {
   )
 
   const isThemeModalOpen = ref(false)
+  const isHelpModalOpen = ref(false)
+
+  function openHelpModal(): void {
+    isHelpModalOpen.value = true
+  }
+
+  function closeHelpModal(): void {
+    isHelpModalOpen.value = false
+  }
+
+  function toggleHelpModal(): void {
+    isHelpModalOpen.value = !isHelpModalOpen.value
+  }
 
   // Detecta automáticamente si el background elegido es oscuro o claro
   const isDark = computed(() => getRelativeLuminance(backgroundColor.value) < 0.25)
@@ -663,6 +676,10 @@ export const useUiStore = defineStore('ui', () => {
     resetToDefaultLightTheme,
     openThemeModal,
     closeThemeModal,
+    isHelpModalOpen,
+    openHelpModal,
+    closeHelpModal,
+    toggleHelpModal,
     toggleTheme,
     toggleLeftSidebar,
     setLeftSidebar,
