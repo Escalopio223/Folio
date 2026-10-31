@@ -30,6 +30,7 @@ import {
 } from 'lucide-vue-next'
 import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/blockFormatting'
 import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
+import EchoRadarToolbar from './EchoRadarToolbar.vue'
 
 const props = defineProps<{
   editor: Editor | null | undefined
@@ -614,6 +615,11 @@ function insertSceneBreak(): void {
           <span class="text-[10px] font-sans font-medium hidden sm:inline">Florón</span>
         </button>
       </div>
+
+      <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
+
+      <!-- 10. Radar de Ecos y Asistente de Estilo Léxico -->
+      <EchoRadarToolbar :editor="editor" />
     </div>
   </div>
 </template>

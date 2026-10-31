@@ -22,7 +22,9 @@ export interface EchoRadarOptions {
     event: MouseEvent
     targetEl: HTMLElement
     pack: LanguagePack
+    windowSizeWords: number
   }) => void
+  onClustersUpdate?: (clusters: EchoCluster[], pack: LanguagePack) => void
 }
 
 export interface EchoRadarPluginState {
@@ -59,7 +61,8 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
       language: 'auto',
       ignoredStems: new Set<string>(),
       wikiExcludedStems: new Set<string>(),
-      onEchoClick: undefined
+      onEchoClick: undefined,
+      onClustersUpdate: undefined
     }
   },
 
@@ -93,17 +96,18 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
         key: echoRadarPluginKey,
         state: {
           init(_, state) {
+            const pack = resolveLanguagePack(extension.options.language, state.doc.textContent)
             if (!extension.options.enabled) {
+              extension.options.onClustersUpdate?.([], pack)
               return {
                 enabled: false,
                 decorations: DecorationSet.empty,
                 clusters: [],
                 occurrencesMap: new Map(),
-                pack: resolveLanguagePack(extension.options.language, state.doc.textContent)
+                pack
               }
             }
 
-            const pack = resolveLanguagePack(extension.options.language, state.doc.textContent)
             const tokens = extractDocumentTokens(
               state.doc,
               pack,
@@ -117,6 +121,7 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
             )
 
             const decorations = buildDecorations(state.doc, occurrencesMap)
+            extension.options.onClustersUpdate?.(clusters, pack)
 
             return {
               enabled: true,
@@ -131,12 +136,29 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
             const meta = tr.getMeta(echoRadarPluginKey)
             let enabled = oldPluginState.enabled
             let ignoredStems = new Set(extension.options.ignoredStems)
-
-            let needsRecalc = tr.docChanged
+            let needsRecalc = false
 
             if (meta?.config) {
-              if (meta.config.enabled !== undefined) enabled = meta.config.enabled
-              if (meta.config.ignoredStems !== undefined) ignoredStems = meta.config.ignoredStems
+              if (meta.config.enabled !== undefined) {
+                enabled = meta.config.enabled
+                extension.options.enabled = enabled
+              }
+              if (meta.config.windowSizeWords !== undefined) {
+                extension.options.windowSizeWords = meta.config.windowSizeWords
+              }
+              if (meta.config.minRepetitions !== undefined) {
+                extension.options.minRepetitions = meta.config.minRepetitions
+              }
+              if (meta.config.language !== undefined) {
+                extension.options.language = meta.config.language
+              }
+              if (meta.config.wikiExcludedStems !== undefined) {
+                extension.options.wikiExcludedStems = meta.config.wikiExcludedStems
+              }
+              if (meta.config.ignoredStems !== undefined) {
+                ignoredStems = meta.config.ignoredStems
+                extension.options.ignoredStems = ignoredStems
+              }
               needsRecalc = true
             }
 
@@ -146,7 +168,15 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
               needsRecalc = true
             }
 
+            if (meta?.recalculate) {
+              needsRecalc = true
+            }
+
+            // Si está desactivado, limpiar decoraciones y notificar
             if (!enabled) {
+              if (oldPluginState.enabled) {
+                extension.options.onClustersUpdate?.([], oldPluginState.pack)
+              }
               return {
                 enabled: false,
                 decorations: DecorationSet.empty,
@@ -156,6 +186,8 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
               }
             }
 
+            // Si el documento cambió pero aún no vence el debounce (meta no es recalculate ni config),
+            // mapeamos las decoraciones existentes a las nuevas posiciones
             if (!needsRecalc) {
               return {
                 ...oldPluginState,
@@ -164,7 +196,7 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
               }
             }
 
-            // Recalcular decoraciones
+            // Recalcular decoraciones con el paquete de idioma correspondiente
             const pack = resolveLanguagePack(extension.options.language, newState.doc.textContent)
             const tokens = extractDocumentTokens(
               newState.doc,
@@ -178,6 +210,7 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
               extension.options.minRepetitions
             )
             const decorations = buildDecorations(newState.doc, occurrencesMap)
+            extension.options.onClustersUpdate?.(clusters, pack)
 
             return {
               enabled: true,
@@ -185,6 +218,30 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
               clusters,
               occurrencesMap,
               pack
+            }
+          }
+        },
+
+        view() {
+          return {
+            update(view, prevState) {
+              if (!extension.options.enabled) return
+              if (!view.state.doc.eq(prevState.doc)) {
+                if (debounceTimer) {
+                  clearTimeout(debounceTimer)
+                }
+                debounceTimer = setTimeout(() => {
+                  if (!view.isDestroyed) {
+                    view.dispatch(view.state.tr.setMeta(echoRadarPluginKey, { recalculate: true }))
+                  }
+                }, 350)
+              }
+            },
+            destroy() {
+              if (debounceTimer) {
+                clearTimeout(debounceTimer)
+                debounceTimer = null
+              }
             }
           }
         },
@@ -229,7 +286,8 @@ export const EchoRadar = Extension.create<EchoRadarOptions>({
                   cluster,
                   event,
                   targetEl: echoEl,
-                  pack: pluginState.pack
+                  pack: pluginState.pack,
+                  windowSizeWords: extension.options.windowSizeWords
                 })
                 return true
               }
