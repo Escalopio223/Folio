@@ -13,6 +13,7 @@ import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import { SearchHighlight } from './extensions/SearchHighlight'
+import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
@@ -33,11 +34,13 @@ const props = withDefaults(
     content?: string
     placeholder?: string
     scrollContainer?: HTMLElement | null
+    wikiEntities?: WikiEntityTerm[]
   }>(),
   {
     content: '',
     placeholder: 'Empieza a escribir tu capítulo...',
-    scrollContainer: null
+    scrollContainer: null,
+    wikiEntities: () => []
   }
 )
 
@@ -46,6 +49,9 @@ const emit = defineEmits<{
   (e: 'change'): void
   (e: 'save'): void
   (e: 'open-find'): void
+  (e: 'wiki-click', entity: WikiEntityTerm, event: MouseEvent): void
+  (e: 'wiki-hover', payload: { entityId: string; targetEl: HTMLElement }): void
+  (e: 'wiki-leave'): void
   (e: 'stats', value: ChapterMetricsSnapshot): void
   (e: 'scene-breaks', value: SceneBreakAnchor[]): void
   (e: 'ready', editor: Editor): void
@@ -146,7 +152,13 @@ const editor = useEditor({
     TabIndent,
     FocusMode,
     Indent,
-    SearchHighlight
+    SearchHighlight,
+    WikiAutoLink.configure({
+      entities: props.wikiEntities,
+      onEntityClick: (entity, event) => {
+        emit('wiki-click', entity, event)
+      }
+    })
   ],
   editorProps: {
     attributes: {
@@ -213,15 +225,54 @@ watch(
   { immediate: true }
 )
 
+// Sincronizar entidades wiki si cambian en el store/base de datos
+watch(
+  () => props.wikiEntities,
+  (entities) => {
+    if (!editor.value) return
+    editor.value.commands.setWikiEntities(entities || [])
+  },
+  { deep: true }
+)
+
+// Delegación de eventos mouseover y mouseout en el DOM de ProseMirror para Hover Preview
+function handleEditorMouseOver(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+
+  const mentionEl = target.closest('.wiki-entity-mention') as HTMLElement | null
+  if (mentionEl) {
+    const entityId = mentionEl.getAttribute('data-wiki-id')
+    if (entityId) {
+      emit('wiki-hover', { entityId, targetEl: mentionEl })
+    }
+  }
+}
+
+function handleEditorMouseOut(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  const related = event.relatedTarget as HTMLElement | null
+
+  if (target?.closest('.wiki-entity-mention') && !related?.closest('.wiki-entity-mention')) {
+    emit('wiki-leave')
+  }
+}
+
 onMounted(() => {
   if (editor.value) {
     emit('ready', editor.value)
     emit('scene-breaks', scanSceneBreaks(editor.value))
+    editor.value.view.dom.addEventListener('mouseover', handleEditorMouseOver)
+    editor.value.view.dom.addEventListener('mouseout', handleEditorMouseOut)
   }
 })
 
 onBeforeUnmount(() => {
-  editor.value?.destroy()
+  if (editor.value) {
+    editor.value.view.dom.removeEventListener('mouseover', handleEditorMouseOver)
+    editor.value.view.dom.removeEventListener('mouseout', handleEditorMouseOut)
+    editor.value.destroy()
+  }
 })
 
 function scrollToSceneBreak(anchorIndex: number): void {
@@ -495,6 +546,26 @@ defineExpose({
   font-weight: 600;
   border-radius: 3px;
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 70%, transparent), 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Detección automática y vinculación interactiva con la Wiki de lore */
+.ProseMirror .wiki-entity-mention {
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3.5px;
+  text-decoration-color: color-mix(in oklab, var(--accent) 65%, transparent);
+  border-radius: 3px;
+  padding: 0.05em 0.2em;
+  background-color: color-mix(in oklab, var(--accent) 8%, transparent);
+  cursor: pointer;
+  transition: all 0.18s ease-in-out;
+}
+
+.ProseMirror .wiki-entity-mention:hover {
+  background-color: color-mix(in oklab, var(--accent) 18%, transparent);
+  text-decoration-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
 }
 
 /* Feedback visual de búsqueda profunda */

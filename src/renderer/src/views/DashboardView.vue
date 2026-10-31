@@ -27,7 +27,9 @@ import {
 import TiptapEditor, { type SceneBreakAnchor } from '../components/editor/TiptapEditor.vue'
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import EditorFindBar from '../components/editor/EditorFindBar.vue'
+import WikiHoverPreview from '../components/editor/WikiHoverPreview.vue'
 import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
+import type { WikiEntityTerm } from '../components/editor/extensions/WikiAutoLink'
 import type { Editor } from '@tiptap/vue-3'
 import type { Folio, FolioType, FolioStatus, ChapterTitleFormat } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
@@ -294,7 +296,44 @@ const titleInputRef = ref<HTMLInputElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const tiptapEditorRef = ref<InstanceType<typeof TiptapEditor> | null>(null)
 const findBarRef = ref<InstanceType<typeof EditorFindBar> | null>(null)
+const wikiHoverPreviewRef = ref<InstanceType<typeof WikiHoverPreview> | null>(null)
 const activeEditor = shallowRef<Editor | null>(null)
+
+// Entidades activas de la Wiki sincronizadas para escaneo y autolink en ProseMirror
+const wikiAutoLinkEntities = computed<WikiEntityTerm[]>(() => {
+  return loreStore.items
+    .filter((item) => !item.isArchived && item.name && item.name.trim().length >= 2)
+    .map((item) => ({
+      id: item.id,
+      name: item.name.trim(),
+      category: item.category,
+      summary: item.summary || '',
+      icon: item.icon
+    }))
+})
+
+// Control de Hover Preview al pasar el ratón sobre una entidad mencionada
+function handleWikiHover(payload: { entityId: string; targetEl: HTMLElement }): void {
+  const entity = loreStore.items.find((i) => i.id === payload.entityId)
+  if (entity) {
+    wikiHoverPreviewRef.value?.show({
+      entity,
+      targetEl: payload.targetEl
+    }, 220)
+  }
+}
+
+function handleWikiLeave(): void {
+  wikiHoverPreviewRef.value?.scheduleHide(180)
+}
+
+// Navegación con Ctrl+Clic o desde la tarjeta flotante hacia la ficha completa de la Wiki
+function handleWikiNavigate(entity: { id: string }): void {
+  wikiHoverPreviewRef.value?.hideImmediately()
+  uiStore.setActiveWikiTab('lore')
+  uiStore.setRightSidebar(true)
+  loreStore.selectLore(entity.id)
+}
 
 function onEditorReady(ed: Editor): void {
   activeEditor.value = ed
@@ -1069,6 +1108,12 @@ onBeforeUnmount(async () => {
           <!-- Barra de Búsqueda Rápida en Capítulo (Ctrl+F estilo VS Code) -->
           <EditorFindBar ref="findBarRef" :editor="activeEditor" />
 
+          <!-- Popover flotante Hover Preview para entidades de la Wiki de Lore -->
+          <WikiHoverPreview
+            ref="wikiHoverPreviewRef"
+            @navigate="handleWikiNavigate"
+          />
+
           <!-- Cabecera Editorial de Capítulo Integrada (con formato sincronizado con PDF) -->
           <div
             class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 bg-[var(--bg-base)] transition-colors"
@@ -1273,6 +1318,7 @@ onBeforeUnmount(async () => {
                 ref="tiptapEditorRef"
                 v-model:content="editFolioContent"
                 :scroll-container="scrollContainerRef"
+                :wiki-entities="wikiAutoLinkEntities"
                 placeholder="Empieza a escribir tu capítulo..."
                 @ready="onEditorReady"
                 @stats="handleEditorStats"
@@ -1280,6 +1326,9 @@ onBeforeUnmount(async () => {
                 @change="onEditorInput"
                 @save="handleManualSave"
                 @open-find="handleOpenFindBar"
+                @wiki-hover="handleWikiHover"
+                @wiki-leave="handleWikiLeave"
+                @wiki-click="(entity) => handleWikiNavigate(entity)"
               />
             </div>
           </div>
