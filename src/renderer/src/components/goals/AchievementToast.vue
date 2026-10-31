@@ -3,16 +3,9 @@ import { computed } from 'vue'
 import {
   Trophy,
   Target,
-  Zap,
-  Layout,
   Feather,
   BookOpen,
-  Compass,
-  Award,
   Crown,
-  BookmarkCheck,
-  Layers,
-  Flame,
   CheckCircle,
   Sparkles,
   X
@@ -30,29 +23,14 @@ const iconComponent = computed(() => {
       return Sparkles
     case 'Target':
       return Target
-    case 'Zap':
-      return Zap
-    case 'Layout':
-      return Layout
     case 'Feather':
       return Feather
     case 'BookOpen':
       return BookOpen
-    case 'Compass':
-      return Compass
-    case 'Award':
-      return Award
     case 'Crown':
       return Crown
-    case 'BookmarkCheck':
-      return BookmarkCheck
-    case 'Layers':
-      return Layers
-    case 'Flame':
-      return Flame
     case 'CheckCircle':
       return CheckCircle
-    case 'Trophy':
     default:
       return Trophy
   }
@@ -63,62 +41,52 @@ const iconComponent = computed(() => {
   <Teleport to="body">
     <Transition
       enter-active-class="transition duration-300 ease-out"
-      enter-from-class="opacity-0 translate-y-6 scale-95"
+      enter-from-class="opacity-0 translate-y-3 scale-95"
       enter-to-class="opacity-100 translate-y-0 scale-100"
       leave-active-class="transition duration-200 ease-in"
       leave-from-class="opacity-100 translate-y-0 scale-100"
-      leave-to-class="opacity-0 translate-y-4 scale-95"
+      leave-to-class="opacity-0 translate-y-2 scale-95"
     >
       <div
         v-if="toast"
-        class="fixed bottom-8 right-6 z-50 pointer-events-none max-w-md w-full select-none"
-        role="status"
+        class="fixed bottom-10 right-6 z-[130] flex items-center gap-3 p-3.5 pr-4 max-w-sm neu-panel rounded-2xl shadow-2xl border border-[var(--neu-border)] bg-[var(--bg-surface)] text-[var(--text-primary)] select-none backdrop-blur-md"
+        role="alert"
         aria-live="polite"
       >
+        <!-- Icono con halo brillante -->
         <div
-          class="pointer-events-none neu-gamification-card p-4 rounded-2xl shadow-2xl border flex items-start gap-3.5 relative overflow-hidden"
-          :class="
-            toast.type === 'goal'
-              ? 'border-[#2E7D32]/50 ring-1 ring-[#2E7D32]/25'
-              : 'border-[var(--accent)]/60 ring-1 ring-amber-500/25'
-          "
+          class="w-10 h-10 rounded-xl neu-well-sm flex items-center justify-center shrink-0"
+          :class="toast.badgeColor"
         >
-          <!-- Resplandor decorativo cálido en la esquina -->
-          <div
-            class="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-20"
-            :class="toast.type === 'goal' ? 'bg-[#2E7D32]' : 'bg-[var(--accent)]'"
-          ></div>
-
-          <!-- Icono de Hito con relieve neumórfico -->
-          <div
-            class="w-11 h-11 rounded-xl neu-well-sm flex items-center justify-center shrink-0"
-            :class="toast.badgeColor || 'text-[var(--accent)]'"
-          >
-            <component :is="iconComponent" :size="22" class="shrink-0" />
-          </div>
-
-          <!-- Contenido textual con tipografía serif legible -->
-          <div class="flex-1 min-w-0 pr-5">
-            <h4 class="font-editorial text-base font-bold text-[var(--text-primary)] leading-snug">
-              {{ toast.title }}
-            </h4>
-            <p class="text-sm text-[var(--text-secondary)] mt-1 leading-relaxed">
-              {{ toast.description }}
-            </p>
-          </div>
-
-          <!-- Botón de Cerrar (único elemento con pointer-events-auto para no robar foco del editor) -->
-          <button
-            type="button"
-            tabindex="-1"
-            class="pointer-events-auto absolute top-3 right-3 w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-            title="Cerrar notificación"
-            @mousedown.prevent
-            @click="goalsStore.dismissToast"
-          >
-            <X :size="13" />
-          </button>
+          <component :is="iconComponent" :size="20" />
         </div>
+
+        <!-- Contenido textual -->
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[9px] font-mono uppercase tracking-wider text-[var(--accent)] font-bold">
+              {{ toast.type === 'achievement' ? 'Logro Desbloqueado' : 'Meta Cumplida' }}
+            </span>
+          </div>
+
+          <h4 class="font-editorial text-xs font-bold text-[var(--text-primary)] truncate mt-0.5">
+            {{ toast.title }}
+          </h4>
+
+          <p class="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2 mt-0.5">
+            {{ toast.description }}
+          </p>
+        </div>
+
+        <!-- Botón cerrar rápido -->
+        <button
+          type="button"
+          class="neu-btn w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer shrink-0"
+          title="Cerrar notificación"
+          @click="goalsStore.dismissToast"
+        >
+          <X :size="12" />
+        </button>
       </div>
     </Transition>
   </Teleport>
