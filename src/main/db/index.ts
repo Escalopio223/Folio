@@ -1473,7 +1473,7 @@ export function updateProjectGoals(projectId: string, input: Partial<ProjectGoal
     .update(schema.projectGoals)
     .set({
       targetTotalWords: input.targetTotalWords ?? current.targetTotalWords,
-      dailyWordGoal: input.dailyWordGoal ?? current.dailyWordGoal,
+      dailyWordGoal: input.dailyWordGoal !== undefined ? Math.max(500, Math.floor(input.dailyWordGoal)) : current.dailyWordGoal,
       dailyChapterGoal: input.dailyChapterGoal ?? current.dailyChapterGoal,
       deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : current.deadlineDate,
       askSessionGoalOnStartup:
