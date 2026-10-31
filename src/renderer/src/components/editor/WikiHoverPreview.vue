@@ -99,7 +99,7 @@ async function updatePosition(): Promise<void> {
   }
 }
 
-function show(payload: WikiHoverPayload, delayMs = 1500): void {
+function show(payload: WikiHoverPayload, delayMs = 900): void {
   // Si ya estamos mostrando esta misma entidad en el mismo elemento, no reiniciar
   if (isVisible.value && currentAnchorEl === payload.targetEl && currentEntity.value?.id === payload.entity.id) {
     if (hideTimeout) {

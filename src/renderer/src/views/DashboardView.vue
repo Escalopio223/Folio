@@ -319,7 +319,7 @@ function handleWikiHover(payload: { entityId: string; targetEl: HTMLElement }): 
     wikiHoverPreviewRef.value?.show({
       entity,
       targetEl: payload.targetEl
-    }, 1500)
+    }, 900)
   }
 }
 
