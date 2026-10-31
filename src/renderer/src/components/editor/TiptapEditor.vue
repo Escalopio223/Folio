@@ -14,11 +14,8 @@ import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import { SearchHighlight } from './extensions/SearchHighlight'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
-import { EchoRadar } from './extensions/EchoRadar'
-import { useEchoRadar } from '../../composables/useEchoRadar'
-import { resolveLanguagePack, detectLanguage } from '../../nlp/languageDetector'
-import type { EchoCluster, EchoOccurrence } from '../../composables/useEchoDetector'
-import type { LanguagePack } from '../../nlp/types'
+import { detectLanguage } from '../../nlp/languageDetector'
+import { useSpellcheck } from '../../composables/useSpellcheck'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
@@ -60,14 +57,6 @@ const emit = defineEmits<{
   (e: 'stats', value: ChapterMetricsSnapshot): void
   (e: 'scene-breaks', value: SceneBreakAnchor[]): void
   (e: 'ready', editor: Editor): void
-  (e: 'echo-click', payload: {
-    occurrence: EchoOccurrence
-    cluster: EchoCluster
-    event: MouseEvent
-    targetEl: HTMLElement
-    pack: LanguagePack
-    windowSizeWords: number
-  }): void
 }>()
 
 const uiStore = useUiStore()
@@ -142,31 +131,11 @@ function scanSceneBreaks(ed: { state: Editor['state'] }): SceneBreakAnchor[] {
   return anchors
 }
 
-const {
-  isRadarEnabled,
-  windowSizeWords,
-  minRepetitions,
-  radarLanguage,
-  ignoredStems,
-  updateClusters
-} = useEchoRadar()
-
-const wikiExcludedStems = computed<Set<string>>(() => {
-  const set = new Set<string>()
-  const pack = resolveLanguagePack(radarLanguage.value, props.content)
-  for (const entity of props.wikiEntities || []) {
-    const words = entity.name.split(/\s+/)
-    for (const w of words) {
-      const clean = w.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase()
-      if (clean) set.add(pack.stem(clean))
-    }
-  }
-  return set
-})
+const { spellcheckLang, setActiveCode } = useSpellcheck()
 
 const currentLanguageCode = computed<'en-US' | 'es-ES'>(() => {
-  if (radarLanguage.value === 'en') return 'en-US'
-  if (radarLanguage.value === 'es') return 'es-ES'
+  if (spellcheckLang.value === 'en') return 'en-US'
+  if (spellcheckLang.value === 'es') return 'es-ES'
   const detected = detectLanguage(props.content || '')
   return detected === 'en' ? 'en-US' : 'es-ES'
 })
@@ -199,20 +168,6 @@ const editor = useEditor({
       entities: props.wikiEntities,
       onEntityClick: (entity, event) => {
         emit('wiki-click', entity, event)
-      }
-    }),
-    EchoRadar.configure({
-      enabled: isRadarEnabled.value,
-      windowSizeWords: windowSizeWords.value,
-      minRepetitions: minRepetitions.value,
-      language: radarLanguage.value,
-      ignoredStems: ignoredStems.value,
-      wikiExcludedStems: wikiExcludedStems.value,
-      onClustersUpdate: (clusters, pack) => {
-        updateClusters(clusters, pack)
-      },
-      onEchoClick: (payload) => {
-        emit('echo-click', payload)
       }
     })
   ],
@@ -249,9 +204,9 @@ const editor = useEditor({
     // Sincronizar automáticamente el atributo lang para que Chromium aplique el corrector adecuado
     if (ed.view?.dom) {
       const targetLang =
-        radarLanguage.value === 'en'
+        spellcheckLang.value === 'en'
           ? 'en-US'
-          : radarLanguage.value === 'es'
+          : spellcheckLang.value === 'es'
             ? 'es-ES'
             : detectLanguage(text) === 'en'
               ? 'en-US'
@@ -260,6 +215,7 @@ const editor = useEditor({
       if (ed.view.dom.getAttribute('lang') !== targetLang) {
         ed.view.dom.setAttribute('lang', targetLang)
         ed.view.dom.setAttribute('spellcheck', 'true')
+        setActiveCode(targetLang)
         if (window.api?.spellcheck) {
           const primary = targetLang === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
           window.api.spellcheck.setLanguages(primary).catch(() => {})
@@ -310,23 +266,6 @@ watch(
   (entities) => {
     if (!editor.value) return
     editor.value.commands.setWikiEntities(entities || [])
-  },
-  { deep: true }
-)
-
-// Sincronizar configuración y exclusiones del Radar de Ecos
-watch(
-  [isRadarEnabled, windowSizeWords, minRepetitions, radarLanguage, ignoredStems, wikiExcludedStems],
-  () => {
-    if (!editor.value) return
-    editor.value.commands.setEchoRadarConfig({
-      enabled: isRadarEnabled.value,
-      windowSizeWords: windowSizeWords.value,
-      minRepetitions: minRepetitions.value,
-      language: radarLanguage.value,
-      ignoredStems: ignoredStems.value,
-      wikiExcludedStems: wikiExcludedStems.value
-    })
   },
   { deep: true }
 )
@@ -685,38 +624,6 @@ defineExpose({
   background-color: color-mix(in oklab, var(--accent) 18%, transparent);
   text-decoration-color: var(--accent);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
-}
-
-/* Resaltado no invasivo del Radar de Ecos (Repeticiones léxicas de proximidad) */
-.ProseMirror .echo-highlight {
-  background-color: color-mix(in oklab, #f97316 12%, transparent);
-  border-bottom: 1.5px dashed color-mix(in oklab, #ea580c 60%, transparent);
-  border-radius: 2px;
-  padding: 0.05em 0.15em;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ProseMirror .echo-highlight:hover {
-  background-color: color-mix(in oklab, #f97316 25%, transparent);
-  border-bottom-color: #ea580c;
-  box-shadow: 0 0 0 1px color-mix(in oklab, #ea580c 30%, transparent);
-}
-
-/* Animación de pulso / destello para la acción "Localizar ecos" */
-.ProseMirror .echo-highlight.echo-pulse-active {
-  animation: echoPulse 0.75s ease-in-out infinite alternate !important;
-  background-color: color-mix(in oklab, #f97316 35%, transparent) !important;
-  border-bottom-style: solid;
-}
-
-@keyframes echoPulse {
-  0% {
-    box-shadow: 0 0 0 1px color-mix(in oklab, #ea580c 40%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 4px color-mix(in oklab, #ea580c 75%, transparent);
-  }
 }
 
 /* Feedback visual de búsqueda profunda */

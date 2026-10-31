@@ -30,11 +30,14 @@ import {
 } from 'lucide-vue-next'
 import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/blockFormatting'
 import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
-import EchoRadarToolbar from './EchoRadarToolbar.vue'
+import SpellcheckLanguageToggle from './SpellcheckLanguageToggle.vue'
+import { useSpellcheck } from '../../composables/useSpellcheck'
 
 const props = defineProps<{
   editor: Editor | null | undefined
 }>()
+
+const { spellcheckLang, setSpellcheckLanguage } = useSpellcheck()
 
 // Minimodales: Fuente, Color, Resaltado
 type ActiveModal = 'font' | 'color' | 'highlight' | null
@@ -618,8 +621,11 @@ function insertSceneBreak(): void {
 
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 
-      <!-- 10. Radar de Ecos y Asistente de Estilo Léxico -->
-      <EchoRadarToolbar :editor="editor" />
+      <!-- 10. Corrector Ortográfico (Español / English) -->
+      <SpellcheckLanguageToggle
+        :current-lang="spellcheckLang"
+        @update:lang="setSpellcheckLanguage"
+      />
     </div>
   </div>
 </template>

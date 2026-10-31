@@ -28,7 +28,6 @@ import TiptapEditor, { type SceneBreakAnchor } from '../components/editor/Tiptap
 import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import EditorFindBar from '../components/editor/EditorFindBar.vue'
 import WikiHoverPreview from '../components/editor/WikiHoverPreview.vue'
-import EchoPopover from '../components/editor/EchoPopover.vue'
 import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
 import type { WikiEntityTerm } from '../components/editor/extensions/WikiAutoLink'
 import type { Editor } from '@tiptap/vue-3'
@@ -298,7 +297,6 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const tiptapEditorRef = ref<InstanceType<typeof TiptapEditor> | null>(null)
 const findBarRef = ref<InstanceType<typeof EditorFindBar> | null>(null)
 const wikiHoverPreviewRef = ref<InstanceType<typeof WikiHoverPreview> | null>(null)
-const echoPopoverRef = ref<InstanceType<typeof EchoPopover> | null>(null)
 const activeEditor = shallowRef<Editor | null>(null)
 
 // Entidades activas de la Wiki sincronizadas para escaneo y autolink en ProseMirror
@@ -327,10 +325,6 @@ function handleWikiHover(payload: { entityId: string; targetEl: HTMLElement }): 
 
 function handleWikiLeave(): void {
   wikiHoverPreviewRef.value?.scheduleHide(200)
-}
-
-function handleEchoClick(payload: any): void {
-  echoPopoverRef.value?.open(payload)
 }
 
 // Navegación con Ctrl+Clic o desde la tarjeta flotante hacia la ficha completa de la Wiki
@@ -1120,12 +1114,6 @@ onBeforeUnmount(async () => {
             @navigate="handleWikiNavigate"
           />
 
-          <!-- Popover flotante para Radar de Ecos y Reemplazo de Sinónimos -->
-          <EchoPopover
-            ref="echoPopoverRef"
-            :editor="activeEditor"
-          />
-
           <!-- Cabecera Editorial de Capítulo Integrada (con formato sincronizado con PDF) -->
           <div
             class="shrink-0 px-6 md:px-8 pt-5 md:pt-6 pb-3.5 bg-[var(--bg-base)] transition-colors"
@@ -1341,7 +1329,6 @@ onBeforeUnmount(async () => {
                 @wiki-hover="handleWikiHover"
                 @wiki-leave="handleWikiLeave"
                 @wiki-click="(entity) => handleWikiNavigate(entity)"
-                @echo-click="handleEchoClick"
               />
             </div>
           </div>
