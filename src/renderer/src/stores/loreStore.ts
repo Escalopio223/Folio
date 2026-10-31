@@ -31,6 +31,15 @@ export const useLoreStore = defineStore('lore', () => {
   })
 
   function selectLore(id: string | null): void {
+    // Si ya era el mismo ID, alternar temporalmente para asegurar que los watchers reactivos
+    // de los inspectores de la Wiki detecten el evento y desplieguen la ficha
+    if (activeLoreId.value === id && id !== null) {
+      activeLoreId.value = null
+      setTimeout(() => {
+        activeLoreId.value = id
+      }, 10)
+      return
+    }
     activeLoreId.value = id
   }
 

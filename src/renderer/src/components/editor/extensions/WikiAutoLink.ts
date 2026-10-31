@@ -199,3 +199,4 @@ export const WikiAutoLink = Extension.create<WikiAutoLinkOptions>({
     ]
   }
 })
+

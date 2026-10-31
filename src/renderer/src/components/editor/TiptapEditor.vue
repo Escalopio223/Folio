@@ -236,12 +236,16 @@ watch(
 )
 
 // Delegación de eventos mouseover y mouseout en el DOM de ProseMirror para Hover Preview
+let currentHoveredMentionEl: HTMLElement | null = null
+
 function handleEditorMouseOver(event: MouseEvent): void {
   const target = event.target as HTMLElement | null
   if (!target) return
 
   const mentionEl = target.closest('.wiki-entity-mention') as HTMLElement | null
   if (mentionEl) {
+    if (currentHoveredMentionEl === mentionEl) return
+    currentHoveredMentionEl = mentionEl
     const entityId = mentionEl.getAttribute('data-wiki-id')
     if (entityId) {
       emit('wiki-hover', { entityId, targetEl: mentionEl })
@@ -253,7 +257,11 @@ function handleEditorMouseOut(event: MouseEvent): void {
   const target = event.target as HTMLElement | null
   const related = event.relatedTarget as HTMLElement | null
 
-  if (target?.closest('.wiki-entity-mention') && !related?.closest('.wiki-entity-mention')) {
+  const fromMention = target?.closest('.wiki-entity-mention') as HTMLElement | null
+  const toMention = related?.closest('.wiki-entity-mention') as HTMLElement | null
+
+  if (fromMention && fromMention !== toMention) {
+    currentHoveredMentionEl = null
     emit('wiki-leave')
   }
 }

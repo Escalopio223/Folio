@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, type Component } from 'vue'
+import { ref, nextTick, onMounted, onBeforeUnmount, type Component } from 'vue'
 import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom'
 import {
   User,
@@ -99,18 +99,36 @@ async function updatePosition(): Promise<void> {
   }
 }
 
-function show(payload: WikiHoverPayload, delayMs = 220): void {
+function show(payload: WikiHoverPayload, delayMs = 1500): void {
+  // Si ya estamos mostrando esta misma entidad en el mismo elemento, no reiniciar
+  if (isVisible.value && currentAnchorEl === payload.targetEl && currentEntity.value?.id === payload.entity.id) {
+    if (hideTimeout) {
+      clearTimeout(hideTimeout)
+      hideTimeout = null
+    }
+    return
+  }
+
   clearTimers()
+  currentAnchorEl = payload.targetEl
+
   showTimeout = setTimeout(() => {
     currentEntity.value = payload.entity
-    currentAnchorEl = payload.targetEl
     isVisible.value = true
-    updatePosition()
+    nextTick(() => {
+      updatePosition()
+    })
   }, delayMs)
 }
 
-function scheduleHide(delayMs = 180): void {
-  clearTimers()
+function scheduleHide(delayMs = 200): void {
+  if (showTimeout) {
+    clearTimeout(showTimeout)
+    showTimeout = null
+  }
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+  }
   hideTimeout = setTimeout(() => {
     isVisible.value = false
     currentAnchorEl = null
@@ -257,3 +275,4 @@ defineExpose({
     </Transition>
   </Teleport>
 </template>
+

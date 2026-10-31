@@ -319,12 +319,12 @@ function handleWikiHover(payload: { entityId: string; targetEl: HTMLElement }): 
     wikiHoverPreviewRef.value?.show({
       entity,
       targetEl: payload.targetEl
-    }, 220)
+    }, 1500)
   }
 }
 
 function handleWikiLeave(): void {
-  wikiHoverPreviewRef.value?.scheduleHide(180)
+  wikiHoverPreviewRef.value?.scheduleHide(200)
 }
 
 // Navegación con Ctrl+Clic o desde la tarjeta flotante hacia la ficha completa de la Wiki

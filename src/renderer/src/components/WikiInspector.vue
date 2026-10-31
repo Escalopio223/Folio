@@ -109,21 +109,28 @@ function toggleExpand(item: LoreItem): void {
   }
 }
 
-// Sincronizar apertura cuando se selecciona un Lore desde la paleta de comandos
+// Sincronizar apertura cuando se selecciona un Lore desde la paleta de comandos o desde la mención en el editor
 watch(
   () => loreStore.activeLoreId,
   (newId) => {
     if (!newId) return
     const item = loreStore.items.find((i) => i.id === newId)
     if (item) {
+      // Si la categoría estaba filtrada, resetear a 'todos' para que la tarjeta sea visible
+      if (loreStore.selectedCategory !== 'todos' && loreStore.selectedCategory.toLowerCase() !== item.category.toLowerCase()) {
+        loreStore.selectedCategory = 'todos'
+      }
       expandedItemIds[newId] = true
       ensureDraft(item)
       nextTick(() => {
-        const el = document.getElementById(`lore-card-${newId}`)
-        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        setTimeout(() => {
+          const el = document.getElementById(`lore-card-${newId}`)
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }, 60)
       })
     }
-  }
+  },
+  { immediate: true }
 )
 
 // Auto-guardado debounced por tarjeta
