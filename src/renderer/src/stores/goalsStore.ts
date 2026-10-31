@@ -69,6 +69,7 @@ export const useGoalsStore = defineStore('goals', () => {
   const isSessionPromptOpen = ref(false)
   const activeSessionGoal = ref<ActiveSessionGoal | null>(null)
   const sessionGoalBaselineWords = ref(0)
+  const isFreeWritingSession = ref(false)
   const persistedSessionWords = ref(0)
 
   // Modales y Toasts
@@ -113,7 +114,7 @@ export const useGoalsStore = defineStore('goals', () => {
 
   // Progreso en palabras escritas en la sesión actual hacia la meta
   const sessionProgressWords = computed<number>(() => {
-    if (activeSessionGoal.value && activeSessionGoal.value.type === 'words') {
+    if (!isFreeWritingSession.value && activeSessionGoal.value && activeSessionGoal.value.type === 'words') {
       return activeSessionGoal.value.current
     }
     const folioStore = useFolioStore()
@@ -134,7 +135,7 @@ export const useGoalsStore = defineStore('goals', () => {
     ) {
       return true
     }
-    if (sessionWordTarget.value > 0 && liveTodayWords.value >= sessionWordTarget.value) {
+    if (!isFreeWritingSession.value && sessionWordTarget.value > 0 && liveTodayWords.value >= sessionWordTarget.value) {
       return true
     }
     return false
@@ -205,6 +206,7 @@ export const useGoalsStore = defineStore('goals', () => {
     }
 
     if (type === 'free') {
+      isFreeWritingSession.value = true
       activeSessionGoal.value = {
         type: 'free',
         target: 0,
@@ -214,6 +216,8 @@ export const useGoalsStore = defineStore('goals', () => {
       isSessionPromptOpen.value = false
       return
     }
+
+    isFreeWritingSession.value = false
 
     // Restricción estricta: Mínimo 500 palabras
     const cleanTarget = Math.max(500, Math.round(target))
@@ -245,7 +249,7 @@ export const useGoalsStore = defineStore('goals', () => {
   }
 
   async function completeActiveSessionGoal(): Promise<void> {
-    if (!activeSessionGoal.value || activeSessionGoal.value.type === 'free') return
+    if (isFreeWritingSession.value || !activeSessionGoal.value || activeSessionGoal.value.type === 'free') return
     if (activeSessionGoal.value.completed) return
 
     activeSessionGoal.value.completed = true
@@ -546,6 +550,7 @@ export const useGoalsStore = defineStore('goals', () => {
     sessionProgressPercentage,
     hasPromptedThisSession,
     isSessionPromptOpen,
+    isFreeWritingSession,
     activeSessionGoal,
     sessionGoalPercentage,
     sessionGoalExactPercentage,

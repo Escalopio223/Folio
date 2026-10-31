@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Flame, Trophy, Target } from 'lucide-vue-next'
+import { Flame, Trophy, Target, Feather } from 'lucide-vue-next'
 import { useGoalsStore } from '../../stores/goalsStore'
 import { useUiStore } from '../../stores/uiStore'
 
 const goalsStore = useGoalsStore()
 const uiStore = useUiStore()
 
+const isFreeWriting = computed(() => {
+  return goalsStore.isFreeWritingSession || goalsStore.activeSessionGoal?.type === 'free'
+})
+
 const hasActiveSessionTarget = computed(() => {
   return (
-    goalsStore.activeSessionGoal !== null && goalsStore.activeSessionGoal.type !== 'free'
+    !isFreeWriting.value &&
+    goalsStore.activeSessionGoal !== null &&
+    goalsStore.activeSessionGoal.type !== 'free'
   )
 })
 
 const activePercent = computed(() => {
+  if (isFreeWriting.value) return 0
   if (hasActiveSessionTarget.value) {
     return goalsStore.sessionGoalPercentage
   }
@@ -21,6 +28,7 @@ const activePercent = computed(() => {
 })
 
 const activeExactPercent = computed(() => {
+  if (isFreeWriting.value) return 0
   if (hasActiveSessionTarget.value) {
     return goalsStore.sessionGoalExactPercentage
   }
@@ -28,6 +36,7 @@ const activeExactPercent = computed(() => {
 })
 
 const isCompleted = computed(() => {
+  if (isFreeWriting.value) return false
   if (hasActiveSessionTarget.value) {
     return Boolean(goalsStore.activeSessionGoal?.completed) || activePercent.value >= 100
   }
@@ -35,6 +44,9 @@ const isCompleted = computed(() => {
 })
 
 const progressLabel = computed(() => {
+  if (isFreeWriting.value) {
+    return 'Escritura libre'
+  }
   if (hasActiveSessionTarget.value && goalsStore.activeSessionGoal) {
     const g = goalsStore.activeSessionGoal
     if (g.type === 'words') {
@@ -47,6 +59,7 @@ const progressLabel = computed(() => {
 })
 
 const barColor = computed(() => {
+  if (isFreeWriting.value) return 'var(--text-muted)'
   return isCompleted.value ? '#2E7D32' : 'var(--accent)'
 })
 </script>
@@ -62,15 +75,17 @@ const barColor = computed(() => {
       { 'opacity-[0.12] hover:opacity-100': uiStore.isFocusMode }
     ]"
     :title="
-      hasActiveSessionTarget
-        ? `Meta de sesión activa: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
-        : `Meta diaria: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
+      isFreeWriting
+        ? 'Modo de escritura libre activo (sin meta por sesión). Clic para ver tus logros o establecer una meta.'
+        : hasActiveSessionTarget
+          ? `Meta de sesión activa: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
+          : `Meta diaria: ${progressLabel} (${activeExactPercent}%). Clic para ver expectativas y logros.`
     "
     @click="goalsStore.openGoalsModal('expectations')"
   >
-    <!-- Racha Diaria con Llama (🔥 X días) -->
+    <!-- Racha Diaria con Llama (🔥 X días) si existe racha -->
     <div
-      v-if="goalsStore.currentStreak > 0"
+      v-if="goalsStore.currentStreak > 0 && !isFreeWriting"
       class="flex items-center gap-1 font-mono text-[11px] font-semibold text-orange-500 shrink-0"
       title="Racha de días consecutivos cumpliendo tu meta"
     >
@@ -79,27 +94,38 @@ const barColor = computed(() => {
     </div>
 
     <div
-      v-if="goalsStore.currentStreak > 0"
+      v-if="goalsStore.currentStreak > 0 && !isFreeWriting"
       class="w-[1px] h-3 bg-[var(--groove-dark)]/60 shrink-0"
     ></div>
 
-    <!-- Etiqueta de Modo (Sesión vs Día) y Progreso -->
+    <!-- Etiqueta de Modo (Libre vs Sesión) y Progreso -->
     <div class="flex items-center gap-1.5 font-mono text-[11px]">
+      <Feather
+        v-if="isFreeWriting"
+        :size="12"
+        class="shrink-0 text-[var(--accent)] opacity-85"
+      />
       <Target
+        v-else
         :size="12"
         class="shrink-0 transition-colors duration-300"
         :style="{ color: barColor }"
       />
+
       <span
-        v-if="hasActiveSessionTarget"
+        v-if="!isFreeWriting && hasActiveSessionTarget"
         class="font-semibold text-[var(--text-secondary)]"
       >
         Sesión:
       </span>
+
       <span class="font-medium text-[var(--text-primary)]">
         {{ progressLabel }}
       </span>
+
+      <!-- Porcentaje sólo si NO es escritura libre -->
       <span
+        v-if="!isFreeWriting"
         class="text-[10px] font-semibold px-1.5 py-0.2 rounded transition-colors duration-300"
         :class="
           isCompleted
@@ -109,10 +135,19 @@ const barColor = computed(() => {
       >
         ({{ activeExactPercent }}%)
       </span>
+      <span
+        v-else
+        class="neu-well-sm px-1.5 py-0.2 text-[9px] text-[var(--accent)] font-semibold rounded"
+      >
+        sin meta
+      </span>
     </div>
 
-    <!-- Barra de progreso fina con transición suave #C85A32 -> #2E7D32 -->
-    <div class="w-12 h-1.5 rounded-full neu-well-sm overflow-hidden shrink-0 hidden sm:block">
+    <!-- Barra de progreso fina (sólo si tiene meta activa) -->
+    <div
+      v-if="!isFreeWriting"
+      class="w-12 h-1.5 rounded-full neu-well-sm overflow-hidden shrink-0 hidden sm:block"
+    >
       <div
         class="h-full rounded-full transition-all duration-500 ease-out"
         :style="{
@@ -122,7 +157,7 @@ const barColor = computed(() => {
       ></div>
     </div>
 
-    <!-- Indicador de Logros Desbloqueados -->
+    <!-- Indicador de Logros Desbloqueados (siempre visible) -->
     <div
       class="hidden lg:flex items-center gap-1 text-[10px] text-[var(--text-muted)] pl-1.5 border-l border-[var(--groove-dark)]/40 group-hover:text-[var(--text-secondary)] transition-colors"
       title="Logros editoriales desbloqueados"
