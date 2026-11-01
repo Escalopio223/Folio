@@ -127,12 +127,19 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
 
             // Umbral anti-jitter: ignorar variaciones subpíxel de la tipografía
             if (Math.abs(deltaY) > 2) {
+              // Si el cursor está por encima del centro objetivo y el contenedor ya está al inicio (scrollTop <= 0), no hay que forzar scroll negativo
+              if (deltaY < 0 && scrollContainer.scrollTop <= 0) {
+                return
+              }
+
               if (rafId) cancelAnimationFrame(rafId)
               rafId = requestAnimationFrame(() => {
                 if (smooth) {
-                  scrollContainer.scrollBy({ top: deltaY, behavior: 'smooth' })
+                  const safeDelta =
+                    deltaY < 0 ? Math.max(deltaY, -scrollContainer.scrollTop) : deltaY
+                  scrollContainer.scrollBy({ top: safeDelta, behavior: 'smooth' })
                 } else {
-                  scrollContainer.scrollTop += deltaY
+                  scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop + deltaY)
                 }
               })
             }

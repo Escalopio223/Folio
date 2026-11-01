@@ -297,23 +297,11 @@ watch(
   { immediate: true }
 )
 
-// Sincronizar y compensar scroll al activar/desactivar el Modo Máquina de Escribir
+// Sincronizar al activar/desactivar el Modo Máquina de Escribir
 watch(
   () => uiStore.isTypewriterMode,
   async (enabled) => {
     if (!editor.value) return
-    const container = props.scrollContainer
-
-    if (container) {
-      const halfHeight = container.clientHeight / 2
-      if (enabled) {
-        // Compensar el padding-top añadido sumando el desplazamiento para evitar salto visual
-        container.scrollTop += halfHeight
-      } else {
-        // Al desactivar, restar la compensación
-        container.scrollTop = Math.max(0, container.scrollTop - halfHeight)
-      }
-    }
 
     editor.value.commands.setTypewriterMode(enabled)
     await nextTick()
@@ -632,9 +620,8 @@ defineExpose({
 
 /* Modo Máquina de Escribir (Typewriter Scrolling Mode) */
 .typewriter-mode-active .ProseMirror {
-  padding-top: 50vh !important;
-  padding-bottom: 50vh !important;
-  transition: padding-top 0.2s ease, padding-bottom 0.2s ease;
+  padding-bottom: 60vh !important;
+  transition: padding-bottom 0.2s ease;
 }
 
 /* Remarcado de coincidencias estilo VS Code */
