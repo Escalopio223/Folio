@@ -150,17 +150,31 @@ Folio/
 
 ---
 
-## 🚀 Instalación y Desarrollo Local
+## 📥 Descarga e Instalación (Para Usuarios Finales)
 
-### Requisitos previos
+> [!TIP]
+> **¡No necesitas instalar Node.js, Git ni usar ninguna consola!**  
+> El instalador de Folio es **100% autónomo y autocontenido (*Standalone*)**: incluye su propio motor de ejecución embebido y base de datos SQLite lista para usar.
+
+1. Entra en la sección oficial de [**GitHub Releases**](https://github.com/Escalopio223/Folio/releases/latest).
+2. Descarga el archivo **`folio-1.0.0-setup.exe`**.
+3. Haz doble clic en el instalador, sigue los sencillos pasos del asistente y la aplicación se abrirá en tu escritorio lista para redactar.
+
+---
+
+## 🛠️ Desarrollo y Compilación desde el Código Fuente (Solo Desarrolladores)
+
+Si eres desarrollador y deseas clonar el repositorio para inspeccionar el código, compilarlo por ti mismo o contribuir:
+
+### Requisitos previos para compilar
 - **Node.js** >= 18.x
 - **npm** o **pnpm**
-- Herramientas de compilación de C++ para compilar módulos nativos (`better-sqlite3`):
-  - **Windows:** `npm install -g windows-build-tools` o Visual Studio C++ Build Tools.
+- Herramientas de compilación C++ para el driver nativo de SQLite (`better-sqlite3`):
+  - **Windows:** Visual Studio C++ Build Tools.
   - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
   - **Linux:** `sudo apt install build-essential`.
 
-### Pasos de instalación
+### Pasos de compilación
 
 1. **Clonar el repositorio:**
    ```bash
@@ -173,7 +187,7 @@ Folio/
    npm install
    ```
 
-3. **Iniciar en modo desarrollo:**
+3. **Iniciar en entorno de desarrollo:**
    ```bash
    npm run dev
    ```
@@ -183,11 +197,11 @@ Folio/
    npm run typecheck
    ```
 
----
-
-## 📦 Compilación y Generación de Ejecutables (.exe)
-
-Para compilar y empaquetar el instalador ejecutable de producción para Windows:
+5. **Generar tu propio instalador (.exe):**
+   ```bash
+   npm run build:win
+   ```
+   El instalador se generará automáticamente en la carpeta `dist/`.
 
 ```bash
 # Compilar TypeScript y empaquetar instalador NSIS (.exe)
