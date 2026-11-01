@@ -103,6 +103,18 @@ select {
   font-family: inherit;
 }
 
+/* Ocultar botones de flecha/stepper nativos del navegador en inputs numéricos */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* =========================================================================
    CURSORES GLOBALES Y COMPORTAMIENTO TÁCTIL / EDITORIAL
    ========================================================================= */
@@ -170,7 +182,8 @@ textarea,
 }
 
 .neu-well,
-.neu-inset {
+.neu-inset,
+.neu-input {
   background: linear-gradient(145deg, color-mix(in oklab, var(--bg-base) 92%, var(--shadow-dark) 8%), var(--bg-base));
   box-shadow: var(--neu-inset);
   border: 1px solid color-mix(in oklab, var(--groove-dark) 45%, transparent);
