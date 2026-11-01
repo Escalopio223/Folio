@@ -529,6 +529,7 @@ export const useUiStore = defineStore('ui', () => {
 
   const isSplashLoading = ref(true)
   const isFocusMode = ref(false)
+  const isTypewriterMode = ref(false)
 
   function toggleLeftSidebar(): void {
     isLeftSidebarOpen.value = !isLeftSidebarOpen.value
@@ -564,6 +565,14 @@ export const useUiStore = defineStore('ui', () => {
 
   function toggleFocusMode(): void {
     isFocusMode.value = !isFocusMode.value
+  }
+
+  function toggleTypewriterMode(): void {
+    isTypewriterMode.value = !isTypewriterMode.value
+  }
+
+  function setTypewriterMode(val: boolean): void {
+    isTypewriterMode.value = val
   }
 
   const activeWikiTab = ref<'lore' | 'rules'>('lore')
@@ -691,6 +700,9 @@ export const useUiStore = defineStore('ui', () => {
     openWikiRules,
     openWikiLore,
     setSplashLoading,
-    toggleFocusMode
+    toggleFocusMode,
+    isTypewriterMode,
+    toggleTypewriterMode,
+    setTypewriterMode
   }
 })

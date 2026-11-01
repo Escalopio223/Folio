@@ -14,6 +14,7 @@ import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import { SearchHighlight } from './extensions/SearchHighlight'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
+import { TypewriterExtension } from './extensions/TypewriterExtension'
 import { detectLanguage } from '../../nlp/languageDetector'
 import { useSpellcheck } from '../../composables/useSpellcheck'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
@@ -169,6 +170,10 @@ const editor = useEditor({
       onEntityClick: (entity, event) => {
         emit('wiki-click', entity, event)
       }
+    }),
+    TypewriterExtension.configure({
+      enabled: uiStore.isTypewriterMode,
+      getScrollContainer: () => props.scrollContainer
     })
   ],
   editorProps: {
@@ -192,6 +197,13 @@ const editor = useEditor({
       if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
         uiStore.toggleFocusMode()
+        return true
+      }
+
+      // Atajo de Modo Máquina dentro del editor (Ctrl+Shift+T)
+      if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 't') {
+        event.preventDefault()
+        uiStore.toggleTypewriterMode()
         return true
       }
       return false
@@ -283,6 +295,33 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Sincronizar y compensar scroll al activar/desactivar el Modo Máquina de Escribir
+watch(
+  () => uiStore.isTypewriterMode,
+  async (enabled) => {
+    if (!editor.value) return
+    const container = props.scrollContainer
+
+    if (container) {
+      const halfHeight = container.clientHeight / 2
+      if (enabled) {
+        // Compensar el padding-top añadido sumando el desplazamiento para evitar salto visual
+        container.scrollTop += halfHeight
+      } else {
+        // Al desactivar, restar la compensación
+        container.scrollTop = Math.max(0, container.scrollTop - halfHeight)
+      }
+    }
+
+    editor.value.commands.setTypewriterMode(enabled)
+    await nextTick()
+
+    if (enabled && editor.value) {
+      editor.value.commands.recenterTypewriter(true)
+    }
+  }
 )
 
 // Delegación de eventos mouseover y mouseout en el DOM de ProseMirror para Hover Preview
@@ -418,7 +457,8 @@ defineExpose({
   getText: () => editor.value?.getText() || '',
   focus: () => editor.value?.commands.focus(),
   scrollToSceneBreak,
-  navigateToMatch
+  navigateToMatch,
+  recenterTypewriter: (smooth = true) => editor.value?.commands.recenterTypewriter(smooth)
 })
 </script>
 
@@ -426,7 +466,8 @@ defineExpose({
   <div
     class="tiptap-wrapper w-full flex-1 flex flex-col relative"
     :class="{
-      'focus-mode-active': uiStore.isFocusMode
+      'focus-mode-active': uiStore.isFocusMode,
+      'typewriter-mode-active': uiStore.isTypewriterMode
     }"
   >
     <!-- Menú flotante contextual neumórfico -->
@@ -587,6 +628,13 @@ defineExpose({
 .focus-mode-active .ProseMirror > .is-active-node,
 .focus-mode-active .ProseMirror > .is-active-paragraph {
   opacity: 1 !important;
+}
+
+/* Modo Máquina de Escribir (Typewriter Scrolling Mode) */
+.typewriter-mode-active .ProseMirror {
+  padding-top: 50vh !important;
+  padding-bottom: 50vh !important;
+  transition: padding-top 0.2s ease, padding-bottom 0.2s ease;
 }
 
 /* Remarcado de coincidencias estilo VS Code */

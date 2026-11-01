@@ -17,6 +17,7 @@ import {
   Trash2,
   Check,
   Eye,
+  Keyboard,
   Flame,
   Pencil,
   GripVertical,
@@ -613,6 +614,13 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     return
   }
 
+  // Ctrl+Shift+T / Cmd+Shift+T: Alternar Modo Máquina de Escribir (Typewriter Mode)
+  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 't') {
+    e.preventDefault()
+    uiStore.toggleTypewriterMode()
+    return
+  }
+
   // Ctrl+S / Cmd+S: Guardado forzado instantáneo (sin shift)
   if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault()
@@ -1025,6 +1033,27 @@ onBeforeUnmount(async () => {
               <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
             </button>
 
+            <!-- Conmutador: Modo Máquina de Escribir (Typewriter Mode) -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40':
+                  uiStore.isTypewriterMode,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]':
+                  !uiStore.isTypewriterMode
+              }"
+              :title="
+                uiStore.isTypewriterMode
+                  ? 'Desactivar Modo Máquina de Escribir'
+                  : 'Activar Modo Máquina de Escribir (Línea activa centrada al 50% vertical)'
+              "
+              @click="uiStore.toggleTypewriterMode"
+            >
+              <Keyboard :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Máquina</span>
+            </button>
+
             <!-- Botón Buscar en capítulo (Ctrl+F) -->
             <button
               type="button"
@@ -1365,6 +1394,8 @@ onBeforeUnmount(async () => {
               <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
               <span>·</span>
               <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Enfoque</span>
+              <span>·</span>
+              <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
             </span>
           </div>
         </footer>
