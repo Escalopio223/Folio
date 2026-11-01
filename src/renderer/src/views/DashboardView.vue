@@ -17,6 +17,7 @@ import {
   Trash2,
   Check,
   Eye,
+  Keyboard,
   Flame,
   Pencil,
   GripVertical,
@@ -613,6 +614,13 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     return
   }
 
+  // Ctrl+Shift+T / Cmd+Shift+T: Alternar Modo Máquina de Escribir (Typewriter Mode)
+  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 't') {
+    e.preventDefault()
+    uiStore.toggleTypewriterMode()
+    return
+  }
+
   // Ctrl+S / Cmd+S: Guardado forzado instantáneo (sin shift)
   if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault()
@@ -1004,7 +1012,7 @@ onBeforeUnmount(async () => {
 
           <!-- Controles Superiores de Capítulo y Guardado -->
           <div class="flex items-center gap-2 shrink-0">
-            <!-- Conmutador: Modo Enfoque por Párrafo -->
+            <!-- Conmutador: Modo Zen / Enfoque Editorial Inmersivo -->
             <button
               type="button"
               class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
@@ -1016,13 +1024,35 @@ onBeforeUnmount(async () => {
               }"
               :title="
                 uiStore.isFocusMode
-                  ? 'Desactivar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
-                  : 'Activar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
+                  ? 'Salir del Modo Zen (Esc o F11)'
+                  : 'Activar Modo Zen Inmersivo (F11 o Ctrl+Shift+F): Lienzo limpio, distracción cero y enfoque de párrafo'
               "
               @click="uiStore.toggleFocusMode"
             >
-              <Eye :size="13" />
-              <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
+              <Sparkles v-if="uiStore.isFocusMode" :size="13" class="text-[var(--accent)] animate-pulse" />
+              <Eye v-else :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Modo Zen</span>
+            </button>
+
+            <!-- Conmutador: Modo Máquina de Escribir (Typewriter Mode) -->
+            <button
+              type="button"
+              class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              :class="{
+                'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40':
+                  uiStore.isTypewriterMode,
+                'text-[var(--text-secondary)] hover:text-[var(--text-primary)]':
+                  !uiStore.isTypewriterMode
+              }"
+              :title="
+                uiStore.isTypewriterMode
+                  ? 'Desactivar Modo Máquina de Escribir'
+                  : 'Activar Modo Máquina de Escribir (Línea activa centrada al 50% vertical)'
+              "
+              @click="uiStore.toggleTypewriterMode"
+            >
+              <Keyboard :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Máquina</span>
             </button>
 
             <!-- Botón Buscar en capítulo (Ctrl+F) -->
@@ -1365,6 +1395,8 @@ onBeforeUnmount(async () => {
               <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
               <span>·</span>
               <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Enfoque</span>
+              <span>·</span>
+              <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
             </span>
           </div>
         </footer>

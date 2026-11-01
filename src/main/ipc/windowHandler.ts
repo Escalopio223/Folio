@@ -22,6 +22,9 @@ export function registerWindowHandlers(): void {
         return true
       case 'isMaximized':
         return win.isMaximized()
+      case 'fullscreen':
+        win.setFullScreen(!win.isFullScreen())
+        return win.isFullScreen()
       default:
         return false
     }

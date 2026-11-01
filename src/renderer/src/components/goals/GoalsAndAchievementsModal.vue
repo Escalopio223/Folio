@@ -245,12 +245,12 @@ onBeforeUnmount(() => {
                         min="500"
                         step="50"
                         placeholder="500"
-                        class="w-full neu-input px-3.5 py-2 rounded-xl text-base font-bold font-mono text-[var(--text-primary)] focus:outline-none"
+                        class="w-full neu-input pl-3.5 pr-20 py-2 rounded-xl text-base font-bold font-mono text-[var(--text-primary)] focus:outline-none"
                         :class="{ '!border-red-500/60': !isInputValid }"
                         @keydown.enter="handleSaveGoal"
                       />
                       <span
-                        class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-[var(--text-muted)] pointer-events-none"
+                        class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-[var(--text-muted)] pointer-events-none select-none"
                       >
                         palabras
                       </span>

@@ -231,7 +231,7 @@ export interface RecordProgressPayload {
   sessionGoalHitDelta?: number
 }
 
-export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized'
+export type WindowAction = 'minimize' | 'maximize' | 'close' | 'isMaximized' | 'fullscreen'
 
 export interface FolioApi {
   project: {
