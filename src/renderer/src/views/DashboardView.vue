@@ -1012,7 +1012,7 @@ onBeforeUnmount(async () => {
 
           <!-- Controles Superiores de Capítulo y Guardado -->
           <div class="flex items-center gap-2 shrink-0">
-            <!-- Conmutador: Modo Enfoque por Párrafo -->
+            <!-- Conmutador: Modo Zen / Enfoque Editorial Inmersivo -->
             <button
               type="button"
               class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer"
@@ -1024,13 +1024,14 @@ onBeforeUnmount(async () => {
               }"
               :title="
                 uiStore.isFocusMode
-                  ? 'Desactivar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
-                  : 'Activar Modo Enfoque por Párrafo (Ctrl+Shift+F)'
+                  ? 'Salir del Modo Zen (Esc o F11)'
+                  : 'Activar Modo Zen Inmersivo (F11 o Ctrl+Shift+F): Lienzo limpio, distracción cero y enfoque de párrafo'
               "
               @click="uiStore.toggleFocusMode"
             >
-              <Eye :size="13" />
-              <span class="text-[11px] font-medium hidden md:inline">Enfoque</span>
+              <Sparkles v-if="uiStore.isFocusMode" :size="13" class="text-[var(--accent)] animate-pulse" />
+              <Eye v-else :size="13" />
+              <span class="text-[11px] font-medium hidden md:inline">Modo Zen</span>
             </button>
 
             <!-- Conmutador: Modo Máquina de Escribir (Typewriter Mode) -->

@@ -102,13 +102,18 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Shift', 'F'],
-        description: 'Modo Enfoque Profundo (atenúa párrafos inactivos y barras laterales)',
+        keys: ['F11 / Ctrl+Shift+F'],
+        description: 'Modo Zen Inmersivo (Lienzo libre de distracciones, pantalla completa y foco en párrafo activo)',
         context: 'Editor'
       },
       {
+        keys: ['Esc'],
+        description: 'Salir del Modo Zen / Cerrar modal o panel activo',
+        context: 'Global'
+      },
+      {
         keys: ['Ctrl', 'Shift', 'T'],
-        description: 'Modo Máquina de Escribir (Typewriter Mode — cursor centrado al 50vh)',
+        description: 'Modo Máquina de Escribir (Typewriter Mode — cursor anclado al centro vertical)',
         context: 'Editor'
       },
       {
@@ -423,8 +428,9 @@ const filteredCategories = computed(() => {
                     Modos de Inmersión y Enfoque
                   </h4>
                   <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Modo Máquina de Escribir (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Shift+T</kbd>):</strong> Fija la línea activa del cursor exactamente en el centro de tu pantalla (50vh) para no forzar la vista hacia abajo.</li>
-                    <li><strong>Modo Enfoque Profundo (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Shift+F</kbd>):</strong> Atenúa todos los párrafos salvo el activo y oculta sutilmente los paneles laterales.</li>
+                    <li><strong>Modo Máquina de Escribir (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Shift+T</kbd>):</strong> Estilo Scrivener y Typora. A partir del centro de la pantalla, la línea de redacción queda anclada al 50% vertical para mantener la vista fija al frente.</li>
+                    <li><strong>Modo Zen Inmersivo (<kbd class="neu-well-sm px-1 text-[10px] font-mono">F11 / Ctrl+Shift+F</kbd>):</strong> Oculta paneles, cabeceras y barras de estado dejando el lienzo limpio y puro, con spotlight nítido sobre el párrafo activo. Pulsa <kbd class="neu-well-sm px-1 text-[10px] font-mono">Esc</kbd> para salir.</li>
+                    <li><strong>Efectos Sonoros Táctiles:</strong> Simulación de mecanografía mecánica en tiempo real con chasquido metálico, retorno de carro y campanita clásica. Actívalo o siléncialo desde el botón de la barra superior.</li>
                     <li><strong>Buscador dentro del capítulo (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+F</kbd>):</strong> Barra estilo VS Code para buscar, resaltar y navegar entre ocurrencias instantáneamente.</li>
                   </ul>
                 </div>

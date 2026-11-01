@@ -20,6 +20,7 @@ import { useSpellcheck } from '../../composables/useSpellcheck'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
+import { useTypewriterAudio } from '../../composables/useTypewriterAudio'
 import {
   computeMetricsFromText,
   type ChapterMetricsSnapshot
@@ -61,6 +62,7 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
+const { handleTypingSound, playBell } = useTypewriterAudio()
 
 function toRoman(num: number): string {
   const romans: Array<[number, string]> = [
@@ -193,10 +195,20 @@ const editor = useEditor({
         return true
       }
 
-      // Atajo de Modo Enfoque dentro del editor (Ctrl+Shift+F)
-      if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') {
+      // Atajo de Modo Zen / Enfoque dentro del editor (Ctrl+Shift+F o F11)
+      if (
+        (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') ||
+        event.key === 'F11'
+      ) {
         event.preventDefault()
         uiStore.toggleFocusMode()
+        return true
+      }
+
+      // Salir de Modo Zen con tecla Escape
+      if (event.key === 'Escape' && uiStore.isFocusMode) {
+        event.preventDefault()
+        uiStore.exitFocusMode()
         return true
       }
 
@@ -206,6 +218,10 @@ const editor = useEditor({
         uiStore.toggleTypewriterMode()
         return true
       }
+
+      // Efecto sonoro de máquina de escribir mecánica
+      handleTypingSound(event.key, event.code, isCtrlOrCmd)
+
       return false
     }
   },
@@ -446,7 +462,8 @@ defineExpose({
   focus: () => editor.value?.commands.focus(),
   scrollToSceneBreak,
   navigateToMatch,
-  recenterTypewriter: (smooth = true) => editor.value?.commands.recenterTypewriter(smooth)
+  recenterTypewriter: (smooth = true) => editor.value?.commands.recenterTypewriter(smooth),
+  playBell
 })
 </script>
 

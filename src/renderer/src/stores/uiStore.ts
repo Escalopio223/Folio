@@ -530,6 +530,36 @@ export const useUiStore = defineStore('ui', () => {
   const isSplashLoading = ref(true)
   const isFocusMode = ref(false)
   const isTypewriterMode = ref(false)
+  const isTypewriterSoundEnabled = ref(localStorage.getItem('folio:typewriter_sound') !== 'false')
+
+  function toggleTypewriterSound(): void {
+    isTypewriterSoundEnabled.value = !isTypewriterSoundEnabled.value
+    localStorage.setItem('folio:typewriter_sound', String(isTypewriterSoundEnabled.value))
+  }
+
+  let wasLeftSidebarOpenBeforeFocus = isLeftSidebarOpen.value
+  let wasRightSidebarOpenBeforeFocus = isRightSidebarOpen.value
+
+  function toggleFocusMode(): void {
+    if (!isFocusMode.value) {
+      // Activar Modo Zen Inmersivo
+      wasLeftSidebarOpenBeforeFocus = isLeftSidebarOpen.value
+      wasRightSidebarOpenBeforeFocus = isRightSidebarOpen.value
+      isLeftSidebarOpen.value = false
+      isRightSidebarOpen.value = false
+      isFocusMode.value = true
+    } else {
+      // Salir del Modo Zen
+      exitFocusMode()
+    }
+  }
+
+  function exitFocusMode(): void {
+    if (!isFocusMode.value) return
+    isFocusMode.value = false
+    isLeftSidebarOpen.value = wasLeftSidebarOpenBeforeFocus
+    isRightSidebarOpen.value = wasRightSidebarOpenBeforeFocus
+  }
 
   function toggleLeftSidebar(): void {
     isLeftSidebarOpen.value = !isLeftSidebarOpen.value
@@ -561,10 +591,6 @@ export const useUiStore = defineStore('ui', () => {
 
   function setSplashLoading(val: boolean): void {
     isSplashLoading.value = val
-  }
-
-  function toggleFocusMode(): void {
-    isFocusMode.value = !isFocusMode.value
   }
 
   function toggleTypewriterMode(): void {
@@ -701,6 +727,9 @@ export const useUiStore = defineStore('ui', () => {
     openWikiLore,
     setSplashLoading,
     toggleFocusMode,
+    exitFocusMode,
+    isTypewriterSoundEnabled,
+    toggleTypewriterSound,
     isTypewriterMode,
     toggleTypewriterMode,
     setTypewriterMode

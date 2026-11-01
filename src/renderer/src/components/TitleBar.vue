@@ -12,7 +12,9 @@ import {
   PanelRightClose,
   Search,
   Feather,
-  HelpCircle
+  HelpCircle,
+  Volume2,
+  VolumeX
 } from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import ExportManuscriptMenu from './ExportManuscriptMenu.vue'
@@ -136,6 +138,26 @@ onUnmounted(() => {
           <HelpCircle :size="13" class="opacity-85 text-[var(--accent)]" />
           <span class="text-[11px] font-medium hidden md:inline">Manual</span>
           <kbd class="neu-well-sm text-[9px] font-mono px-1 py-0.2 text-[var(--text-muted)]">F1</kbd>
+        </button>
+
+        <!-- Conmutador: Sonido de Máquina de Escribir Mecánica -->
+        <button
+          type="button"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          :class="{
+            'neu-well !text-[var(--accent)] font-semibold border-[var(--accent)]/40':
+              uiStore.isTypewriterSoundEnabled
+          }"
+          :title="
+            uiStore.isTypewriterSoundEnabled
+              ? 'Silenciar efectos sonoros de máquina de escribir'
+              : 'Activar efectos sonoros táctiles de máquina de escribir'
+          "
+          @click="uiStore.toggleTypewriterSound"
+        >
+          <Volume2 v-if="uiStore.isTypewriterSoundEnabled" :size="13" class="text-[var(--accent)]" />
+          <VolumeX v-else :size="13" class="opacity-60" />
+          <span class="text-[11px] font-medium hidden md:inline">Sonido</span>
         </button>
       </div>
 
