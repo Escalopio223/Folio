@@ -413,6 +413,15 @@ textarea,
   background: var(--accent);
 }
 
+/* Ocultar barra de scroll preservando el desplazamiento */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* =========================================================================
    MODO ZEN / ENFOQUE INMERSIVO SUPREMO (ZEN FOCUS MODE)
    ========================================================================= */

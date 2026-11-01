@@ -114,7 +114,7 @@ function handleReset(): void {
         type="text"
         inputmode="decimal"
         :placeholder="placeholder"
-        class="w-10 bg-transparent border-none focus:outline-none text-[11px] font-mono font-semibold text-center text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60"
+        class="w-11 min-w-[36px] bg-transparent border-none focus:outline-none text-[11px] font-mono font-semibold text-center text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60"
         aria-label="Tamaño de fuente"
         @focus="($event.target as HTMLInputElement).select()"
         @blur="validateAndCommit"

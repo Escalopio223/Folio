@@ -174,10 +174,10 @@ function insertSceneBreak(): void {
 
 <template>
   <div
-    class="editor-toolbar w-full neu-surface px-2 py-1 flex items-center justify-between gap-1 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30"
+    class="editor-toolbar w-full neu-surface px-2.5 py-1 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30 overflow-x-auto no-scrollbar"
   >
-    <!-- Contenedor flexible de opciones (sin scrollbar cuando está maximizado) -->
-    <div class="flex items-center gap-1 flex-wrap lg:flex-nowrap w-full">
+    <!-- Contenedor horizontal en una sola fila fija (nunca se parte ni se descoloca) -->
+    <div class="flex items-center gap-1 flex-nowrap min-w-max">
       <!-- 1. Deshacer / Rehacer -->
       <div class="flex items-center gap-0.5 shrink-0">
         <button
@@ -583,7 +583,7 @@ function insertSceneBreak(): void {
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 
       <!-- 9. Listas & Florón Narrativo Clásico -->
-      <div class="flex items-center gap-1 shrink-0 ml-auto lg:ml-0">
+      <div class="flex items-center gap-1 shrink-0">
         <button
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"

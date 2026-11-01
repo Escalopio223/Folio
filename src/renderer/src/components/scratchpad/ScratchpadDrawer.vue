@@ -29,6 +29,49 @@ const isListCollapsed = ref(false)
 const copyToast = ref(false)
 const promoteToast = ref<string | null>(null)
 
+// Ancho redimensionable del cajón con persistencia local
+const drawerWidth = ref<number>(
+  Number(localStorage.getItem('folio:scratchpad_width')) || 430
+)
+const isResizing = ref(false)
+
+function onResizePointerDown(e: PointerEvent): void {
+  if (e.button !== 0) return
+  e.preventDefault()
+  isResizing.value = true
+  const startX = e.clientX
+  const startW = drawerWidth.value
+
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+
+  const onPointerMove = (ev: PointerEvent) => {
+    const deltaX = ev.clientX - startX
+    const maxW = Math.round(window.innerWidth * 0.88)
+    const newWidth = Math.max(340, Math.min(maxW, Math.round(startW - deltaX)))
+    drawerWidth.value = newWidth
+  }
+
+  const onPointerUp = () => {
+    isResizing.value = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    localStorage.setItem('folio:scratchpad_width', String(drawerWidth.value))
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+    window.removeEventListener('pointercancel', onPointerUp)
+  }
+
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerUp)
+}
+
+function resetDrawerWidth(): void {
+  drawerWidth.value = 430
+  localStorage.setItem('folio:scratchpad_width', '430')
+}
+
 // Cerrar drawer al hacer clic fuera del panel
 onClickOutside(drawerRef, () => {
   if (scratchpadStore.isOpen) {
@@ -252,10 +295,24 @@ async function handleCreateNewNote(): Promise<void> {
       <aside
         v-if="scratchpadStore.isOpen"
         ref="drawerRef"
-        class="fixed right-0 top-0 bottom-0 z-50 w-[410px] max-w-[95vw] h-full flex flex-col bg-[var(--bg-surface)] text-[var(--text-primary)] neu-surface border-l border-[var(--groove-dark)]/60 shadow-[-12px_0_36px_rgba(0,0,0,0.35)] overflow-hidden select-none"
+        class="fixed right-0 top-0 bottom-0 z-50 h-full flex flex-col bg-[var(--bg-surface)] text-[var(--text-primary)] neu-surface border-l border-[var(--groove-dark)]/60 shadow-[-12px_0_36px_rgba(0,0,0,0.35)] overflow-hidden select-none"
+        :style="{ width: `${drawerWidth}px`, maxWidth: '90vw' }"
         role="dialog"
         aria-label="Scratchpad - Bloc de Captura Rápida"
       >
+        <!-- Tirador de Redimensionamiento Lateral Izquierdo -->
+        <div
+          class="absolute left-0 top-0 bottom-0 w-2.5 -translate-x-1 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[var(--accent)]/30 active:bg-[var(--accent)] transition-all"
+          :class="{ 'bg-[var(--accent)]/40': isResizing }"
+          title="Arrastrar para redimensionar el Scratchpad (Doble clic para restablecer)"
+          @pointerdown="onResizePointerDown"
+          @dblclick="resetDrawerWidth"
+        >
+          <div
+            class="w-1 h-8 rounded-full bg-[var(--groove-dark)]/70 group-hover:bg-[var(--accent)] transition-colors"
+            :class="{ '!bg-[var(--accent)]': isResizing }"
+          />
+        </div>
         <!-- =============================================================== -->
         <!-- 1. CABECERA DEL SCRATCHPAD                                      -->
         <!-- =============================================================== -->
