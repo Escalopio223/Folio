@@ -140,6 +140,23 @@ const currentLanguageCode = computed<'en-US' | 'es-ES'>(() => {
   return activeSpellcheckCode.value
 })
 
+function applySpellcheckDOM(ed: { view?: { dom?: HTMLElement } } | null | undefined, langCode: 'en-US' | 'es-ES'): void {
+  if (!ed || !ed.view?.dom) return
+  const dom = ed.view.dom
+  dom.setAttribute('lang', langCode)
+  // Forzar a Chromium a reanalizar de inmediato las palabras existentes con el nuevo diccionario
+  dom.setAttribute('spellcheck', 'false')
+  requestAnimationFrame(() => {
+    if (dom) {
+      dom.setAttribute('spellcheck', 'true')
+    }
+  })
+  if (window.api?.spellcheck) {
+    const single = langCode === 'en-US' ? ['en-US'] : ['es-ES']
+    window.api.spellcheck.setLanguages(single).catch(() => {})
+  }
+}
+
 const editor = useEditor({
   content: normalizeHtml(props.content),
   extensions: [
@@ -233,12 +250,7 @@ const editor = useEditor({
     if (ed.view?.dom) {
       const targetLang = activeSpellcheckCode.value
       if (ed.view.dom.getAttribute('lang') !== targetLang) {
-        ed.view.dom.setAttribute('lang', targetLang)
-        ed.view.dom.setAttribute('spellcheck', 'true')
-        if (window.api?.spellcheck) {
-          const primary = targetLang === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
-          window.api.spellcheck.setLanguages(primary).catch(() => {})
-        }
+        applySpellcheckDOM(ed, targetLang)
       }
     }
 
@@ -298,13 +310,8 @@ watch(
 watch(
   [currentLanguageCode, editor],
   ([langCode, ed]) => {
-    if (!ed || !ed.view || !ed.view.dom) return
-    ed.view.dom.setAttribute('lang', langCode)
-    ed.view.dom.setAttribute('spellcheck', 'true')
-    if (window.api?.spellcheck) {
-      const primary = langCode === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
-      window.api.spellcheck.setLanguages(primary).catch(() => {})
-    }
+    if (!ed || !ed.view?.dom) return
+    applySpellcheckDOM(ed, langCode)
   },
   { immediate: true }
 )

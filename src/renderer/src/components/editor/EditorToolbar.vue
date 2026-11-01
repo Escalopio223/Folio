@@ -174,10 +174,10 @@ function insertSceneBreak(): void {
 
 <template>
   <div
-    class="editor-toolbar w-full neu-surface px-2.5 py-1 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30 overflow-x-auto no-scrollbar"
+    class="editor-toolbar w-full neu-surface px-2.5 py-1 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30"
   >
     <!-- Contenedor horizontal en una sola fila fija (nunca se parte ni se descoloca) -->
-    <div class="flex items-center gap-1 flex-nowrap min-w-max">
+    <div class="flex items-center gap-1 flex-nowrap w-full">
       <!-- 1. Deshacer / Rehacer -->
       <div class="flex items-center gap-0.5 shrink-0">
         <button

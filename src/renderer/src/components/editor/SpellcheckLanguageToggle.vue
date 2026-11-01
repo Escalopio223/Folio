@@ -30,6 +30,7 @@ function select(lang: 'auto' | 'es' | 'en'): void {
     <button
       type="button"
       class="neu-btn h-7 px-2 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer select-none"
+      :class="{ 'neu-well !text-[var(--accent)] font-semibold': isOpen }"
       :title="
         currentLang === 'auto'
           ? `Corrector ortográfico: Detección automática (Detectado: ${detectedLang === 'en' ? 'Inglés' : 'Español'})`
@@ -64,13 +65,14 @@ function select(lang: 'auto' | 'es' | 'en'): void {
     >
       <div
         v-if="isOpen"
-        class="absolute right-0 top-full mt-1.5 z-50 neu-surface p-1.5 min-w-[170px] shadow-xl border border-[var(--groove-dark)]/50 rounded-lg space-y-0.5 text-xs text-[var(--text-primary)] select-none"
+        class="absolute right-0 top-full mt-1.5 z-50 neu-surface bg-[var(--bg-surface)] backdrop-blur-md p-1.5 min-w-[170px] shadow-2xl border border-[var(--groove-dark)]/60 rounded-xl space-y-0.5 text-xs text-[var(--text-primary)] select-none"
       >
         <button
           type="button"
-          class="w-full px-2 py-1 text-left rounded-md flex items-center justify-between hover:bg-[var(--bg-base)] cursor-pointer"
+          class="w-full px-2.5 py-1.5 text-left rounded-lg flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
           :class="{ 'text-[var(--accent)] font-bold neu-well-sm': currentLang === 'auto' }"
-          @click="select('auto')"
+          @mousedown.prevent
+          @click.stop="select('auto')"
         >
           <div class="flex items-center gap-1.5">
             <span>Auto (Detectar)</span>
@@ -84,18 +86,20 @@ function select(lang: 'auto' | 'es' | 'en'): void {
         </button>
         <button
           type="button"
-          class="w-full px-2 py-1 text-left rounded-md flex items-center justify-between hover:bg-[var(--bg-base)] cursor-pointer"
+          class="w-full px-2.5 py-1.5 text-left rounded-lg flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
           :class="{ 'text-[var(--accent)] font-bold neu-well-sm': currentLang === 'es' }"
-          @click="select('es')"
+          @mousedown.prevent
+          @click.stop="select('es')"
         >
           <span>Español (ES)</span>
           <Check v-if="currentLang === 'es'" :size="11" />
         </button>
         <button
           type="button"
-          class="w-full px-2 py-1 text-left rounded-md flex items-center justify-between hover:bg-[var(--bg-base)] cursor-pointer"
+          class="w-full px-2.5 py-1.5 text-left rounded-lg flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
           :class="{ 'text-[var(--accent)] font-bold neu-well-sm': currentLang === 'en' }"
-          @click="select('en')"
+          @mousedown.prevent
+          @click.stop="select('en')"
         >
           <span>English (EN)</span>
           <Check v-if="currentLang === 'en'" :size="11" />

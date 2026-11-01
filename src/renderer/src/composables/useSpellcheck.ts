@@ -15,8 +15,9 @@ export function useSpellcheck() {
   async function applyLanguages(): Promise<void> {
     if (window.api?.spellcheck) {
       try {
-        const primary = activeSpellcheckCode.value === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
-        await window.api.spellcheck.setLanguages(primary)
+        // Enviar exclusivamente el idioma objetivo para que palabras de otro idioma sean marcadas con error
+        const target = activeSpellcheckCode.value === 'en-US' ? ['en-US'] : ['es-ES']
+        await window.api.spellcheck.setLanguages(target)
       } catch {
         // Ignorar si no está disponible en la plataforma
       }
