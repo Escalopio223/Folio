@@ -37,7 +37,7 @@ const props = defineProps<{
   editor: Editor | null | undefined
 }>()
 
-const { spellcheckLang, setSpellcheckLanguage } = useSpellcheck()
+const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 
 // Minimodales: Fuente, Color, Resaltado
 type ActiveModal = 'font' | 'color' | 'highlight' | null
@@ -624,6 +624,7 @@ function insertSceneBreak(): void {
       <!-- 10. Corrector Ortográfico (Español / English) -->
       <SpellcheckLanguageToggle
         :current-lang="spellcheckLang"
+        :detected-lang="detectedLang"
         @update:lang="setSpellcheckLanguage"
       />
     </div>

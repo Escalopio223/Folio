@@ -1,36 +1,53 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export type SpellcheckLanguageMode = 'auto' | 'es' | 'en'
 
 const spellcheckLang = ref<SpellcheckLanguageMode>('auto')
-const activeSpellcheckCode = ref<'es-ES' | 'en-US'>('es-ES')
+const detectedLang = ref<'es' | 'en'>('es')
 
 export function useSpellcheck() {
-  async function setSpellcheckLanguage(mode: SpellcheckLanguageMode): Promise<void> {
-    spellcheckLang.value = mode
-    if (mode === 'en') {
-      activeSpellcheckCode.value = 'en-US'
-    } else if (mode === 'es') {
-      activeSpellcheckCode.value = 'es-ES'
-    }
+  const activeSpellcheckCode = computed<'es-ES' | 'en-US'>(() => {
+    if (spellcheckLang.value === 'en') return 'en-US'
+    if (spellcheckLang.value === 'es') return 'es-ES'
+    return detectedLang.value === 'en' ? 'en-US' : 'es-ES'
+  })
+
+  async function applyLanguages(): Promise<void> {
     if (window.api?.spellcheck) {
       try {
-        const langs = mode === 'en' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
-        await window.api.spellcheck.setLanguages(langs)
+        const primary = activeSpellcheckCode.value === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
+        await window.api.spellcheck.setLanguages(primary)
       } catch {
-        // Ignorar si no está disponible
+        // Ignorar si no está disponible en la plataforma
+      }
+    }
+  }
+
+  async function setSpellcheckLanguage(mode: SpellcheckLanguageMode): Promise<void> {
+    spellcheckLang.value = mode
+    await applyLanguages()
+  }
+
+  function setDetectedLanguage(lang: 'es' | 'en'): void {
+    if (detectedLang.value !== lang) {
+      detectedLang.value = lang
+      if (spellcheckLang.value === 'auto') {
+        applyLanguages()
       }
     }
   }
 
   function setActiveCode(code: 'es-ES' | 'en-US'): void {
-    activeSpellcheckCode.value = code
+    setDetectedLanguage(code === 'en-US' ? 'en' : 'es')
   }
 
   return {
     spellcheckLang,
+    detectedLang,
     activeSpellcheckCode,
     setSpellcheckLanguage,
-    setActiveCode
+    setDetectedLanguage,
+    setActiveCode,
+    applyLanguages
   }
 }

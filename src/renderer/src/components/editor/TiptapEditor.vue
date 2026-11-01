@@ -134,13 +134,10 @@ function scanSceneBreaks(ed: { state: Editor['state'] }): SceneBreakAnchor[] {
   return anchors
 }
 
-const { spellcheckLang, setActiveCode } = useSpellcheck()
+const { activeSpellcheckCode, setDetectedLanguage } = useSpellcheck()
 
 const currentLanguageCode = computed<'en-US' | 'es-ES'>(() => {
-  if (spellcheckLang.value === 'en') return 'en-US'
-  if (spellcheckLang.value === 'es') return 'es-ES'
-  const detected = detectLanguage(props.content || '')
-  return detected === 'en' ? 'en-US' : 'es-ES'
+  return activeSpellcheckCode.value
 })
 
 const editor = useEditor({
@@ -229,21 +226,15 @@ const editor = useEditor({
     const html = ed.getHTML()
     const text = ed.getText()
 
-    // Sincronizar automáticamente el atributo lang para que Chromium aplique el corrector adecuado
-    if (ed.view?.dom) {
-      const targetLang =
-        spellcheckLang.value === 'en'
-          ? 'en-US'
-          : spellcheckLang.value === 'es'
-            ? 'es-ES'
-            : detectLanguage(text) === 'en'
-              ? 'en-US'
-              : 'es-ES'
+    // Sincronizar automáticamente el idioma detectado y el atributo lang para que Chromium aplique el corrector adecuado
+    const detected = detectLanguage(text)
+    setDetectedLanguage(detected)
 
+    if (ed.view?.dom) {
+      const targetLang = activeSpellcheckCode.value
       if (ed.view.dom.getAttribute('lang') !== targetLang) {
         ed.view.dom.setAttribute('lang', targetLang)
         ed.view.dom.setAttribute('spellcheck', 'true')
-        setActiveCode(targetLang)
         if (window.api?.spellcheck) {
           const primary = targetLang === 'en-US' ? ['en-US', 'es-ES'] : ['es-ES', 'en-US']
           window.api.spellcheck.setLanguages(primary).catch(() => {})
@@ -265,6 +256,10 @@ const editor = useEditor({
 watch(
   () => props.content,
   (newContent) => {
+    // Detectar idioma inicial o actualizado del contenido
+    const detected = detectLanguage(newContent || '')
+    setDetectedLanguage(detected)
+
     if (!editor.value) return
     const currentHtml = editor.value.getHTML()
     if (currentHtml !== newContent) {
@@ -274,7 +269,8 @@ watch(
       emit('stats', calculateStats(text))
       emit('scene-breaks', scanSceneBreaks(editor.value))
     }
-  }
+  },
+  { immediate: true }
 )
 
 watch(
