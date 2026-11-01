@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 export const typewriterPluginKey = new PluginKey('typewriterExtension')
 
 export interface TypewriterOptions {
-  enabled: boolean
+  enabled: boolean | (() => boolean)
   getScrollContainer?: () => HTMLElement | null
 }
 
@@ -18,9 +18,13 @@ declare module '@tiptap/core' {
   }
 }
 
+let activeScrollToCaret: ((view: EditorView, smooth?: boolean, force?: boolean) => void) | null = null
+
 /**
- * Extensión de TipTap / ProseMirror para el Modo Máquina de Escribir (Typewriter Scrolling Mode)
- * Mantiene la línea del cursor centrada al 50% vertical exacto del contenedor visible.
+ * Extensión de TipTap / ProseMirror para el Modo Máquina de Escribir estilo Scrivener / Typora
+ * El texto inicia arriba normalmente sin huecos artificiales.
+ * En cuanto el cursor alcanza o supera el 50% vertical, queda anclado en el centro
+ * y el texto asciende suavemente a cada línea o Enter.
  */
 export const TypewriterExtension = Extension.create<TypewriterOptions>({
   name: 'typewriter',
@@ -33,11 +37,12 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
   },
 
   addCommands() {
+    const extension = this
     return {
       setTypewriterMode:
         (enabled: boolean) =>
         ({ tr, dispatch }) => {
-          this.options.enabled = enabled
+          extension.options.enabled = enabled
           if (dispatch) {
             tr.setMeta(typewriterPluginKey, { enabled })
           }
@@ -45,13 +50,9 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
         },
       recenterTypewriter:
         (smooth = true) =>
-        ({ editor, tr, dispatch }) => {
-          if (dispatch) {
-            tr.setMeta(typewriterPluginKey, { recenter: true, smooth })
-          }
-          if (editor.view) {
-            const pluginState = typewriterPluginKey.getState(editor.view.state)
-            pluginState?.scrollToCaret?.(editor.view, smooth, true)
+        ({ editor }) => {
+          if (editor?.view) {
+            activeScrollToCaret?.(editor.view, smooth, true)
           }
           return true
         }
@@ -61,6 +62,19 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
   addProseMirrorPlugins() {
     const extension = this
 
+    const isEnabled = (view?: EditorView): boolean => {
+      if (typeof extension.options.enabled === 'function') {
+        return extension.options.enabled()
+      }
+      if (view) {
+        const pluginState = typewriterPluginKey.getState(view.state)
+        if (pluginState?.enabled !== undefined) {
+          return pluginState.enabled
+        }
+      }
+      return !!extension.options.enabled
+    }
+
     return [
       new Plugin({
         key: typewriterPluginKey,
@@ -68,10 +82,7 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
         state: {
           init() {
             return {
-              enabled: extension.options.enabled,
-              scrollToCaret: null as
-                | null
-                | ((view: EditorView, smooth?: boolean, force?: boolean) => void)
+              enabled: typeof extension.options.enabled === 'function' ? extension.options.enabled() : extension.options.enabled
             }
           },
           apply(tr, prev) {
@@ -101,8 +112,8 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
           }
 
           const scrollToCaret = (view: EditorView, smooth = false, force = false) => {
-            if (!extension.options.enabled) return
-            // Si el usuario está scrolleando libremente para leer o arrastrando texto, no forzar a menos que sea comando directo
+            if (!isEnabled(view)) return
+            // Si el usuario está usando la rueda para leer o arrastrando texto, no forzar recentrado automático
             if (!force && (userScrolledAway || isMouseDown)) return
 
             const scrollContainer = getContainer()
@@ -125,9 +136,11 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
             const caretCenterY = caretCoords.top + (caretCoords.bottom - caretCoords.top) / 2
             const deltaY = caretCenterY - targetY
 
-            // Umbral anti-jitter: ignorar variaciones subpíxel de la tipografía
+            // Umbral anti-jitter
             if (Math.abs(deltaY) > 2) {
-              // Si el cursor está por encima del centro objetivo y el contenedor ya está al inicio (scrollTop <= 0), no hay que forzar scroll negativo
+              // Estilo Scrivener / Typora:
+              // Si el cursor está por encima de la mitad de pantalla y ya estamos arriba (scrollTop <= 0),
+              // se escribe con el diseño natural debajo del título sin forzar scroll.
               if (deltaY < 0 && scrollContainer.scrollTop <= 0) {
                 return
               }
@@ -145,29 +158,23 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
             }
           }
 
-          // Vincular método al estado para llamadas externas
-          const pluginState = typewriterPluginKey.getState(editorView.state)
-          if (pluginState) {
-            pluginState.scrollToCaret = scrollToCaret
-          }
+          activeScrollToCaret = scrollToCaret
 
           // 1. Detección de Scroll Manual (wheel / touchmove):
-          // Permite al usuario desplazarse libremente con la rueda para leer sin que la vista vuelva sola al cursor
+          // Permite al usuario desplazarse libremente para releer sin que la vista salte al cursor
           const handleWheelOrTouch = () => {
-            if (!extension.options.enabled) return
+            if (!isEnabled(editorView)) return
             userScrolledAway = true
           }
 
           // 2. Reactivación inmediata por teclado:
-          // Al volver a pulsar cualquier tecla de escritura o navegación, reactiva el anclaje al centro
           const handleKeyDown = () => {
             if (userScrolledAway) {
               userScrolledAway = false
             }
           }
 
-          // 3. Manejo de clics y arrastre de texto con el ratón (mousedown / mouseup):
-          // Espera a soltar el ratón (mouseup) para no interferir en selecciones por arrastre
+          // 3. Manejo de clics del ratón (mousedown / mouseup):
           const handleMouseDown = () => {
             isMouseDown = true
           }
@@ -176,7 +183,7 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
             if (isMouseDown) {
               isMouseDown = false
               userScrolledAway = false
-              if (extension.options.enabled) {
+              if (isEnabled(editorView)) {
                 setTimeout(() => {
                   scrollToCaret(editorView, true, true)
                 }, 30)
@@ -193,10 +200,10 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
           editorView.dom.addEventListener('keydown', handleKeyDown)
           editorView.dom.addEventListener('mousedown', handleMouseDown)
 
-          // 4. ResizeObserver: Mantiene el centrado si el usuario redimensiona la ventana o paneles laterales
+          // 4. ResizeObserver: Mantiene el centrado al redimensionar paneles o ventana
           if (scrollContainer && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver(() => {
-              if (extension.options.enabled && !userScrolledAway && !isMouseDown) {
+              if (isEnabled(editorView) && !userScrolledAway && !isMouseDown) {
                 scrollToCaret(editorView, false)
               }
             })
@@ -205,19 +212,26 @@ export const TypewriterExtension = Extension.create<TypewriterOptions>({
 
           return {
             update(view, prevState) {
-              if (!extension.options.enabled) return
+              if (!isEnabled(view)) return
 
               const docChanged = !prevState.doc.eq(view.state.doc)
               const selChanged = !prevState.selection.eq(view.state.selection)
 
-              if (docChanged || selChanged) {
-                // Centrado inmediato al escribir o desplazarse por teclado
+              if (docChanged) {
+                // Al escribir una letra, salto de línea o borrado, reanudar centrado inmediatamente
+                userScrolledAway = false
+                scrollToCaret(view, false)
+              } else if (selChanged && !userScrolledAway && !isMouseDown) {
+                // Al mover el cursor con las flechas
                 scrollToCaret(view, false)
               }
             },
 
             destroy() {
               if (rafId) cancelAnimationFrame(rafId)
+              if (activeScrollToCaret === scrollToCaret) {
+                activeScrollToCaret = null
+              }
 
               if (scrollContainer) {
                 scrollContainer.removeEventListener('wheel', handleWheelOrTouch)

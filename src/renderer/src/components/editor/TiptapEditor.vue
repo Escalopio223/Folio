@@ -172,7 +172,7 @@ const editor = useEditor({
       }
     }),
     TypewriterExtension.configure({
-      enabled: uiStore.isTypewriterMode,
+      enabled: () => uiStore.isTypewriterMode,
       getScrollContainer: () => props.scrollContainer
     })
   ],
@@ -618,10 +618,10 @@ defineExpose({
   opacity: 1 !important;
 }
 
-/* Modo Máquina de Escribir (Typewriter Scrolling Mode) */
+/* Modo Máquina de Escribir (Typewriter Scrolling Mode) estilo Scrivener / Typora */
 .typewriter-mode-active .ProseMirror {
-  padding-bottom: 60vh !important;
-  transition: padding-bottom 0.2s ease;
+  padding-bottom: 75vh !important;
+  transition: padding-bottom 0.25s ease;
 }
 
 /* Remarcado de coincidencias estilo VS Code */
