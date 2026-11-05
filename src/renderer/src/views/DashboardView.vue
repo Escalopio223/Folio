@@ -627,45 +627,6 @@ async function handleQuickNewChapter(): Promise<void> {
   })
 }
 
-const isCanvasFocusedHighlight = ref(false)
-let focusHighlightTimer: ReturnType<typeof setTimeout> | null = null
-
-async function focusEditorCanvas(): Promise<void> {
-  // 1. Si no hay capítulo seleccionado pero hay capítulos en el libro, abrir el primero
-  if (!folioStore.activeFolioId && folioStore.chapters.length > 0) {
-    await selectChapter(folioStore.chapters[0])
-    await nextTick()
-  }
-
-  // 2. Si no hay ningún capítulo creado en el proyecto, crear uno nuevo
-  if (
-    !folioStore.activeFolioId &&
-    folioStore.chapters.length === 0 &&
-    projectStore.activeProjectId
-  ) {
-    await handleCreateChapter('chapter')
-    await nextTick()
-  }
-
-  // 3. Activar feedback visual luminoso temporal (resaltado perimetral y píldora)
-  if (focusHighlightTimer) clearTimeout(focusHighlightTimer)
-  isCanvasFocusedHighlight.value = true
-  focusHighlightTimer = setTimeout(() => {
-    isCanvasFocusedHighlight.value = false
-  }, 1200)
-
-  // 4. Enfocar el editor y posicionar el cursor al final de la prosa
-  await nextTick()
-  if (tiptapEditorRef.value) {
-    tiptapEditorRef.value.focus('end')
-  } else {
-    const el = document.querySelector(
-      '.tiptap-editor-content, .ProseMirror, [contenteditable="true"]'
-    ) as HTMLElement | null
-    el?.focus()
-  }
-}
-
 // Listener de atajos de teclado globales de productividad
 function handleGlobalKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
@@ -681,18 +642,6 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
   if (isCtrlOrCmd && e.shiftKey && (e.key.toLowerCase() === 't' || e.code === 'KeyT')) {
     e.preventDefault()
     uiStore.toggleTypewriterMode()
-    return
-  }
-
-  // Ctrl+2 / Cmd+2: Enfocar Lienzo Central (Editor de Prosa)
-  if (
-    isCtrlOrCmd &&
-    !e.shiftKey &&
-    !e.altKey &&
-    (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2')
-  ) {
-    e.preventDefault()
-    focusEditorCanvas()
     return
   }
 
@@ -789,7 +738,6 @@ async function handleProjectDeleted(): Promise<void> {
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('folio:open-edit-book', handleOpenEditBookEvent)
-  window.addEventListener('folio:focus-editor', focusEditorCanvas)
   window.addEventListener('beforeunload', () => {
     if (hasPendingChanges.value) {
       flushSave()
@@ -816,7 +764,6 @@ onMounted(async () => {
 onBeforeUnmount(async () => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('folio:open-edit-book', handleOpenEditBookEvent)
-  window.removeEventListener('folio:focus-editor', focusEditorCanvas)
   if (hasPendingChanges.value) {
     await flushSave()
   }
@@ -1436,24 +1383,7 @@ onBeforeUnmount(async () => {
             ref="scrollContainerRef"
             class="flex-1 overflow-y-auto editorial-scrollbar px-6 md:px-8 py-5 md:py-6"
           >
-            <div
-              class="max-w-3xl mx-auto w-full flex-1 flex flex-col relative rounded-2xl transition-all duration-300"
-              :class="{
-                'ring-2 ring-[var(--accent)]/70 shadow-[0_0_30px_rgba(217,119,6,0.25)]':
-                  isCanvasFocusedHighlight
-              }"
-            >
-              <!-- Píldora de feedback visual háptico al pulsar Ctrl+2 -->
-              <transition name="fade">
-                <div
-                  v-if="isCanvasFocusedHighlight"
-                  class="absolute -top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none neu-surface px-3 py-1 rounded-full text-[11px] font-mono text-[var(--accent)] font-semibold shadow-lg border border-[var(--accent)]/40 flex items-center gap-1.5 backdrop-blur-sm"
-                >
-                  <Feather :size="12" />
-                  <span>Lienzo central enfocado</span>
-                </div>
-              </transition>
-
+            <div class="max-w-3xl mx-auto w-full flex-1 flex flex-col relative">
               <TiptapEditor
                 ref="tiptapEditorRef"
                 v-model:content="editFolioContent"

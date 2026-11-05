@@ -350,28 +350,7 @@ function handleEditorMouseOut(event: MouseEvent): void {
   }
 }
 
-function handleFocusEditor(): void {
-  if (editor.value) {
-    editor.value.commands.focus('end')
-    nextTick(() => {
-      const dom = editor.value?.view?.dom as HTMLElement | undefined
-      if (dom) {
-        dom.focus()
-        dom.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-    })
-  } else {
-    nextTick(() => {
-      const el = document.querySelector(
-        '.tiptap-editor-content, .ProseMirror, [contenteditable="true"]'
-      ) as HTMLElement | null
-      el?.focus()
-    })
-  }
-}
-
 onMounted(() => {
-  window.addEventListener('folio:focus-editor', handleFocusEditor)
   if (editor.value) {
     emit('ready', editor.value)
     emit('scene-breaks', scanSceneBreaks(editor.value))
@@ -381,7 +360,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('folio:focus-editor', handleFocusEditor)
   if (editor.value) {
     editor.value.view.dom.removeEventListener('mouseover', handleEditorMouseOver)
     editor.value.view.dom.removeEventListener('mouseout', handleEditorMouseOut)

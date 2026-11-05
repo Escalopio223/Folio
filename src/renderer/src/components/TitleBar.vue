@@ -59,22 +59,6 @@ function handleKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Ctrl+2 / Cmd+2: Enfocar lienzo central (Editor)
-  if (
-    isCtrlOrCmd &&
-    !e.shiftKey &&
-    !e.altKey &&
-    (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2')
-  ) {
-    e.preventDefault()
-    window.dispatchEvent(new CustomEvent('folio:focus-editor'))
-    const editorEl = document.querySelector(
-      '.tiptap-editor, .ProseMirror, [contenteditable="true"]'
-    ) as HTMLElement | null
-    editorEl?.focus()
-    return
-  }
-
   // Ctrl+3 / Cmd+3: Alternar panel derecho (Wiki / Reglas)
   if (
     isCtrlOrCmd &&

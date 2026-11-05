@@ -60,11 +60,6 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Global'
       },
       {
-        keys: ['Ctrl', '2'],
-        description: 'Enfocar lienzo central (Cursor directo al editor de prosa)',
-        context: 'Global'
-      },
-      {
         keys: ['Ctrl', '3'],
         description: 'Alternar panel derecho (Wiki de Lore y Reglas del Mundo)',
         context: 'Global'

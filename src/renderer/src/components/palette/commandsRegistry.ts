@@ -186,20 +186,6 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     },
     {
-      id: 'focus-editor-canvas',
-      title: 'Enfocar Lienzo Central (Editor)',
-      description: 'Devolver el foco del cursor directamente a la prosa del capítulo activo',
-      category: 'action',
-      badge: 'Vista',
-      icon: Feather,
-      shortcut: 'Ctrl+2',
-      keywords: ['editor', 'lienzo', 'foco', 'prosa', 'escribir', 'central'],
-      execute: () => {
-        const editorEl = document.querySelector('.ProseMirror') as HTMLElement | null
-        editorEl?.focus()
-      }
-    },
-    {
       id: 'toggle-wiki-inspector',
       title: 'Alternar Wiki / Reglas (Sidebar Der)',
       description: uiStore.isRightSidebarOpen
