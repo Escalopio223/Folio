@@ -627,40 +627,76 @@ async function handleQuickNewChapter(): Promise<void> {
   })
 }
 
+function focusEditorCanvas(): void {
+  window.dispatchEvent(new CustomEvent('folio:focus-editor'))
+  nextTick(() => {
+    if (tiptapEditorRef.value?.editor) {
+      tiptapEditorRef.value.editor.commands.focus()
+    } else {
+      const editorEl = document.querySelector(
+        '.tiptap-editor, .ProseMirror, [contenteditable="true"]'
+      ) as HTMLElement | null
+      editorEl?.focus()
+    }
+  })
+}
+
 // Listener de atajos de teclado globales de productividad
 function handleGlobalKeydown(e: KeyboardEvent): void {
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
 
-  // Ctrl+Shift+F / Cmd+Shift+F: Alternar Modo Enfoque
-  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'f') {
+  // Ctrl+Shift+F / Cmd+Shift+F: Alternar Modo Zen
+  if (isCtrlOrCmd && e.shiftKey && (e.key.toLowerCase() === 'f' || e.code === 'KeyF')) {
     e.preventDefault()
     uiStore.toggleFocusMode()
     return
   }
 
   // Ctrl+Shift+T / Cmd+Shift+T: Alternar Modo Máquina de Escribir (Typewriter Mode)
-  if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 't') {
+  if (isCtrlOrCmd && e.shiftKey && (e.key.toLowerCase() === 't' || e.code === 'KeyT')) {
     e.preventDefault()
     uiStore.toggleTypewriterMode()
     return
   }
 
+  // Ctrl+2 / Cmd+2: Enfocar Lienzo Central (Editor de Prosa)
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2')
+  ) {
+    e.preventDefault()
+    focusEditorCanvas()
+    return
+  }
+
   // Ctrl+S / Cmd+S: Guardado forzado instantáneo (sin shift)
-  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 's') {
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key.toLowerCase() === 's' || e.code === 'KeyS')
+  ) {
     e.preventDefault()
     handleManualSave()
     return
   }
 
   // Ctrl+Alt+N / Cmd+Alt+N: Nuevo capítulo sin usar el ratón
-  if (isCtrlOrCmd && e.altKey && e.key.toLowerCase() === 'n') {
+  if (isCtrlOrCmd && e.altKey && (e.key.toLowerCase() === 'n' || e.code === 'KeyN')) {
     e.preventDefault()
     handleQuickNewChapter()
     return
   }
 
   // Ctrl+J / Cmd+J: Alternar Scratchpad / Bloc Rápido
-  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'j') {
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key.toLowerCase() === 'j' || e.code === 'KeyJ')
+  ) {
     e.preventDefault()
     scratchpadStore.toggleScratchpad()
     return
@@ -1424,7 +1460,7 @@ onBeforeUnmount(async () => {
             >
               <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
               <span>·</span>
-              <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Enfoque</span>
+              <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Modo Zen</span>
               <span>·</span>
               <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
             </span>

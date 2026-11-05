@@ -48,22 +48,40 @@ function handleKeydown(e: KeyboardEvent): void {
   }
 
   // Ctrl+1 / Cmd+1: Alternar panel izquierdo (Manuscrito)
-  if (isCtrlOrCmd && !e.shiftKey && !e.altKey && e.key === '1') {
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key === '1' || e.code === 'Digit1' || e.code === 'Numpad1')
+  ) {
     e.preventDefault()
     uiStore.toggleLeftSidebar()
     return
   }
 
   // Ctrl+2 / Cmd+2: Enfocar lienzo central (Editor)
-  if (isCtrlOrCmd && !e.shiftKey && !e.altKey && e.key === '2') {
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2')
+  ) {
     e.preventDefault()
-    const editorEl = document.querySelector('.ProseMirror') as HTMLElement | null
+    window.dispatchEvent(new CustomEvent('folio:focus-editor'))
+    const editorEl = document.querySelector(
+      '.tiptap-editor, .ProseMirror, [contenteditable="true"]'
+    ) as HTMLElement | null
     editorEl?.focus()
     return
   }
 
   // Ctrl+3 / Cmd+3: Alternar panel derecho (Wiki / Reglas)
-  if (isCtrlOrCmd && !e.shiftKey && !e.altKey && e.key === '3') {
+  if (
+    isCtrlOrCmd &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key === '3' || e.code === 'Digit3' || e.code === 'Numpad3')
+  ) {
     e.preventDefault()
     uiStore.toggleRightSidebar()
     return

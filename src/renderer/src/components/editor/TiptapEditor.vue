@@ -203,19 +203,14 @@ const editor = useEditor({
       const isCtrlOrCmd = event.ctrlKey || event.metaKey
 
       // Atajo de Búsqueda rápida (Ctrl+F) en el capítulo activo
-      if (isCtrlOrCmd && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
-        event.preventDefault()
-        emit('open-find')
-        return true
-      }
-
-      // Atajo de Modo Zen / Enfoque dentro del editor (Ctrl+Shift+F o F11)
       if (
-        (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 'f') ||
-        event.key === 'F11'
+        isCtrlOrCmd &&
+        !event.shiftKey &&
+        !event.altKey &&
+        (event.key.toLowerCase() === 'f' || event.code === 'KeyF')
       ) {
         event.preventDefault()
-        uiStore.toggleFocusMode()
+        emit('open-find')
         return true
       }
 
@@ -223,13 +218,6 @@ const editor = useEditor({
       if (event.key === 'Escape' && uiStore.isFocusMode) {
         event.preventDefault()
         uiStore.exitFocusMode()
-        return true
-      }
-
-      // Atajo de Modo Máquina dentro del editor (Ctrl+Shift+T)
-      if (isCtrlOrCmd && event.shiftKey && event.key.toLowerCase() === 't') {
-        event.preventDefault()
-        uiStore.toggleTypewriterMode()
         return true
       }
 
@@ -362,7 +350,21 @@ function handleEditorMouseOut(event: MouseEvent): void {
   }
 }
 
+function handleFocusEditor(): void {
+  if (editor.value) {
+    editor.value.commands.focus()
+  } else {
+    nextTick(() => {
+      const el = document.querySelector(
+        '.tiptap-editor, .ProseMirror, [contenteditable="true"]'
+      ) as HTMLElement | null
+      el?.focus()
+    })
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('folio:focus-editor', handleFocusEditor)
   if (editor.value) {
     emit('ready', editor.value)
     emit('scene-breaks', scanSceneBreaks(editor.value))
@@ -372,6 +374,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('folio:focus-editor', handleFocusEditor)
   if (editor.value) {
     editor.value.view.dom.removeEventListener('mouseover', handleEditorMouseOver)
     editor.value.view.dom.removeEventListener('mouseout', handleEditorMouseOut)

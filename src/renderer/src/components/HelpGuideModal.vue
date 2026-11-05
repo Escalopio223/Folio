@@ -6,14 +6,12 @@ import {
   BookOpen,
   Feather,
   Sparkles,
-  Scroll,
   Search,
-  Download,
   FolderTree,
-  Eye,
-  Sliders,
-  FileCheck2,
-  HelpCircle
+  Trophy,
+  ShieldCheck,
+  HelpCircle,
+  Pin
 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
 import { useUiStore } from '../stores/uiStore'
@@ -21,7 +19,7 @@ import { useUiStore } from '../stores/uiStore'
 const uiStore = useUiStore()
 
 const modalCardRef = ref<HTMLElement | null>(null)
-const activeTab = ref<'shortcuts' | 'manuscript' | 'editor' | 'wiki'>('shortcuts')
+const activeTab = ref<'shortcuts' | 'features'>('shortcuts')
 const shortcutSearchQuery = ref('')
 
 onClickOutside(modalCardRef, () => {
@@ -54,82 +52,157 @@ interface ShortcutCategory {
 
 const shortcutCategories: ShortcutCategory[] = [
   {
-    title: 'Navegación y Vistas Tripartitas',
+    title: '1. Navegación y Vistas Tripartitas',
     items: [
       {
         keys: ['Ctrl', '1'],
-        description: 'Mostrar u ocultar el Árbol del Manuscrito (panel izquierdo)',
+        description: 'Alternar panel izquierdo (Árbol del Manuscrito)',
         context: 'Global'
       },
       {
         keys: ['Ctrl', '2'],
-        description: 'Enfocar el Lienzo de Escritura Central (prosa del capítulo)',
+        description: 'Enfocar lienzo central (Cursor directo al editor de prosa)',
         context: 'Global'
       },
       {
         keys: ['Ctrl', '3'],
-        description: 'Mostrar u ocultar la Wiki de Lore y Reglas del Mundo (panel derecho)',
+        description: 'Alternar panel derecho (Wiki de Lore y Reglas del Mundo)',
         context: 'Global'
       },
       {
         keys: ['Ctrl', 'J'],
-        description: 'Abrir o cerrar el Scratchpad (bloc de notas y captura rápida)',
+        description: 'Abrir o cerrar el Scratchpad (cajón de captura rápida)',
         context: 'Global'
       },
       {
         keys: ['Ctrl', 'K'],
-        description: 'Paleta de Comandos y Búsqueda Profunda de Texto en toda la obra',
+        description: 'Paleta de Comandos y Búsqueda Profunda en todo el libro',
         context: 'Global'
       },
       {
         keys: ['F1'],
-        description: 'Abrir este Manual de Funcionalidades y Atajos',
+        description: 'Abrir este Manual y Guía de Atajos',
         context: 'Global'
       }
     ]
   },
   {
-    title: 'Editor y Escritura Inmersiva',
+    title: '2. Modos de Inmersión y Concentración',
     items: [
       {
-        keys: ['Ctrl', 'S'],
-        description: 'Guardado forzado e instantáneo a la base de datos SQLite',
+        keys: ['Ctrl', 'Shift', 'F'],
+        description: 'Alternar Modo Zen (Pantalla completa, sin distracciones y enfoque de párrafo)',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'F'],
-        description: 'Barra de búsqueda de texto dentro del capítulo activo (estilo VS Code)',
-        context: 'Editor'
+        keys: ['F11'],
+        description: 'Alternar Modo Zen / Pantalla completa nativa',
+        context: 'Global'
       },
       {
-        keys: ['F11 / Ctrl+Shift+F'],
-        description: 'Modo Zen Inmersivo (Lienzo libre de distracciones, pantalla completa y foco en párrafo activo)',
+        keys: ['Ctrl', 'Shift', 'T'],
+        description: 'Modo Máquina de Escribir (Línea de redacción anclada al centro de la pantalla)',
         context: 'Editor'
       },
       {
         keys: ['Esc'],
         description: 'Salir del Modo Zen / Cerrar modal o panel activo',
         context: 'Global'
-      },
+      }
+    ]
+  },
+  {
+    title: '3. Gestión del Manuscrito y Archivo',
+    items: [
       {
-        keys: ['Ctrl', 'Shift', 'T'],
-        description: 'Modo Máquina de Escribir (Typewriter Mode — cursor anclado al centro vertical)',
+        keys: ['Ctrl', 'S'],
+        description: 'Guardado forzado instantáneo a la base de datos SQLite',
         context: 'Editor'
       },
       {
         keys: ['Ctrl', 'Alt', 'N'],
-        description: 'Crear un nuevo capítulo o escena instantáneamente sin tocar el ratón',
+        description: 'Crear un nuevo capítulo instantáneamente sin tocar el ratón',
         context: 'Manuscrito'
       },
       {
         keys: ['Ctrl', 'Clic'],
-        description: 'Saltar a la ficha de la Wiki desde una entidad detectada en el texto',
+        description: 'Saltar a la ficha de la Wiki desde un personaje o entidad detectada en el texto',
         context: 'Editor'
       }
     ]
   },
   {
-    title: 'Formato Tipográfico y Estilos',
+    title: '4. Búsqueda dentro del Capítulo Activo',
+    items: [
+      {
+        keys: ['Ctrl', 'F'],
+        description: 'Abrir barra flotante de búsqueda de texto dentro del capítulo',
+        context: 'Editor'
+      },
+      {
+        keys: ['Enter'],
+        description: 'Saltar a la siguiente coincidencia encontrada',
+        context: 'Búsqueda'
+      },
+      {
+        keys: ['Shift', 'Enter'],
+        description: 'Retroceder a la coincidencia anterior',
+        context: 'Búsqueda'
+      },
+      {
+        keys: ['Esc'],
+        description: 'Cerrar la barra de búsqueda y volver al texto',
+        context: 'Búsqueda'
+      }
+    ]
+  },
+  {
+    title: '5. Scratchpad (Captura Rápida de Ideas)',
+    items: [
+      {
+        keys: ['Enter'],
+        description: 'Fijar nota al feed continuo al instante (cero fricción)',
+        context: 'Scratchpad'
+      },
+      {
+        keys: ['Shift', 'Enter'],
+        description: 'Salto de línea dentro de la nota sin guardarla',
+        context: 'Scratchpad'
+      },
+      {
+        keys: ['Ctrl', 'Enter'],
+        description: 'Fijar nota de inmediato (atajo alternativo)',
+        context: 'Scratchpad'
+      },
+      {
+        keys: ['Esc'],
+        description: 'Cerrar el Scratchpad y devolver el foco al editor',
+        context: 'Scratchpad'
+      }
+    ]
+  },
+  {
+    title: '6. Paleta de Comandos (Ctrl+K)',
+    items: [
+      {
+        keys: ['↑', '↓'],
+        description: 'Navegar entre resultados, capítulos y acciones del sistema',
+        context: 'Paleta'
+      },
+      {
+        keys: ['Enter'],
+        description: 'Ejecutar comando o abrir la escena/ficha seleccionada',
+        context: 'Paleta'
+      },
+      {
+        keys: ['Esc'],
+        description: 'Cerrar la paleta de comandos',
+        context: 'Paleta'
+      }
+    ]
+  },
+  {
+    title: '7. Formato Tipográfico y Edición',
     items: [
       {
         keys: ['Ctrl', 'B'],
@@ -157,6 +230,11 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Editor'
       },
       {
+        keys: ['Ctrl', 'Alt', '0'],
+        description: 'Restablecer a Párrafo normal',
+        context: 'Editor'
+      },
+      {
         keys: ['Ctrl', 'Shift', 'B'],
         description: 'Convertir bloque en Cita editorial (Blockquote)',
         context: 'Editor'
@@ -167,14 +245,64 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Editor'
       },
       {
+        keys: ['Tab'],
+        description: 'Insertar 2 espacios de sangría editorial limpia',
+        context: 'Editor'
+      },
+      {
+        keys: ['Shift', 'Tab'],
+        description: 'Reducir sangría del párrafo (Outdent)',
+        context: 'Editor'
+      },
+      {
         keys: ['Ctrl', 'Z'],
         description: 'Deshacer último cambio de texto',
         context: 'Editor'
       },
       {
         keys: ['Ctrl', 'Y'],
-        description: 'Rehacer último cambio de texto',
+        description: 'Rehacer último cambio deshecho',
         context: 'Editor'
+      }
+    ]
+  },
+  {
+    title: '8. Atajos Markdown en Tiempo Real al Escribir',
+    items: [
+      {
+        keys: ['#', 'Espacio'],
+        description: 'Convierte la línea en Encabezado 1 (H1)',
+        context: 'Markdown'
+      },
+      {
+        keys: ['##', 'Espacio'],
+        description: 'Convierte la línea en Encabezado 2 (H2)',
+        context: 'Markdown'
+      },
+      {
+        keys: ['###', 'Espacio'],
+        description: 'Convierte la línea en Encabezado 3 (H3)',
+        context: 'Markdown'
+      },
+      {
+        keys: ['>', 'Espacio'],
+        description: 'Inicia un bloque de Cita editorial',
+        context: 'Markdown'
+      },
+      {
+        keys: ['-', 'Espacio'],
+        description: 'Inicia una lista con viñetas',
+        context: 'Markdown'
+      },
+      {
+        keys: ['1.', 'Espacio'],
+        description: 'Inicia una lista numerada',
+        context: 'Markdown'
+      },
+      {
+        keys: ['***', 'Enter'],
+        description: 'Inserta un separador de descanso de escena',
+        context: 'Markdown'
       }
     ]
   }
@@ -196,6 +324,97 @@ const filteredCategories = computed(() => {
     }))
     .filter((cat) => cat.items.length > 0)
 })
+
+interface FeatureModule {
+  title: string
+  subtitle: string
+  icon: any
+  shortcut?: string
+  bullets: string[]
+}
+
+const featureModules: FeatureModule[] = [
+  {
+    title: '1. Árbol del Manuscrito',
+    subtitle: 'Estructura organizada de tu obra literaria',
+    icon: FolderTree,
+    shortcut: 'Ctrl+1',
+    bullets: [
+      'Organiza tu libro en capítulos, preliminares (prólogos, dedicatorias) y epílogos.',
+      'Reordena capítulos y escenas cómodamente arrastrando y soltando (Drag & Drop).',
+      'Edita títulos en línea con un simple clic y controla el estado editorial (Borrador, En curso, Finalizado).',
+      'Inserta descansos de escena (* * *) para dividir y navegar ágilmente por sub-escenas.'
+    ]
+  },
+  {
+    title: '2. Lienzo Central & Modo Zen',
+    subtitle: 'El santuario de escritura inmersiva libre de distracciones',
+    icon: Feather,
+    shortcut: 'Ctrl+Shift+F',
+    bullets: [
+      'Modo Zen (Ctrl+Shift+F o F11): oculta todas las barras y menús, dejando un lienzo puro con iluminación focalizada en el párrafo en el que estás redactando.',
+      'Modo Máquina de Escribir (Ctrl+Shift+T): fija la línea activa al 50% vertical de la pantalla para no bajar la mirada ni fatigarte.',
+      'Sonido Mecánico Opcional: chasquido sutil de teclas, campanilla de final de línea y retorno de carro mecánico.',
+      'Buscador integrado (Ctrl+F) estilo VS Code para saltar y reemplazar texto en la escena activa.'
+    ]
+  },
+  {
+    title: '3. Scratchpad (Bloc Rápido)',
+    subtitle: 'Captura instantánea de ideas fugaces con cero fricción',
+    icon: Pin,
+    shortcut: 'Ctrl+J',
+    bullets: [
+      'Ábrelo al instante desde cualquier parte con Ctrl+J; el cursor ya estará listo para teclear.',
+      'Sin formularios obligatorios: escribe lo que se te ocurra y pulsa Enter para fijar la idea en el feed continuo.',
+      'Fija notas importantes arriba con el botón de chincheta y cópialas al portapapeles con un solo clic.',
+      'Persistencia inmediata en SQLite local: tus pensamientos quedan guardados en milisegundos.'
+    ]
+  },
+  {
+    title: '4. Wiki de Lore & Reglas del Mundo',
+    subtitle: 'Tu biblia narrativa conectada bidireccionalmente al manuscrito',
+    icon: Sparkles,
+    shortcut: 'Ctrl+3',
+    bullets: [
+      'Crea fichas ordenadas para Personajes, Lugares, Objetos y Facciones de tu universo.',
+      'Detección automática en el editor: Folio reconoce los nombres de tus personajes mientras redactas y los subraya sutilmente sin ensuciar el texto.',
+      'Hover Preview & Ctrl+Clic: reposa el ratón sobre cualquier mención para ver su resumen, o pulsa Ctrl+Clic para saltar directamente a su ficha en la Wiki.',
+      'Reglas del Mundo: documenta axiomas, leyes mágicas y códigos inquebrantables de tu universo narrativo.'
+    ]
+  },
+  {
+    title: '5. Paleta de Comandos & Búsqueda Profunda',
+    subtitle: 'El Omnibox universal que controla toda la aplicación',
+    icon: Search,
+    shortcut: 'Ctrl+K',
+    bullets: [
+      'Pulsa Ctrl+K para abrir la paleta global y navegar por toda la aplicación desde el teclado.',
+      'Búsqueda profunda: encuentra al instante cualquier frase o fragmento a través de todos los capítulos del manuscrito simultáneamente.',
+      'Ejecuta cualquier acción de la app (cambiar temas, guardar, crear escenas, abrir papelera) en segundos.'
+    ]
+  },
+  {
+    title: '6. Ritmo Diario, Metas & Logros',
+    subtitle: 'Motivación y seguimiento constante de tu progreso como autor',
+    icon: Trophy,
+    bullets: [
+      'Fija tu expectativa diaria o define un objetivo de palabras por sesión antes de empezar a escribir.',
+      'Seguimiento de racha diaria de escritura y conteo de palabras en tiempo real en la barra de estado inferior.',
+      'Vitrina con 22 logros editoriales inspiradores que recompensan tu constancia literaria.'
+    ]
+  },
+  {
+    title: '7. Seguridad Local-First & Papelera',
+    subtitle: 'Control absoluto y privacidad total de tu obra',
+    icon: ShieldCheck,
+    shortcut: 'Ctrl+S',
+    bullets: [
+      'Almacenamiento local en SQLite: tu manuscrito vive exclusivamente en tu ordenador y nunca se sube a servidores externos.',
+      'Autoguardado continuo inteligente con debounce para garantizar cero pérdida de datos.',
+      'Papelera de reciclaje segura: ningún capítulo o ficha eliminada se borra de inmediato; puedes restaurarlos cuando quieras.'
+    ]
+  }
+]
 </script>
 
 <template>
@@ -210,7 +429,7 @@ const filteredCategories = computed(() => {
     >
       <div
         v-if="uiStore.isHelpModalOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/55 backdrop-blur-sm select-none"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/60 backdrop-blur-sm select-none"
       >
         <!-- Modal Card -->
         <div
@@ -232,7 +451,7 @@ const filteredCategories = computed(() => {
                   Guía y Manual de Folio
                 </h2>
                 <p class="text-[11px] text-[var(--text-muted)] font-mono">
-                  Atajos rápidos de teclado y guía exhaustiva de las funcionalidades del santuario
+                  Atajos rápidos de teclado y funcionalidades principales explicadas de forma simple
                 </p>
               </div>
             </div>
@@ -247,13 +466,13 @@ const filteredCategories = computed(() => {
             </button>
           </div>
 
-          <!-- Navigation Tabs -->
+          <!-- Navigation Tabs Simples: 2 Apartados Claros -->
           <div
-            class="px-6 pt-3 pb-2 flex items-center gap-2 border-b border-[var(--neu-border)] bg-[var(--bg-base)] overflow-x-auto shrink-0"
+            class="px-6 pt-3 pb-2 flex items-center gap-2 border-b border-[var(--neu-border)] bg-[var(--bg-base)] shrink-0"
           >
             <button
               type="button"
-              class="neu-btn px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
+              class="neu-btn px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
               :class="{
                 'neu-well !text-[var(--accent)] font-semibold shadow-inner':
                   activeTab === 'shortcuts'
@@ -266,45 +485,23 @@ const filteredCategories = computed(() => {
 
             <button
               type="button"
-              class="neu-btn px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
+              class="neu-btn px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
               :class="{
                 'neu-well !text-[var(--accent)] font-semibold shadow-inner':
-                  activeTab === 'manuscript'
+                  activeTab === 'features'
               }"
-              @click="activeTab = 'manuscript'"
+              @click="activeTab = 'features'"
             >
-              <FolderTree :size="14" />
-              <span>Manuscrito y Estructura</span>
-            </button>
-
-            <button
-              type="button"
-              class="neu-btn px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
-              :class="{
-                'neu-well !text-[var(--accent)] font-semibold shadow-inner': activeTab === 'editor'
-              }"
-              @click="activeTab = 'editor'"
-            >
-              <Feather :size="14" />
-              <span>Editor, Prosa y Exportación</span>
-            </button>
-
-            <button
-              type="button"
-              class="neu-btn px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium cursor-pointer transition-all"
-              :class="{
-                'neu-well !text-[var(--accent)] font-semibold shadow-inner': activeTab === 'wiki'
-              }"
-              @click="activeTab = 'wiki'"
-            >
-              <Sparkles :size="14" />
-              <span>Wiki Lore y Reglas del Mundo</span>
+              <BookOpen :size="14" />
+              <span>Funcionalidades de Folio</span>
             </button>
           </div>
 
           <!-- Body Content -->
-          <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm">
-            <!-- PESTAÑA 1: ATAJOS DE TECLADO -->
+          <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm editorial-scrollbar">
+            <!-- =============================================================== -->
+            <!-- APARTADO 1: ATAJOS DE TECLADO                                    -->
+            <!-- =============================================================== -->
             <div v-if="activeTab === 'shortcuts'" class="space-y-6">
               <!-- Search Shortcuts Input -->
               <div class="relative">
@@ -315,12 +512,15 @@ const filteredCategories = computed(() => {
                 <input
                   v-model="shortcutSearchQuery"
                   type="text"
-                  placeholder="Buscar atajo por comando, tecla o descripción..."
-                  class="w-full neu-input pl-10 pr-4 py-2 text-xs rounded-xl focus:outline-none placeholder:text-[var(--text-muted)]"
+                  placeholder="Buscar atajo por combinación, tecla o acción..."
+                  class="w-full neu-input pl-10 pr-4 py-2 text-xs rounded-xl focus:outline-none placeholder:text-[var(--text-muted)] font-mono"
                 />
               </div>
 
-              <div v-if="filteredCategories.length === 0" class="text-center py-10 text-[var(--text-muted)]">
+              <div
+                v-if="filteredCategories.length === 0"
+                class="text-center py-10 text-[var(--text-muted)]"
+              >
                 <Keyboard :size="32" class="mx-auto mb-2 opacity-40" />
                 <p>No se encontraron atajos que coincidan con "{{ shortcutSearchQuery }}".</p>
               </div>
@@ -370,120 +570,48 @@ const filteredCategories = computed(() => {
               </div>
             </div>
 
-            <!-- PESTAÑA 2: MANUSCRITO Y ESTRUCTURA -->
-            <div v-else-if="activeTab === 'manuscript'" class="space-y-5">
-              <div class="neu-panel p-5 rounded-xl border border-[var(--neu-border)] space-y-3">
-                <div class="flex items-center gap-2 text-[var(--accent)]">
-                  <FolderTree :size="18" />
-                  <h3 class="font-editorial text-base font-bold">Árbol del Manuscrito (Panel Izquierdo)</h3>
-                </div>
+            <!-- =============================================================== -->
+            <!-- APARTADO 2: FUNCIONALIDADES DE FOLIO (SIMPLE Y EN 1 LECTURA)    -->
+            <!-- =============================================================== -->
+            <div v-else-if="activeTab === 'features'" class="space-y-4">
+              <div class="neu-panel p-4 rounded-xl border border-[var(--neu-border)] bg-[var(--bg-surface)]">
                 <p class="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  El panel izquierdo organiza jerárquicamente la estructura narrativa de tu libro en <strong>Capítulos</strong> y <strong>Escenas</strong>. Puedes alternarlo en cualquier momento usando <kbd class="neu-well-sm px-1.5 py-0.5 text-[10px] font-mono text-[var(--accent)]">Ctrl+1</kbd> o arrastrar el divisor central para ajustar su ancho exacto.
+                  Folio está diseñado como un <strong>santuario editorial local</strong> para escritores de novelas y narrativa. Aquí tienes el resumen directo de cada pilar de la aplicación para dominarla en una sola lectura:
                 </p>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <BookOpen :size="14" class="text-[var(--accent)]" />
-                    Gestión de Capítulos y Escenas
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Creación instantánea:</strong> Pulsa <kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Alt+N</kbd> o los botones (+) para crear capítulos o escenas sin apartar las manos.</li>
-                    <li><strong>Reordenación Drag & Drop:</strong> Arrastra y suelta capítulos o escenas libremente. El orden se guarda en SQLite en tiempo real.</li>
-                    <li><strong>Edición de títulos en vivo:</strong> Haz clic en el nombre de cualquier capítulo para renombrarlo al instante.</li>
-                  </ul>
-                </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div
+                  v-for="feat in featureModules"
+                  :key="feat.title"
+                  class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2.5 flex flex-col justify-between"
+                >
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2 border-b border-[var(--neu-border)] pb-2">
+                      <div class="flex items-center gap-2">
+                        <component :is="feat.icon" :size="16" class="text-[var(--accent)] shrink-0" />
+                        <h4 class="font-editorial text-sm font-bold text-[var(--text-primary)]">
+                          {{ feat.title }}
+                        </h4>
+                      </div>
+                      <kbd
+                        v-if="feat.shortcut"
+                        class="neu-well-sm px-1.5 py-0.5 text-[10px] font-mono font-semibold text-[var(--accent)] rounded"
+                      >
+                        {{ feat.shortcut }}
+                      </kbd>
+                    </div>
 
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <FileCheck2 :size="14" class="text-[var(--accent)]" />
-                    Estados Editoriales y Métricas
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Ciclo de vida por escena:</strong> Marca cada escena como <em>Borrador</em> (ámbar), <em>En curso</em> (azul) o <em>Finalizado</em> (verde).</li>
-                    <li><strong>Conteo dinámico:</strong> Visualiza el total de palabras acumuladas por capítulo y por todo el libro.</li>
-                    <li><strong>Papelera no destructiva:</strong> Los elementos eliminados van a la papelera (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Papelera</kbd>) y pueden ser restaurados o purgados permanentemente.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+                    <p class="text-[11px] text-[var(--text-muted)] font-mono leading-tight">
+                      {{ feat.subtitle }}
+                    </p>
 
-            <!-- PESTAÑA 3: EDITOR Y PROSA -->
-            <div v-else-if="activeTab === 'editor'" class="space-y-5">
-              <div class="neu-panel p-5 rounded-xl border border-[var(--neu-border)] space-y-3">
-                <div class="flex items-center gap-2 text-[var(--accent)]">
-                  <Feather :size="18" />
-                  <h3 class="font-editorial text-base font-bold">Lienzo Central de Escritura & Motor TipTap</h3>
-                </div>
-                <p class="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Un santuario libre de distracciones diseñado para largas sesiones creativas. Cuenta con persistencia continua a disco, salvaguardas reactivas y herramientas tipográficas avanzadas.
-                </p>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Eye :size="14" class="text-[var(--accent)]" />
-                    Modos de Inmersión y Enfoque
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Modo Máquina de Escribir (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Shift+T</kbd>):</strong> Estilo Scrivener y Typora. A partir del centro de la pantalla, la línea de redacción queda anclada al 50% vertical para mantener la vista fija al frente.</li>
-                    <li><strong>Modo Zen Inmersivo (<kbd class="neu-well-sm px-1 text-[10px] font-mono">F11 / Ctrl+Shift+F</kbd>):</strong> Oculta paneles, cabeceras y barras de estado dejando el lienzo limpio y puro, con spotlight nítido sobre el párrafo activo. Pulsa <kbd class="neu-well-sm px-1 text-[10px] font-mono">Esc</kbd> para salir.</li>
-                    <li><strong>Efectos Sonoros Táctiles:</strong> Simulación de mecanografía mecánica en tiempo real con chasquido metálico, retorno de carro y campanita clásica. Actívalo o siléncialo desde el botón de la barra superior.</li>
-                    <li><strong>Buscador dentro del capítulo (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+F</kbd>):</strong> Barra estilo VS Code para buscar, resaltar y navegar entre ocurrencias instantáneamente.</li>
-                  </ul>
-                </div>
-
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Download :size="14" class="text-[var(--accent)]" />
-                    Maquetación y Exportación
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Compilación multiformato:</strong> Exporta toda la obra a <strong>.epub</strong> (lectores de libros electrónicos), <strong>.pdf</strong> (maquetación tipográfica lista para imprenta) o <strong>.docx</strong> (Word editable).</li>
-                    <li><strong>Ajustes del Título de Capítulo:</strong> Personaliza la alineación (izquierda, centro, derecha), la línea divisoria decorativa, la tipografía específica y el color del título del capítulo.</li>
-                    <li><strong>Tamaños de fuente híbridos:</strong> Usa el selector numérico para escribir decimales libres (ej. 11.5pt, 13.5pt) con validación inmediata.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <!-- PESTAÑA 4: WIKI Y REGLAS DEL MUNDO -->
-            <div v-else-if="activeTab === 'wiki'" class="space-y-5">
-              <div class="neu-panel p-5 rounded-xl border border-[var(--neu-border)] space-y-3">
-                <div class="flex items-center gap-2 text-[var(--accent)]">
-                  <Sparkles :size="18" />
-                  <h3 class="font-editorial text-base font-bold">Wiki de Lore, Reglas del Mundo & Scratchpad</h3>
-                </div>
-                <p class="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  El panel derecho (<kbd class="neu-well-sm px-1.5 py-0.5 text-[10px] font-mono text-[var(--accent)]">Ctrl+3</kbd>) es tu enciclopedia de worldbuilding y biblia narrativa, sincronizada bidireccionalmente con el editor mediante detección reactiva de entidades.
-                </p>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Scroll :size="14" class="text-[var(--accent)]" />
-                    Detección y Autovinculación en el Editor
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Decoraciones sin mutar el texto:</strong> Las menciones de tus personajes, lugares y objetos en la wiki se subrayan elegantemente sin ensuciar la base de datos SQLite.</li>
-                    <li><strong>Hover Preview (0.9s):</strong> Al reposar el ratón 0.9 segundos sobre una entidad, se despliega una tarjeta flotante con su categoría, resumen y datos clave.</li>
-                    <li><strong>Navegación con <kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+Clic</kbd>:</strong> Abre el panel de la Wiki, filtra la ficha correspondiente y la despliega con scroll automático.</li>
-                  </ul>
-                </div>
-
-                <div class="neu-surface p-4 rounded-xl border border-[var(--neu-border)] space-y-2">
-                  <h4 class="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Sliders :size="14" class="text-[var(--accent)]" />
-                    Reglas del Canon & Scratchpad
-                  </h4>
-                  <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside">
-                    <li><strong>Axiomas y Reglas del Mundo:</strong> Documenta leyes inquebrantables de magia, tecnología o sociedad con condiciones, consecuencias y niveles de rigidez.</li>
-                    <li><strong>Scratchpad / Bloc Rápido (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+J</kbd>):</strong> Cajón deslizable para capturar ideas repentinas, con notas fijadas, etiquetas de color y opción de "Promover a nuevo capítulo".</li>
-                    <li><strong>Paleta Global (<kbd class="neu-well-sm px-1 text-[10px] font-mono">Ctrl+K</kbd>):</strong> Busca cualquier frase en todo el manuscrito o ejecuta acciones del sistema al vuelo.</li>
-                  </ul>
+                    <ul class="text-xs text-[var(--text-secondary)] space-y-1.5 list-disc list-inside leading-relaxed pt-1">
+                      <li v-for="(bullet, bIdx) in feat.bullets" :key="bIdx">
+                        {{ bullet }}
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -494,14 +622,18 @@ const filteredCategories = computed(() => {
             class="px-6 py-3 border-t border-[var(--neu-border)] bg-[var(--bg-surface)] flex items-center justify-between text-xs text-[var(--text-muted)] shrink-0"
           >
             <div class="flex items-center gap-3">
-              <span class="font-mono text-[11px]">Folio Desktop v0.1.0</span>
+              <span class="font-mono text-[11px]">Folio v1.0.0</span>
               <span>·</span>
-              <span>Pulsa <kbd class="neu-well-sm px-1.5 py-0.5 text-[10px] font-mono text-[var(--accent)] font-semibold">F1</kbd> para abrir esta guía en cualquier momento</span>
+              <span>
+                Pulsa
+                <kbd class="neu-well-sm px-1.5 py-0.5 text-[10px] font-mono text-[var(--accent)] font-semibold">F1</kbd>
+                para abrir esta guía en cualquier momento
+              </span>
             </div>
 
             <button
               type="button"
-              class="neu-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:!text-[var(--accent)] cursor-pointer transition-all"
+              class="neu-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:!text-[var(--accent)] cursor-pointer transition-all active:scale-95"
               @click="uiStore.closeHelpModal"
             >
               Entendido
@@ -512,3 +644,20 @@ const filteredCategories = computed(() => {
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+.editorial-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.editorial-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.editorial-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--groove-dark);
+  border-radius: 9999px;
+  opacity: 0.5;
+}
+.editorial-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+</style>

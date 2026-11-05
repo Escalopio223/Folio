@@ -86,19 +86,6 @@ function handleClose(): void {
 
 // Atajos globales: Ctrl+J / Cmd+J para abrir y Esc para salir
 function handleKeydown(e: KeyboardEvent): void {
-  const isCtrlOrCmd = e.ctrlKey || e.metaKey
-
-  if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'j') {
-    e.preventDefault()
-    e.stopPropagation()
-    if (scratchpadStore.isOpen) {
-      handleClose()
-    } else {
-      scratchpadStore.openScratchpad()
-    }
-    return
-  }
-
   if (e.key === 'Escape' && scratchpadStore.isOpen) {
     e.preventDefault()
     if (editingNoteId.value) {

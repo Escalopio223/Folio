@@ -239,15 +239,15 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
     },
     {
       id: 'toggle-focus-mode',
-      title: 'Alternar Modo Enfoque',
+      title: 'Alternar Modo Zen',
       description: uiStore.isFocusMode
-        ? 'Desactivar atenuación de párrafos secundarios'
-        : 'Atenuar párrafos no activos para máxima concentración',
+        ? 'Salir del Modo Zen inmersivo'
+        : 'Activar Modo Zen inmersivo (pantalla completa sin distracciones y enfoque de párrafo)',
       category: 'action',
       badge: 'Editor',
       icon: Eye,
       shortcut: 'Ctrl+Shift+F',
-      keywords: ['focus', 'enfoque', 'concentracion', 'parrafo', 'atenuar', 'modo'],
+      keywords: ['zen', 'focus', 'enfoque', 'concentracion', 'parrafo', 'atenuar', 'modo', 'pantalla completa'],
       execute: () => {
         uiStore.toggleFocusMode()
       }
