@@ -6,19 +6,16 @@ import { useProjectStore } from './projectStore'
 import { useFolioStore } from './folioStore'
 import { useGoalsStore } from './goalsStore'
 
-export type ScratchpadColorTag = 'idea' | 'duda' | 'pendiente' | null
-
 export const useScratchpadStore = defineStore('scratchpad', () => {
   const isOpen = ref(false)
   const notes = ref<ScratchpadNote[]>([])
   const activeNoteId = ref<number | null>(null)
   const searchQuery = ref('')
-  const selectedColorFilter = ref<string>('all')
   const isLoading = ref(false)
   const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('saved')
   const lastSavedTime = ref('')
 
-  // Referencia al contenido pendiente de persistir
+  // Referencia para guardado con debounce al editar notas
   let pendingSavePayload: SaveScratchpadNoteInput | null = null
 
   const activeNote = computed<ScratchpadNote | null>(() => {
@@ -26,7 +23,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     return notes.value.find((n) => n.id === activeNoteId.value) || null
   })
 
-  // Normalizador para búsqueda insensible a mayúsculas y diacríticos
+  // Normalizador para búsqueda rápida
   function normalize(str: string): string {
     return (str || '')
       .toLowerCase()
@@ -35,18 +32,14 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
       .trim()
   }
 
-  // Lista filtrada con orden: fijados primero (isPinned DESC), luego updatedAt DESC
+  // Lista ordenada de notas: fijadas arriba, luego por fecha descendente
   const filteredNotes = computed<ScratchpadNote[]>(() => {
     const q = normalize(searchQuery.value)
-    const filterTag = selectedColorFilter.value
 
     return notes.value
       .filter((note) => {
-        if (filterTag !== 'all' && note.colorTag !== filterTag) {
-          return false
-        }
         if (!q) return true
-        return normalize(note.title).includes(q) || normalize(note.content).includes(q)
+        return normalize(note.content).includes(q) || normalize(note.title).includes(q)
       })
       .sort((a, b) => {
         if (a.isPinned !== b.isPinned) {
@@ -67,7 +60,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // AUTOGUARDADO DEBOUNCED A 400ms
+  // AUTOGUARDADO DEBOUNCED A 350ms
   // ---------------------------------------------------------------------------
   async function flushSave(): Promise<void> {
     if (!pendingSavePayload) return
@@ -85,44 +78,21 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
       const now = new Date()
       lastSavedTime.value = now.toLocaleTimeString([], {
         hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+        minute: '2-digit'
       })
     } catch (err) {
-      console.error('[ScratchpadStore] Error al guardar nota en SQLite:', err)
+      console.error('[ScratchpadStore] Error al guardar en SQLite:', err)
       saveStatus.value = 'error'
     }
   }
 
   const debouncedSave = useDebounceFn(async () => {
     await flushSave()
-  }, 400)
+  }, 350)
 
-  // Actualización instantánea en memoria (Zero-Lag) + Debounce a SQLite
-  function updateActiveTitle(title: string): void {
-    if (!activeNoteId.value) return
-    const note = activeNote.value
-    if (!note) return
-
-    note.title = title
-    note.updatedAt = new Date()
-
-    pendingSavePayload = {
-      id: note.id,
-      projectId: note.projectId,
-      title: note.title,
-      content: note.content,
-      isPinned: note.isPinned,
-      colorTag: note.colorTag
-    }
-
-    saveStatus.value = 'saving'
-    debouncedSave()
-  }
-
-  function updateActiveContent(content: string): void {
-    if (!activeNoteId.value) return
-    const note = activeNote.value
+  // Actualización en caliente de contenido de una nota existente
+  function updateNoteContent(id: number, content: string): void {
+    const note = notes.value.find((n) => n.id === id)
     if (!note) return
 
     note.content = content
@@ -131,7 +101,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     pendingSavePayload = {
       id: note.id,
       projectId: note.projectId,
-      title: note.title,
+      title: note.title || '',
       content: note.content,
       isPinned: note.isPinned,
       colorTag: note.colorTag
@@ -142,7 +112,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // ACCIONES CRUD
+  // ACCIONES DE CAPTURA RÁPIDA (FRICCIÓN CERO)
   // ---------------------------------------------------------------------------
 
   async function fetchNotes(projectId?: string | null): Promise<void> {
@@ -158,15 +128,8 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     try {
       const fetched = await window.api.scratchpad.list(targetProject)
       notes.value = fetched
-
-      if (fetched.length > 0) {
-        // Mantener nota activa si aún existe, o seleccionar la primera
-        const exists = fetched.some((n) => n.id === activeNoteId.value)
-        if (!exists || !activeNoteId.value) {
-          activeNoteId.value = fetched[0].id
-        }
-      } else {
-        activeNoteId.value = null
+      if (fetched.length > 0 && !activeNoteId.value) {
+        activeNoteId.value = fetched[0].id
       }
     } catch (err) {
       console.error('[ScratchpadStore] Error al listar notas:', err)
@@ -175,41 +138,39 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     }
   }
 
-  async function createQuickNote(
-    title = '',
-    initialContent = '',
-    colorTag: ScratchpadColorTag = null
-  ): Promise<ScratchpadNote | null> {
+  /**
+   * Captura instantánea de idea.
+   * Guarda de inmediato en SQLite sin requerir título ni categorías.
+   */
+  async function addQuickIdea(rawContent: string): Promise<ScratchpadNote | null> {
+    const clean = rawContent.trim()
+    if (!clean) return null
+
     const projectStore = useProjectStore()
     if (!projectStore.activeProjectId) return null
 
-    // Forzar guardado previo de cambios pendientes
-    await flushSave()
-
+    saveStatus.value = 'saving'
     try {
       const newNote = await window.api.scratchpad.save({
         projectId: projectStore.activeProjectId,
-        title,
-        content: initialContent,
+        title: '',
+        content: clean,
         isPinned: false,
-        colorTag
+        colorTag: null
       })
 
       notes.value.unshift(newNote)
       activeNoteId.value = newNote.id
       saveStatus.value = 'saved'
+
+      // Registrar métricas de logros si aplica
       await useGoalsStore().checkAchievements()
       return newNote
     } catch (err) {
-      console.error('[ScratchpadStore] Error al crear nota rápida:', err)
+      console.error('[ScratchpadStore] Error al añadir nota rápida:', err)
+      saveStatus.value = 'error'
       return null
     }
-  }
-
-  function selectNote(id: number): void {
-    if (activeNoteId.value === id) return
-    flushSave()
-    activeNoteId.value = id
   }
 
   async function deleteNote(id: number): Promise<boolean> {
@@ -254,39 +215,11 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     }
   }
 
-  async function setColorTag(id: number, colorTag: ScratchpadColorTag): Promise<void> {
-    const note = notes.value.find((n) => n.id === id)
-    if (!note) return
-
-    await flushSave()
-
-    try {
-      const updated = await window.api.scratchpad.save({
-        id: note.id,
-        projectId: note.projectId,
-        colorTag
-      })
-
-      const index = notes.value.findIndex((n) => n.id === id)
-      if (index !== -1) {
-        notes.value[index] = updated
-      }
-    } catch (err) {
-      console.error('[ScratchpadStore] Error al cambiar etiqueta de color:', err)
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // APERTURA / CIERRE
-  // ---------------------------------------------------------------------------
-
-  async function toggleScratchpad(forceState?: boolean): Promise<void> {
-    const targetState = forceState !== undefined ? forceState : !isOpen.value
-
-    if (targetState) {
-      await openScratchpad()
+  function toggleScratchpad(): void {
+    if (isOpen.value) {
+      closeScratchpad()
     } else {
-      await closeScratchpad()
+      openScratchpad()
     }
   }
 
@@ -295,12 +228,6 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     if (projectStore.activeProjectId && notes.value.length === 0) {
       await fetchNotes(projectStore.activeProjectId)
     }
-
-    // Si aún no hay notas, crear automáticamente la primera para captura inmediata sin clics
-    if (notes.value.length === 0 && projectStore.activeProjectId) {
-      await createQuickNote()
-    }
-
     isOpen.value = true
   }
 
@@ -309,9 +236,24 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     isOpen.value = false
   }
 
-  // ---------------------------------------------------------------------------
-  // PROMOVER A CAPÍTULO DEL MANUSCRITO
-  // ---------------------------------------------------------------------------
+  /**
+   * Enviar fragmento al final del capítulo activo en el editor central TipTap.
+   */
+  async function sendToActiveChapter(noteId: number): Promise<boolean> {
+    const note = notes.value.find((n) => n.id === noteId)
+    if (!note || !note.content.trim()) return false
+
+    window.dispatchEvent(
+      new CustomEvent('folio:scratchpad-append-chapter', {
+        detail: { content: note.content }
+      })
+    )
+    return true
+  }
+
+  /**
+   * Promover nota a un capítulo independiente en el manuscrito.
+   */
   async function promoteToChapter(noteId: number): Promise<Folio | null> {
     const projectStore = useProjectStore()
     const folioStore = useFolioStore()
@@ -322,18 +264,15 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
 
     await flushSave()
 
-    // Priorizar el título de la nota si existe, o la primera línea
-    const noteTitle = note.title?.trim()
     const firstLine = note.content.trim().split('\n')[0] || ''
     const cleanTitle =
-      noteTitle ||
-      firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 50).trim() ||
-      'Nuevo Capítulo (Scratchpad)'
+      firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 48).trim() ||
+      'Nueva Escena (Scratchpad)'
 
     const htmlContent = note.content
       .trim()
       .split(/\n{2,}/)
-      .map((para) => `<p>${para.trim()}</p>`)
+      .map((para) => `<p>${para.trim().replace(/\n/g, '<br>')}</p>`)
       .join('')
 
     try {
@@ -355,9 +294,6 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // COPIAR AL PORTAPAPELES
-  // ---------------------------------------------------------------------------
   async function copyNote(noteId: number): Promise<boolean> {
     const note = notes.value.find((n) => n.id === noteId)
     if (!note || !note.content) return false
@@ -376,7 +312,6 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     notes,
     activeNoteId,
     searchQuery,
-    selectedColorFilter,
     isLoading,
     saveStatus,
     lastSavedTime,
@@ -388,14 +323,12 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     toggleScratchpad,
     openScratchpad,
     closeScratchpad,
-    createQuickNote,
-    selectNote,
-    updateActiveTitle,
-    updateActiveContent,
+    addQuickIdea,
+    updateNoteContent,
     flushSave,
     deleteNote,
     togglePin,
-    setColorTag,
+    sendToActiveChapter,
     promoteToChapter,
     copyNote
   }

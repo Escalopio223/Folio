@@ -389,7 +389,6 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       keywords: ['scratchpad', 'nueva nota', 'apunte', 'idea'],
       execute: async () => {
         await scratchpadStore.openScratchpad()
-        await scratchpadStore.createQuickNote()
       }
     },
     {
