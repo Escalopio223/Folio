@@ -80,29 +80,6 @@ function handleOpenEditBookEvent(): void {
   }
 }
 
-function handleAppendToActiveChapter(e: Event): void {
-  const customEv = e as CustomEvent<{ content: string }>
-  const textToAppend = customEv.detail?.content?.trim()
-  if (!textToAppend || !folioStore.activeFolioId) return
-
-  const wrapped = textToAppend
-    .split(/\n{2,}/)
-    .map((p) => '<p>' + p.trim().replace(/\n/g, '<br>') + '</p>')
-    .join('')
-
-  if (tiptapEditorRef.value?.editor) {
-    tiptapEditorRef.value.editor.commands.insertContentAt(
-      tiptapEditorRef.value.editor.state.doc.content.size,
-      wrapped
-    )
-    tiptapEditorRef.value.editor.commands.focus('end')
-    onEditorInput()
-  } else {
-    editFolioContent.value = (editFolioContent.value ? editFolioContent.value + '\n\n' : '') + wrapped
-    onEditorInput()
-  }
-}
-
 // Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
 const { width: windowWidth } = useWindowSize()
 const isDraggingLeft = ref(false)
@@ -751,7 +728,6 @@ async function handleProjectDeleted(): Promise<void> {
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('folio:open-edit-book', handleOpenEditBookEvent)
-  window.addEventListener('folio:scratchpad-append-chapter', handleAppendToActiveChapter)
   window.addEventListener('beforeunload', () => {
     if (hasPendingChanges.value) {
       flushSave()
@@ -778,7 +754,6 @@ onMounted(async () => {
 onBeforeUnmount(async () => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('folio:open-edit-book', handleOpenEditBookEvent)
-  window.removeEventListener('folio:scratchpad-append-chapter', handleAppendToActiveChapter)
   if (hasPendingChanges.value) {
     await flushSave()
   }

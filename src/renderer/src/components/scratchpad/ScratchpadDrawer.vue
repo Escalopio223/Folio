@@ -8,17 +8,13 @@ import {
   Trash2,
   Copy,
   Check,
-  ArrowRight,
-  BookOpen,
   CornerDownLeft,
   Sparkles
 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
-import { useFolioStore } from '../../stores/folioStore'
 
 const scratchpadStore = useScratchpadStore()
-const folioStore = useFolioStore()
 
 const drawerRef = ref<HTMLElement | null>(null)
 const quickInputRef = ref<HTMLTextAreaElement | null>(null)
@@ -26,7 +22,6 @@ const newIdeaText = ref('')
 
 // Feedbacks visuales transitorios (toasts hápticos sutiles)
 const copiedNoteId = ref<number | null>(null)
-const sentNoteId = ref<number | null>(null)
 const editingNoteId = ref<number | null>(null)
 
 // Ancho redimensionable del cajón lateral con memoria
@@ -184,24 +179,6 @@ async function handleCopyNote(id: number): Promise<void> {
     setTimeout(() => {
       copiedNoteId.value = null
     }, 1800)
-  }
-}
-
-async function handleSendToChapter(id: number): Promise<void> {
-  if (!folioStore.activeFolioId) return
-  const ok = await scratchpadStore.sendToActiveChapter(id)
-  if (ok) {
-    sentNoteId.value = id
-    setTimeout(() => {
-      sentNoteId.value = null
-    }, 1800)
-  }
-}
-
-async function handlePromoteNote(id: number): Promise<void> {
-  const chapter = await scratchpadStore.promoteToChapter(id)
-  if (chapter) {
-    handleClose()
   }
 }
 
@@ -447,28 +424,6 @@ function formatRelativeTime(dateVal: Date | string | number): string {
                   >
                     <Check v-if="copiedNoteId === note.id" :size="11" class="text-emerald-500" />
                     <Copy v-else :size="11" />
-                  </button>
-
-                  <!-- Enviar al final del capítulo activo -->
-                  <button
-                    v-if="folioStore.activeFolioId"
-                    type="button"
-                    class="p-1 rounded-md neu-well-sm text-[var(--text-muted)] hover:!text-[var(--accent)] cursor-pointer transition-colors"
-                    :title="sentNoteId === note.id ? '¡Añadido al capítulo!' : 'Enviar al capítulo activo'"
-                    @click="handleSendToChapter(note.id)"
-                  >
-                    <Check v-if="sentNoteId === note.id" :size="11" class="text-emerald-500" />
-                    <ArrowRight v-else :size="11" />
-                  </button>
-
-                  <!-- Promover a nuevo capítulo -->
-                  <button
-                    type="button"
-                    class="p-1 rounded-md neu-well-sm text-[var(--text-muted)] hover:!text-[var(--accent)] cursor-pointer transition-colors"
-                    title="Convertir en un nuevo capítulo"
-                    @click="handlePromoteNote(note.id)"
-                  >
-                    <BookOpen :size="11" />
                   </button>
 
                   <!-- Alternar Pin -->

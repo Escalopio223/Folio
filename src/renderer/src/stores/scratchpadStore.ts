@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
-import type { ScratchpadNote, SaveScratchpadNoteInput, Folio } from '@shared/types'
+import type { ScratchpadNote, SaveScratchpadNoteInput } from '@shared/types'
 import { useProjectStore } from './projectStore'
-import { useFolioStore } from './folioStore'
 import { useGoalsStore } from './goalsStore'
 
 export const useScratchpadStore = defineStore('scratchpad', () => {
@@ -301,64 +300,6 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     isOpen.value = false
   }
 
-  /**
-   * Enviar fragmento al final del capítulo activo en el editor central TipTap.
-   */
-  async function sendToActiveChapter(noteId: number): Promise<boolean> {
-    const note = notes.value.find((n) => n.id === noteId)
-    if (!note || !note.content.trim()) return false
-
-    window.dispatchEvent(
-      new CustomEvent('folio:scratchpad-append-chapter', {
-        detail: { content: note.content }
-      })
-    )
-    return true
-  }
-
-  /**
-   * Promover nota a un capítulo independiente en el manuscrito.
-   */
-  async function promoteToChapter(noteId: number): Promise<Folio | null> {
-    const projectStore = useProjectStore()
-    const folioStore = useFolioStore()
-
-    if (!projectStore.activeProjectId) return null
-    const note = notes.value.find((n) => n.id === noteId)
-    if (!note || !note.content.trim()) return null
-
-    await flushSave()
-
-    const firstLine = note.content.trim().split('\n')[0] || ''
-    const cleanTitle =
-      firstLine.replace(/^[#*\-•\s]+/, '').slice(0, 48).trim() ||
-      'Nueva Escena (Scratchpad)'
-
-    const htmlContent = note.content
-      .trim()
-      .split(/\n{2,}/)
-      .map((para) => `<p>${para.trim().replace(/\n/g, '<br>')}</p>`)
-      .join('')
-
-    try {
-      const chapter = await folioStore.createChapter(projectStore.activeProjectId, {
-        type: 'chapter',
-        title: cleanTitle,
-        content: htmlContent
-      })
-
-      if (chapter) {
-        folioStore.selectFolio(chapter.id)
-        await deleteNote(noteId)
-      }
-
-      return chapter
-    } catch (err) {
-      console.error('[ScratchpadStore] Error al promover nota a capítulo:', err)
-      return null
-    }
-  }
-
   async function copyNote(noteId: number): Promise<boolean> {
     const note = notes.value.find((n) => n.id === noteId)
     if (!note || !note.content) return false
@@ -394,8 +335,6 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     flushSave,
     deleteNote,
     togglePin,
-    sendToActiveChapter,
-    promoteToChapter,
     copyNote
   }
 })
