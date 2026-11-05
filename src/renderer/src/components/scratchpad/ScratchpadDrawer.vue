@@ -122,11 +122,12 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown, true)
 })
 
-// Focus inmediato al abrir el cajón: Cero fricción para teclear
+// Focus inmediato al abrir el cajón y carga garantizada de notas
 watch(
   () => scratchpadStore.isOpen,
   (open) => {
     if (open) {
+      scratchpadStore.ensureNotesLoaded()
       nextTick(() => {
         quickInputRef.value?.focus()
       })
@@ -134,26 +135,34 @@ watch(
   }
 )
 
-// Captura de nota: Enter o Cmd/Ctrl+Enter
+// Captura de nota: función unificada para teclado y clic
+async function submitQuickIdea(): Promise<void> {
+  const text = newIdeaText.value.trim()
+  if (!text) return
+
+  // Limpiar inmediatamente el input para que la experiencia sea instantánea
+  newIdeaText.value = ''
+  if (quickInputRef.value) {
+    quickInputRef.value.style.height = 'auto'
+    quickInputRef.value.focus()
+  }
+
+  const created = await scratchpadStore.addQuickIdea(text)
+  if (!created) {
+    // Si la creación fallara, restaurar el texto para evitar pérdida de datos
+    newIdeaText.value = text
+  }
+}
+
+// Atajo de teclado: Enter sin shift o Cmd/Ctrl+Enter
 async function handleQuickSubmit(e: KeyboardEvent): Promise<void> {
-  // Enter sin shift o Cmd+Enter / Ctrl+Enter guarda de inmediato
   const isCtrlOrCmd = e.ctrlKey || e.metaKey
   const isPlainEnter = e.key === 'Enter' && !e.shiftKey
   const isModifierEnter = e.key === 'Enter' && isCtrlOrCmd
 
   if (isPlainEnter || isModifierEnter) {
     e.preventDefault()
-    const text = newIdeaText.value.trim()
-    if (!text) return
-
-    newIdeaText.value = ''
-    await scratchpadStore.addQuickIdea(text)
-
-    // Reajustar altura del textarea
-    if (quickInputRef.value) {
-      quickInputRef.value.style.height = 'auto'
-      quickInputRef.value.focus()
-    }
+    await submitQuickIdea()
   }
 }
 
@@ -342,7 +351,7 @@ function formatRelativeTime(dateVal: Date | string | number): string {
                 type="button"
                 class="neu-btn px-2.5 py-1 text-[10px] text-[var(--accent)] font-semibold flex items-center gap-1 rounded-lg cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                 :disabled="!newIdeaText.trim()"
-                @click="handleQuickSubmit({ key: 'Enter', preventDefault: () => {} } as any)"
+                @click="submitQuickIdea"
               >
                 <span>Fijar</span>
                 <CornerDownLeft :size="10" />
@@ -380,8 +389,8 @@ function formatRelativeTime(dateVal: Date | string | number): string {
         <!-- =============================================================== -->
         <!-- FEED CONTINUO DE NOTAS (OPCIÓN A: SIN TÍTULO, ACCIONES EN HOVER) -->
         <!-- =============================================================== -->
-        <main class="flex-1 overflow-y-auto px-3.5 pb-4 space-y-2.5 editorial-scrollbar min-h-0">
-          <transition-group name="note-list">
+        <main class="flex-1 overflow-y-auto px-3.5 pb-4 editorial-scrollbar min-h-0">
+          <transition-group name="note-list" tag="div" class="space-y-2.5">
             <div
               v-for="note in scratchpadStore.filteredNotes"
               :key="note.id"

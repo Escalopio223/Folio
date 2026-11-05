@@ -32,6 +32,32 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
       .trim()
   }
 
+  // Helper seguro para interpretar timestamps de SQLite / Date / ISO
+  function parseTimestamp(val: unknown): number {
+    if (!val) return 0
+    if (typeof val === 'number') {
+      return val < 1e11 ? val * 1000 : val
+    }
+    if (val instanceof Date) {
+      return val.getTime()
+    }
+    const t = new Date(String(val)).getTime()
+    return isNaN(t) ? 0 : t
+  }
+
+  // Resolver ID de proyecto activo con fallback seguro
+  function resolveProjectId(): string | null {
+    const projectStore = useProjectStore()
+    if (projectStore.activeProjectId) return projectStore.activeProjectId
+    const fallback =
+      projectStore.projects[0]?.id || localStorage.getItem('folio:lastActiveProject')
+    if (fallback) {
+      projectStore.selectProject(fallback)
+      return fallback
+    }
+    return null
+  }
+
   // Lista ordenada de notas: fijadas arriba, luego por fecha descendente
   const filteredNotes = computed<ScratchpadNote[]>(() => {
     const q = normalize(searchQuery.value)
@@ -45,8 +71,8 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
         if (a.isPinned !== b.isPinned) {
           return a.isPinned ? -1 : 1
         }
-        const timeA = new Date(a.updatedAt).getTime()
-        const timeB = new Date(b.updatedAt).getTime()
+        const timeA = parseTimestamp(a.updatedAt || a.createdAt)
+        const timeB = parseTimestamp(b.updatedAt || b.createdAt)
         return timeB - timeA
       })
   })
@@ -116,8 +142,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   // ---------------------------------------------------------------------------
 
   async function fetchNotes(projectId?: string | null): Promise<void> {
-    const projectStore = useProjectStore()
-    const targetProject = projectId || projectStore.activeProjectId
+    const targetProject = projectId || resolveProjectId()
     if (!targetProject) {
       notes.value = []
       activeNoteId.value = null
@@ -139,35 +164,71 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
   }
 
   /**
-   * Captura instantánea de idea.
-   * Guarda de inmediato en SQLite sin requerir título ni categorías.
+   * Captura instantánea de idea con actualización optimista y persistencia en SQLite.
+   * Sin requerir títulos ni categorización previa: cero fricción.
    */
   async function addQuickIdea(rawContent: string): Promise<ScratchpadNote | null> {
     const clean = rawContent.trim()
     if (!clean) return null
 
-    const projectStore = useProjectStore()
-    if (!projectStore.activeProjectId) return null
+    const projectId = resolveProjectId()
+    if (!projectId) {
+      console.warn('[ScratchpadStore] No hay proyecto activo para guardar la idea rápida')
+      return null
+    }
 
+    // Inserción optimista instantánea para respuesta visual inmediata
+    const tempId = -Date.now()
+    const now = new Date()
+    const optimisticNote: ScratchpadNote = {
+      id: tempId,
+      projectId,
+      title: '',
+      content: clean,
+      isPinned: false,
+      colorTag: null,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    notes.value.unshift(optimisticNote)
+    activeNoteId.value = tempId
     saveStatus.value = 'saving'
+
     try {
-      const newNote = await window.api.scratchpad.save({
-        projectId: projectStore.activeProjectId,
+      const saved = await window.api.scratchpad.save({
+        projectId,
         title: '',
         content: clean,
         isPinned: false,
         colorTag: null
       })
 
-      notes.value.unshift(newNote)
-      activeNoteId.value = newNote.id
+      // Reemplazar la nota optimista con la confirmada de SQLite
+      const index = notes.value.findIndex((n) => n.id === tempId)
+      if (index !== -1) {
+        notes.value[index] = saved
+      } else {
+        notes.value.unshift(saved)
+      }
+      activeNoteId.value = saved.id
       saveStatus.value = 'saved'
 
-      // Registrar métricas de logros si aplica
-      await useGoalsStore().checkAchievements()
-      return newNote
+      // Comprobar logros en segundo plano sin interrumpir ni bloquear el hilo
+      useGoalsStore()
+        .checkAchievements()
+        .catch((err) => {
+          console.warn('[ScratchpadStore] Error no bloqueante al verificar logros:', err)
+        })
+
+      return saved
     } catch (err) {
-      console.error('[ScratchpadStore] Error al añadir nota rápida:', err)
+      console.error('[ScratchpadStore] Error al guardar nota rápida en SQLite:', err)
+      // Si falla la persistencia, revertir la nota optimista
+      const index = notes.value.findIndex((n) => n.id === tempId)
+      if (index !== -1) {
+        notes.value.splice(index, 1)
+      }
       saveStatus.value = 'error'
       return null
     }
@@ -223,11 +284,15 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     }
   }
 
-  async function openScratchpad(): Promise<void> {
-    const projectStore = useProjectStore()
-    if (projectStore.activeProjectId && notes.value.length === 0) {
-      await fetchNotes(projectStore.activeProjectId)
+  async function ensureNotesLoaded(): Promise<void> {
+    const projectId = resolveProjectId()
+    if (projectId && (notes.value.length === 0 || notes.value[0]?.projectId !== projectId)) {
+      await fetchNotes(projectId)
     }
+  }
+
+  async function openScratchpad(): Promise<void> {
+    await ensureNotesLoaded()
     isOpen.value = true
   }
 
@@ -320,6 +385,7 @@ export const useScratchpadStore = defineStore('scratchpad', () => {
     pinnedCount,
     totalCount,
     fetchNotes,
+    ensureNotesLoaded,
     toggleScratchpad,
     openScratchpad,
     closeScratchpad,
