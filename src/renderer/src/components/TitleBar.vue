@@ -21,6 +21,7 @@ import ExportManuscriptMenu from './ExportManuscriptMenu.vue'
 import { useUiStore } from '../stores/uiStore'
 import { usePaletteStore } from '../stores/paletteStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
+import { modKey } from '../utils/platform'
 import type { WindowAction } from '@shared/types'
 
 const uiStore = useUiStore()
@@ -97,8 +98,8 @@ onUnmounted(() => {
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isLeftSidebarOpen }"
           :title="
             uiStore.isLeftSidebarOpen
-              ? 'Ocultar panel de manuscrito (Ctrl+1)'
-              : 'Mostrar panel de manuscrito (Ctrl+1)'
+              ? `Ocultar panel de manuscrito (${modKey}+1)`
+              : `Mostrar panel de manuscrito (${modKey}+1)`
           "
           @click="uiStore.toggleLeftSidebar"
         >
@@ -165,17 +166,17 @@ onUnmounted(() => {
 
       <!-- Right: Omnibox, Lore Toggle, Custom 3-Color Theme & Window Controls -->
       <div class="no-drag flex items-center gap-2">
-        <!-- Quick Command Palette / Omnibox Button (Ctrl+K) -->
+        <!-- Quick Command Palette / Omnibox Button (Ctrl+K / Cmd+K) -->
         <button
           type="button"
           class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
-          title="Paleta de Comandos y Búsqueda Global (Ctrl+K)"
+          :title="`Paleta de Comandos y Búsqueda Global (${modKey}+K)`"
           @click="paletteStore.open"
         >
           <Search :size="13" class="opacity-80" />
           <span class="text-[11px] font-medium hidden md:inline">Búsqueda global</span>
           <kbd class="neu-well-sm text-[9px] font-mono px-1 py-0.2 text-[var(--text-muted)]"
-            >Ctrl+K</kbd
+            >{{ modKey }}+K</kbd
           >
         </button>
 
@@ -188,8 +189,8 @@ onUnmounted(() => {
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isRightSidebarOpen }"
           :title="
             uiStore.isRightSidebarOpen
-              ? 'Ocultar Wiki & Reglas (Ctrl+3)'
-              : 'Mostrar Wiki & Reglas (Ctrl+3)'
+              ? `Ocultar Wiki & Reglas (${modKey}+3)`
+              : `Mostrar Wiki & Reglas (${modKey}+3)`
           "
           @click="uiStore.toggleRightSidebar"
         >
@@ -205,8 +206,8 @@ onUnmounted(() => {
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': scratchpadStore.isOpen }"
           :title="
             scratchpadStore.isOpen
-              ? 'Cerrar Scratchpad (Ctrl+J)'
-              : 'Abrir Scratchpad / Bloc Rápido (Ctrl+J)'
+              ? `Cerrar Scratchpad (${modKey}+J)`
+              : `Abrir Scratchpad / Bloc Rápido (${modKey}+J)`
           "
           @click="scratchpadStore.toggleScratchpad()"
         >

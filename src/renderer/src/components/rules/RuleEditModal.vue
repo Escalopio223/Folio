@@ -10,6 +10,7 @@ import {
 import { useRulesStore } from '../../stores/rulesStore'
 import { useProjectStore } from '../../stores/projectStore'
 import { getPresetsForGenre } from '../../utils/rulePresets'
+import { modKey } from '../../utils/platform'
 
 const rulesStore = useRulesStore()
 const projectStore = useProjectStore()
@@ -284,7 +285,7 @@ onUnmounted(() => {
     <!-- FOOTER: Atajos y Botones de Guardar / Cancelar -->
     <div class="flex items-center justify-between gap-2 pt-1 border-t border-[var(--groove-dark)]/20">
       <span class="text-[9px] font-mono text-[var(--text-muted)] hidden sm:inline">
-        Ctrl+Enter para guardar · Esc para cancelar
+        {{ modKey }}+Enter para guardar · Esc para cancelar
       </span>
 
       <div class="flex items-center gap-1.5 ml-auto">

@@ -15,6 +15,7 @@ import {
 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
 import { useUiStore } from '../stores/uiStore'
+import { modKey, formatShortcut } from '../utils/platform'
 
 const uiStore = useUiStore()
 
@@ -50,27 +51,27 @@ interface ShortcutCategory {
   }[]
 }
 
-const shortcutCategories: ShortcutCategory[] = [
+const shortcutCategories = computed<ShortcutCategory[]>(() => [
   {
     title: '1. Navegación y Vistas Tripartitas',
     items: [
       {
-        keys: ['Ctrl', '1'],
+        keys: [modKey, '1'],
         description: 'Alternar panel izquierdo (Árbol del Manuscrito)',
         context: 'Global'
       },
       {
-        keys: ['Ctrl', '3'],
+        keys: [modKey, '3'],
         description: 'Alternar panel derecho (Wiki de Lore y Reglas del Mundo)',
         context: 'Global'
       },
       {
-        keys: ['Ctrl', 'J'],
+        keys: [modKey, 'J'],
         description: 'Abrir o cerrar el Scratchpad (cajón de captura rápida)',
         context: 'Global'
       },
       {
-        keys: ['Ctrl', 'K'],
+        keys: [modKey, 'K'],
         description: 'Paleta de Comandos y Búsqueda Profunda en todo el libro',
         context: 'Global'
       },
@@ -85,7 +86,7 @@ const shortcutCategories: ShortcutCategory[] = [
     title: '2. Modos de Inmersión y Concentración',
     items: [
       {
-        keys: ['Ctrl', 'Shift', 'F'],
+        keys: [modKey, 'Shift', 'F'],
         description: 'Alternar Modo Zen (Pantalla completa, sin distracciones y enfoque de párrafo)',
         context: 'Editor'
       },
@@ -95,7 +96,7 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Global'
       },
       {
-        keys: ['Ctrl', 'Shift', 'T'],
+        keys: [modKey, 'Shift', 'T'],
         description: 'Modo Máquina de Escribir (Línea de redacción anclada al centro de la pantalla)',
         context: 'Editor'
       },
@@ -110,17 +111,17 @@ const shortcutCategories: ShortcutCategory[] = [
     title: '3. Gestión del Manuscrito y Archivo',
     items: [
       {
-        keys: ['Ctrl', 'S'],
+        keys: [modKey, 'S'],
         description: 'Guardado forzado instantáneo a la base de datos SQLite',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Alt', 'N'],
+        keys: [modKey, 'Alt', 'N'],
         description: 'Crear un nuevo capítulo instantáneamente sin tocar el ratón',
         context: 'Manuscrito'
       },
       {
-        keys: ['Ctrl', 'Clic'],
+        keys: [modKey, 'Clic'],
         description: 'Saltar a la ficha de la Wiki desde un personaje o entidad detectada en el texto',
         context: 'Editor'
       }
@@ -130,7 +131,7 @@ const shortcutCategories: ShortcutCategory[] = [
     title: '4. Búsqueda dentro del Capítulo Activo',
     items: [
       {
-        keys: ['Ctrl', 'F'],
+        keys: [modKey, 'F'],
         description: 'Abrir barra flotante de búsqueda de texto dentro del capítulo',
         context: 'Editor'
       },
@@ -165,7 +166,7 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Scratchpad'
       },
       {
-        keys: ['Ctrl', 'Enter'],
+        keys: [modKey, 'Enter'],
         description: 'Fijar nota de inmediato (atajo alternativo)',
         context: 'Scratchpad'
       },
@@ -177,7 +178,7 @@ const shortcutCategories: ShortcutCategory[] = [
     ]
   },
   {
-    title: '6. Paleta de Comandos (Ctrl+K)',
+    title: `6. Paleta de Comandos (${modKey}+K)`,
     items: [
       {
         keys: ['↑', '↓'],
@@ -200,42 +201,42 @@ const shortcutCategories: ShortcutCategory[] = [
     title: '7. Formato Tipográfico y Edición',
     items: [
       {
-        keys: ['Ctrl', 'B'],
+        keys: [modKey, 'B'],
         description: 'Aplicar o quitar formato Negrita',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'I'],
+        keys: [modKey, 'I'],
         description: 'Aplicar o quitar formato Cursiva (itálica)',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'U'],
+        keys: [modKey, 'U'],
         description: 'Aplicar o quitar Subrayado',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Shift', 'X'],
+        keys: [modKey, 'Shift', 'X'],
         description: 'Aplicar o quitar Tachado',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Alt', '1 / 2 / 3'],
+        keys: [modKey, 'Alt', '1 / 2 / 3'],
         description: 'Convertir párrafo en Encabezado H1, H2 o H3',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Alt', '0'],
+        keys: [modKey, 'Alt', '0'],
         description: 'Restablecer a Párrafo normal',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Shift', 'B'],
+        keys: [modKey, 'Shift', 'B'],
         description: 'Convertir bloque en Cita editorial (Blockquote)',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Shift', 'S'],
+        keys: [modKey, 'Shift', 'S'],
         description: 'Insertar descanso de escena tipográfico (* * *)',
         context: 'Editor'
       },
@@ -250,12 +251,12 @@ const shortcutCategories: ShortcutCategory[] = [
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Z'],
+        keys: [modKey, 'Z'],
         description: 'Deshacer último cambio de texto',
         context: 'Editor'
       },
       {
-        keys: ['Ctrl', 'Y'],
+        keys: [modKey, 'Y'],
         description: 'Rehacer último cambio deshecho',
         context: 'Editor'
       }
@@ -301,13 +302,13 @@ const shortcutCategories: ShortcutCategory[] = [
       }
     ]
   }
-]
+])
 
 const filteredCategories = computed(() => {
   const query = shortcutSearchQuery.value.trim().toLowerCase()
-  if (!query) return shortcutCategories
+  if (!query) return shortcutCategories.value
 
-  return shortcutCategories
+  return shortcutCategories.value
     .map((cat) => ({
       title: cat.title,
       items: cat.items.filter(
@@ -328,12 +329,12 @@ interface FeatureModule {
   bullets: string[]
 }
 
-const featureModules: FeatureModule[] = [
+const featureModules = computed<FeatureModule[]>(() => [
   {
     title: '1. Árbol del Manuscrito',
     subtitle: 'Estructura organizada de tu obra literaria',
     icon: FolderTree,
-    shortcut: 'Ctrl+1',
+    shortcut: formatShortcut('Ctrl+1'),
     bullets: [
       'Organiza tu libro en capítulos, preliminares (prólogos, dedicatorias) y epílogos.',
       'Reordena capítulos y escenas cómodamente arrastrando y soltando (Drag & Drop).',
@@ -345,21 +346,21 @@ const featureModules: FeatureModule[] = [
     title: '2. Lienzo Central & Modo Zen',
     subtitle: 'El santuario de escritura inmersiva libre de distracciones',
     icon: Feather,
-    shortcut: 'Ctrl+Shift+F',
+    shortcut: formatShortcut('Ctrl+Shift+F'),
     bullets: [
-      'Modo Zen (Ctrl+Shift+F o F11): oculta todas las barras y menús, dejando un lienzo puro con iluminación focalizada en el párrafo en el que estás redactando.',
-      'Modo Máquina de Escribir (Ctrl+Shift+T): fija la línea activa al 50% vertical de la pantalla para no bajar la mirada ni fatigarte.',
+      `Modo Zen (${modKey}+Shift+F o F11): oculta todas las barras y menús, dejando un lienzo puro con iluminación focalizada en el párrafo en el que estás redactando.`,
+      `Modo Máquina de Escribir (${modKey}+Shift+T): fija la línea activa al 50% vertical de la pantalla para no bajar la mirada ni fatigarte.`,
       'Sonido Mecánico Opcional: chasquido sutil de teclas, campanilla de final de línea y retorno de carro mecánico.',
-      'Buscador integrado (Ctrl+F) estilo VS Code para saltar y reemplazar texto en la escena activa.'
+      `Buscador integrado (${modKey}+F) estilo VS Code para saltar y reemplazar texto en la escena activa.`
     ]
   },
   {
     title: '3. Scratchpad (Bloc Rápido)',
     subtitle: 'Captura instantánea de ideas fugaces con cero fricción',
     icon: Pin,
-    shortcut: 'Ctrl+J',
+    shortcut: formatShortcut('Ctrl+J'),
     bullets: [
-      'Ábrelo al instante desde cualquier parte con Ctrl+J; el cursor ya estará listo para teclear.',
+      `Ábrelo al instante desde cualquier parte con ${modKey}+J; el cursor ya estará listo para teclear.`,
       'Sin formularios obligatorios: escribe lo que se te ocurra y pulsa Enter para fijar la idea en el feed continuo.',
       'Fija notas importantes arriba con el botón de chincheta y cópialas al portapapeles con un solo clic.',
       'Persistencia inmediata en SQLite local: tus pensamientos quedan guardados en milisegundos.'
@@ -369,11 +370,11 @@ const featureModules: FeatureModule[] = [
     title: '4. Wiki de Lore & Reglas del Mundo',
     subtitle: 'Tu biblia narrativa conectada bidireccionalmente al manuscrito',
     icon: Sparkles,
-    shortcut: 'Ctrl+3',
+    shortcut: formatShortcut('Ctrl+3'),
     bullets: [
       'Crea fichas ordenadas para Personajes, Lugares, Objetos y Facciones de tu universo.',
       'Detección automática en el editor: Folio reconoce los nombres de tus personajes mientras redactas y los subraya sutilmente sin ensuciar el texto.',
-      'Hover Preview & Ctrl+Clic: reposa el ratón sobre cualquier mención para ver su resumen, o pulsa Ctrl+Clic para saltar directamente a su ficha en la Wiki.',
+      `Hover Preview & ${modKey}+Clic: reposa el ratón sobre cualquier mención para ver su resumen, o pulsa ${modKey}+Clic para saltar directamente a su ficha en la Wiki.`,
       'Reglas del Mundo: documenta axiomas, leyes mágicas y códigos inquebrantables de tu universo narrativo.'
     ]
   },
@@ -381,9 +382,9 @@ const featureModules: FeatureModule[] = [
     title: '5. Paleta de Comandos & Búsqueda Profunda',
     subtitle: 'El Omnibox universal que controla toda la aplicación',
     icon: Search,
-    shortcut: 'Ctrl+K',
+    shortcut: formatShortcut('Ctrl+K'),
     bullets: [
-      'Pulsa Ctrl+K para abrir la paleta global y navegar por toda la aplicación desde el teclado.',
+      `Pulsa ${modKey}+K para abrir la paleta global y navegar por toda la aplicación desde el teclado.`,
       'Búsqueda profunda: encuentra al instante cualquier frase o fragmento a través de todos los capítulos del manuscrito simultáneamente.',
       'Ejecuta cualquier acción de la app (cambiar temas, guardar, crear escenas, abrir papelera) en segundos.'
     ]
@@ -402,14 +403,14 @@ const featureModules: FeatureModule[] = [
     title: '7. Seguridad Local-First & Papelera',
     subtitle: 'Control absoluto y privacidad total de tu obra',
     icon: ShieldCheck,
-    shortcut: 'Ctrl+S',
+    shortcut: formatShortcut('Ctrl+S'),
     bullets: [
       'Almacenamiento local en SQLite: tu manuscrito vive exclusivamente en tu ordenador y nunca se sube a servidores externos.',
       'Autoguardado continuo inteligente con debounce para garantizar cero pérdida de datos.',
       'Papelera de reciclaje segura: ningún capítulo o ficha eliminada se borra de inmediato; puedes restaurarlos cuando quieras.'
     ]
   }
-]
+])
 </script>
 
 <template>

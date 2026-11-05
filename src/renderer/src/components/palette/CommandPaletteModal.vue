@@ -26,6 +26,7 @@ import { useScratchpadStore } from '../../stores/scratchpadStore'
 import { useRulesStore } from '../../stores/rulesStore'
 import { getSystemCommands, type CommandAction } from './commandsRegistry'
 import { useDocumentSearch, type SearchMatch } from '../../composables/useDocumentSearch'
+import { modKey } from '../../utils/platform'
 
 const paletteStore = usePaletteStore()
 const uiStore = useUiStore()
@@ -873,7 +874,7 @@ onUnmounted(() => {
             </div>
 
             <div class="flex items-center gap-1 text-[10px]">
-              <kbd class="neu-well-sm px-1 py-0.2">Ctrl+K</kbd>
+              <kbd class="neu-well-sm px-1 py-0.2">{{ modKey }}+K</kbd>
               <span>Alternar</span>
             </div>
           </div>

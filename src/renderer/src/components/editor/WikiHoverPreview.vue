@@ -11,6 +11,7 @@ import {
   BookOpen
 } from 'lucide-vue-next'
 import type { LoreItem } from '@shared/types'
+import { modKey } from '../../utils/platform'
 
 export interface WikiHoverPayload {
   entity: LoreItem
@@ -268,7 +269,7 @@ defineExpose({
             <span>Wiki de Lore</span>
           </span>
           <span class="neu-well-sm px-1 py-0.2 rounded text-[9px]">
-            <strong class="text-[var(--accent)]">Ctrl+Clic</strong>: Abrir
+            <strong class="text-[var(--accent)]">{{ modKey }}+Clic</strong>: Abrir
           </span>
         </div>
       </div>

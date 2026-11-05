@@ -26,6 +26,7 @@ import { useTrashStore } from '../../stores/trashStore'
 import { useScratchpadStore } from '../../stores/scratchpadStore'
 import { useRulesStore } from '../../stores/rulesStore'
 import { useGoalsStore } from '../../stores/goalsStore'
+import { formatShortcut } from '../../utils/platform'
 
 export interface CommandAction {
   id: string
@@ -61,7 +62,7 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
   const rulesStore = ctx.rulesStore || useRulesStore()
   const goalsStore = ctx.goalsStore || useGoalsStore()
 
-  return [
+  const rawCommands: CommandAction[] = [
     {
       id: 'new-chapter',
       title: 'Nuevo Capítulo',
@@ -451,4 +452,9 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       }
     }
   ]
+
+  return rawCommands.map((cmd) => ({
+    ...cmd,
+    shortcut: formatShortcut(cmd.shortcut)
+  }))
 }

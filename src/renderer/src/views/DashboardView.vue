@@ -39,6 +39,7 @@ import { useRulesStore } from '../stores/rulesStore'
 import { useGoalsStore } from '../stores/goalsStore'
 import { usePaletteStore } from '../stores/paletteStore'
 import GoalsProgressPill from '../components/goals/GoalsProgressPill.vue'
+import { modKey } from '../utils/platform'
 import {
   useChapterMetrics,
   type ChapterMetricsSnapshot
@@ -809,7 +810,7 @@ onBeforeUnmount(async () => {
       <button
         type="button"
         class="neu-btn-terracotta w-full py-2 px-3 flex items-center justify-center gap-2 text-xs shrink-0 active:scale-95 transition-transform cursor-pointer"
-        title="Crear un nuevo capítulo en el manuscrito (Ctrl+Alt+N)"
+        :title="`Crear un nuevo capítulo en el manuscrito (${modKey}+Alt+N)`"
         @click="handleCreateChapter('chapter')"
       >
         <Plus :size="14" />
@@ -1002,7 +1003,7 @@ onBeforeUnmount(async () => {
         <span
           class="neu-well-sm px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-1"
         >
-          <strong class="text-[var(--accent)]">Ctrl+1</strong>: Panel
+          <strong class="text-[var(--accent)]">{{ modKey }}+1</strong>: Panel
         </span>
       </div>
     </aside>
@@ -1065,7 +1066,7 @@ onBeforeUnmount(async () => {
               :title="
                 uiStore.isFocusMode
                   ? 'Salir del Modo Zen (Esc o F11)'
-                  : 'Activar Modo Zen Inmersivo (F11 o Ctrl+Shift+F): Lienzo limpio, distracción cero y enfoque de párrafo'
+                  : `Activar Modo Zen Inmersivo (F11 o ${modKey}+Shift+F): Lienzo limpio, distracción cero y enfoque de párrafo`
               "
               @click="uiStore.toggleFocusMode"
             >
@@ -1095,19 +1096,19 @@ onBeforeUnmount(async () => {
               <span class="text-[11px] font-medium hidden md:inline">Máquina</span>
             </button>
 
-            <!-- Botón Buscar en capítulo (Ctrl+F) -->
+            <!-- Botón Buscar en capítulo (Ctrl+F / Cmd+F) -->
             <button
               type="button"
               class="neu-btn px-2.5 py-1 text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               :class="{
                 'neu-well !text-[var(--accent)] font-semibold': findBarRef?.isVisible
               }"
-              title="Buscar palabra en el capítulo actual (Ctrl+F)"
+              :title="`Buscar palabra en el capítulo actual (${modKey}+F)`"
               @click="handleOpenFindBar"
             >
               <Search :size="13" />
               <span class="text-[11px] font-medium hidden md:inline">Buscar</span>
-              <kbd class="neu-well-sm text-[9px] font-mono px-1 text-[var(--text-muted)]">Ctrl+F</kbd>
+              <kbd class="neu-well-sm text-[9px] font-mono px-1 text-[var(--text-muted)]">{{ modKey }}+F</kbd>
             </button>
 
             <button
@@ -1129,7 +1130,7 @@ onBeforeUnmount(async () => {
                 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]':
                   saveStatus === 'saved'
               }"
-              title="Forzar guardado manual inmediato (Ctrl+S)"
+              :title="`Forzar guardado manual inmediato (${modKey}+S)`"
               @click="handleManualSave"
             >
               <span class="relative flex h-2 w-2">
@@ -1160,7 +1161,7 @@ onBeforeUnmount(async () => {
               <span
                 class="text-[9px] font-mono px-1 py-0.2 rounded neu-well-sm text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors opacity-75"
               >
-                Ctrl+S
+                {{ modKey }}+S
               </span>
             </button>
           </div>
@@ -1432,11 +1433,11 @@ onBeforeUnmount(async () => {
             <span
               class="neu-well-sm px-2 py-0.5 text-[9px] text-[var(--text-secondary)] font-semibold flex items-center gap-2"
             >
-              <span><strong class="text-[var(--accent)]">Ctrl+S</strong>: Guardar</span>
+              <span><strong class="text-[var(--accent)]">{{ modKey }}+S</strong>: Guardar</span>
               <span>·</span>
-              <span><strong class="text-[var(--accent)]">Ctrl+Shift+F</strong>: Modo Zen</span>
+              <span><strong class="text-[var(--accent)]">{{ modKey }}+Shift+F</strong>: Modo Zen</span>
               <span>·</span>
-              <span><strong class="text-[var(--accent)]">Ctrl+Shift+T</strong>: Máquina</span>
+              <span><strong class="text-[var(--accent)]">{{ modKey }}+Shift+T</strong>: Máquina</span>
             </span>
           </div>
         </footer>

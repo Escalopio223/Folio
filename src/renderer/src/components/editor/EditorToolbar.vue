@@ -32,6 +32,7 @@ import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/
 import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
 import SpellcheckLanguageToggle from './SpellcheckLanguageToggle.vue'
 import { useSpellcheck } from '../../composables/useSpellcheck'
+import { modKey } from '../../utils/platform'
 
 const props = defineProps<{
   editor: Editor | null | undefined
@@ -184,7 +185,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[var(--text-primary)]"
           :disabled="!editor?.can().undo()"
-          title="Deshacer (Ctrl+Z)"
+          :title="`Deshacer (${modKey}+Z)`"
           @mousedown.prevent
           @click="editor?.chain().focus().undo().run()"
         >
@@ -195,7 +196,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[var(--text-primary)]"
           :disabled="!editor?.can().redo()"
-          title="Rehacer (Ctrl+Y)"
+          :title="`Rehacer (${modKey}+Y)`"
           @mousedown.prevent
           @click="editor?.chain().focus().redo().run()"
         >
@@ -333,7 +334,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('bold') }"
-          title="Negrita (Ctrl+B)"
+          :title="`Negrita (${modKey}+B)`"
           @mousedown.prevent
           @click="editor?.chain().focus().toggleBold().run()"
         >
@@ -344,7 +345,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('italic') }"
-          title="Cursiva (Ctrl+I)"
+          :title="`Cursiva (${modKey}+I)`"
           @mousedown.prevent
           @click="editor?.chain().focus().toggleItalic().run()"
         >
@@ -355,7 +356,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('underline') }"
-          title="Subrayado (Ctrl+U)"
+          :title="`Subrayado (${modKey}+U)`"
           @mousedown.prevent
           @click="editor?.chain().focus().toggleUnderline().run()"
         >
@@ -366,7 +367,7 @@ function insertSceneBreak(): void {
           type="button"
           class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
           :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('strike') }"
-          title="Tachado (Ctrl+Shift+X)"
+          :title="`Tachado (${modKey}+Shift+X)`"
           @mousedown.prevent
           @click="editor?.chain().focus().toggleStrike().run()"
         >

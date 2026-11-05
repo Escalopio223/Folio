@@ -10,6 +10,7 @@ import {
   Quote
 } from 'lucide-vue-next'
 import { setHeadingSmart, setBlockquoteSmart } from './utils/blockFormatting'
+import { modKey } from '../../utils/platform'
 
 defineProps<{
   editor: Editor | null | undefined
@@ -31,7 +32,7 @@ defineProps<{
       type="button"
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('bold') }"
-      title="Negrita (Ctrl+B)"
+      :title="`Negrita (${modKey}+B)`"
       @mousedown.prevent
       @click="editor.chain().focus().toggleBold().run()"
     >
@@ -43,7 +44,7 @@ defineProps<{
       type="button"
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('italic') }"
-      title="Cursiva (Ctrl+I)"
+      :title="`Cursiva (${modKey}+I)`"
       @mousedown.prevent
       @click="editor.chain().focus().toggleItalic().run()"
     >
@@ -55,7 +56,7 @@ defineProps<{
       type="button"
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('underline') }"
-      title="Subrayado (Ctrl+U)"
+      :title="`Subrayado (${modKey}+U)`"
       @mousedown.prevent
       @click="editor.chain().focus().toggleUnderline().run()"
     >
@@ -67,7 +68,7 @@ defineProps<{
       type="button"
       class="neu-btn w-7 h-7 flex items-center justify-center text-xs transition-all cursor-pointer"
       :class="{ 'neu-well !text-[var(--accent)] font-bold': editor.isActive('strike') }"
-      title="Tachado (Ctrl+Shift+X)"
+      :title="`Tachado (${modKey}+Shift+X)`"
       @mousedown.prevent
       @click="editor.chain().focus().toggleStrike().run()"
     >

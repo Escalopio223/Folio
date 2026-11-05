@@ -13,6 +13,7 @@ import AchievementToast from './components/goals/AchievementToast.vue'
 import ThemeCustomizerModal from './components/ThemeCustomizerModal.vue'
 import HelpGuideModal from './components/HelpGuideModal.vue'
 import { Feather, Sparkles } from 'lucide-vue-next'
+import { modKey } from './utils/platform'
 
 const uiStore = useUiStore()
 const scratchpadStore = useScratchpadStore()
@@ -86,11 +87,11 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="flex items-center gap-1.5 hover:text-[var(--accent)] transition-colors cursor-pointer"
-          title="Abrir Scratchpad / Bloc Rápido (Ctrl+J)"
+          :title="`Abrir Scratchpad / Bloc Rápido (${modKey}+J)`"
           @click="scratchpadStore.toggleScratchpad()"
         >
           <Feather :size="11" />
-          <span>Bloc Rápido (Ctrl+J)</span>
+          <span>Bloc Rápido ({{ modKey }}+J)</span>
           <span
             v-if="scratchpadStore.notes.length > 0"
             class="px-1.5 py-0.2 rounded-full neu-well-sm text-[9px] text-[var(--accent)] font-semibold"
