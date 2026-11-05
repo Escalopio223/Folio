@@ -15,7 +15,8 @@ import {
   Target,
   Trophy,
   BookOpen,
-  HelpCircle
+  HelpCircle,
+  Pencil
 } from 'lucide-vue-next'
 import type { useUiStore } from '../../stores/uiStore'
 import type { useFolioStore } from '../../stores/folioStore'
@@ -450,6 +451,18 @@ export function getSystemCommands(ctx: StoreContext): CommandAction[] {
       ],
       execute: () => {
         uiStore.openWikiRules()
+      }
+    },
+    {
+      id: 'edit-active-book',
+      title: 'Editar Libro Activo (Título, Género, Sinopsis)',
+      description: 'Modificar el título/nombre, género literario y sinopsis de la obra actual',
+      category: 'action',
+      badge: 'Libro',
+      icon: Pencil,
+      keywords: ['libro', 'editar', 'titulo', 'nombre', 'genero', 'sinopsis', 'proyecto', 'novela', 'obra'],
+      execute: () => {
+        window.dispatchEvent(new CustomEvent('folio:open-edit-book'))
       }
     }
   ]

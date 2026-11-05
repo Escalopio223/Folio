@@ -1,11 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { BookOpen, X, Plus } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
+import { BookOpen, X, Plus, Check, Pencil } from 'lucide-vue-next'
 import { useProjectStore } from '../stores/projectStore'
+import type { Project } from '@shared/types'
+
+const props = withDefaults(
+  defineProps<{
+    mode?: 'create' | 'edit'
+    project?: Project | null
+  }>(),
+  {
+    mode: 'create',
+    project: null
+  }
+)
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'created', projectId: string): void
+  (e: 'updated', project: Project): void
 }>()
 
 const projectStore = useProjectStore()
@@ -14,18 +27,51 @@ const synopsis = ref('')
 const genre = ref('')
 const isSubmitting = ref(false)
 
+// Sincronizar campos con los datos iniciales según el modo
+watch(
+  () => props.project,
+  (p) => {
+    if (props.mode === 'edit' && p) {
+      title.value = p.title || ''
+      genre.value = p.genre || ''
+      synopsis.value = p.synopsis || ''
+    } else if (props.mode === 'create') {
+      title.value = ''
+      genre.value = ''
+      synopsis.value = ''
+    }
+  },
+  { immediate: true }
+)
+
 async function handleSubmit(): Promise<void> {
-  if (!title.value.trim()) return
+  const cleanTitle = title.value.trim()
+  if (!cleanTitle) return
+
   try {
     isSubmitting.value = true
-    const created = await projectStore.createProject({
-      title: title.value.trim(),
-      synopsis: synopsis.value.trim(),
-      genre: genre.value.trim()
-    })
-    if (created) {
-      emit('created', created.id)
-      emit('close')
+
+    if (props.mode === 'edit' && props.project) {
+      const updated = await projectStore.updateProject({
+        id: props.project.id,
+        title: cleanTitle,
+        genre: genre.value.trim(),
+        synopsis: synopsis.value.trim()
+      })
+      if (updated) {
+        emit('updated', updated)
+        emit('close')
+      }
+    } else {
+      const created = await projectStore.createProject({
+        title: cleanTitle,
+        genre: genre.value.trim(),
+        synopsis: synopsis.value.trim()
+      })
+      if (created) {
+        emit('created', created.id)
+        emit('close')
+      }
     }
   } finally {
     isSubmitting.value = false
@@ -40,21 +86,26 @@ async function handleSubmit(): Promise<void> {
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-lg neu-well-sm flex items-center justify-center text-[var(--accent)]">
-            <BookOpen :size="16" />
+            <Pencil v-if="mode === 'edit'" :size="16" />
+            <BookOpen v-else :size="16" />
           </div>
           <div>
             <h3 class="font-editorial text-lg font-bold text-[var(--text-primary)]">
-              Nuevo Proyecto / Libro
+              {{ mode === 'edit' ? 'Editar Libro' : 'Nuevo Proyecto / Libro' }}
             </h3>
             <p class="text-[11px] text-[var(--text-muted)] font-mono">
-              Comienza un nuevo manuscrito con su propia wiki de mundo
+              {{
+                mode === 'edit'
+                  ? 'Modifica el título, género y sinopsis de la obra'
+                  : 'Comienza un nuevo manuscrito con su propia wiki de mundo'
+              }}
             </p>
           </div>
         </div>
 
         <button
           type="button"
-          class="neu-btn p-1.5 text-[var(--text-muted)] hover:!text-[var(--accent)]"
+          class="neu-btn p-1.5 text-[var(--text-muted)] hover:!text-[var(--accent)] cursor-pointer"
           @click="emit('close')"
         >
           <X :size="14" />
@@ -66,7 +117,9 @@ async function handleSubmit(): Promise<void> {
       <!-- Form -->
       <form class="space-y-4 text-xs" @submit.prevent="handleSubmit">
         <div class="space-y-1">
-          <label class="block font-medium text-[var(--text-secondary)]">Título del Libro *</label>
+          <label class="block font-medium text-[var(--text-secondary)]">
+            Título / Nombre del Libro *
+          </label>
           <input
             v-model="title"
             type="text"
@@ -103,7 +156,7 @@ async function handleSubmit(): Promise<void> {
         <div class="flex items-center justify-end gap-2.5 pt-1">
           <button
             type="button"
-            class="neu-btn px-4 py-2 text-xs"
+            class="neu-btn px-4 py-2 text-xs cursor-pointer"
             @click="emit('close')"
           >
             Cancelar
@@ -111,11 +164,12 @@ async function handleSubmit(): Promise<void> {
 
           <button
             type="submit"
-            class="neu-btn-terracotta px-5 py-2 text-xs flex items-center gap-1.5"
+            class="neu-btn-terracotta px-5 py-2 text-xs flex items-center gap-1.5 cursor-pointer"
             :disabled="isSubmitting || !title.trim()"
           >
-            <Plus :size="14" />
-            <span>Crear Proyecto</span>
+            <Check v-if="mode === 'edit'" :size="14" />
+            <Plus v-else :size="14" />
+            <span>{{ mode === 'edit' ? 'Guardar Cambios' : 'Crear Proyecto' }}</span>
           </button>
         </div>
       </form>

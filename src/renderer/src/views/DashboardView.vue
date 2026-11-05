@@ -32,7 +32,7 @@ import WikiHoverPreview from '../components/editor/WikiHoverPreview.vue'
 import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
 import type { WikiEntityTerm } from '../components/editor/extensions/WikiAutoLink'
 import type { Editor } from '@tiptap/vue-3'
-import type { Folio, FolioType, FolioStatus, ChapterTitleFormat } from '@shared/types'
+import type { Folio, FolioType, FolioStatus, ChapterTitleFormat, Project } from '@shared/types'
 import { useTrashStore } from '../stores/trashStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
 import { useRulesStore } from '../stores/rulesStore'
@@ -55,7 +55,30 @@ const goalsStore = useGoalsStore()
 const paletteStore = usePaletteStore()
 
 const isProjectModalOpen = ref(false)
+const projectModalMode = ref<'create' | 'edit'>('create')
+const projectToEdit = ref<Project | null>(null)
 
+function openCreateProjectModal(): void {
+  projectModalMode.value = 'create'
+  projectToEdit.value = null
+  isProjectModalOpen.value = true
+}
+
+function openEditProjectModal(project: Project): void {
+  projectModalMode.value = 'edit'
+  projectToEdit.value = project
+  isProjectModalOpen.value = true
+}
+
+function handleProjectUpdated(_updated: Project): void {
+  // El store de proyectos ya se actualiza automáticamente
+}
+
+function handleOpenEditBookEvent(): void {
+  if (projectStore.activeProject) {
+    openEditProjectModal(projectStore.activeProject)
+  }
+}
 // Dimensiones dinámicas y estado de arrastre para Manuscrito y Wiki
 const { width: windowWidth } = useWindowSize()
 const isDraggingLeft = ref(false)
@@ -703,6 +726,7 @@ async function handleProjectDeleted(): Promise<void> {
 // Initial boot & listeners
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('folio:open-edit-book', handleOpenEditBookEvent)
   window.addEventListener('beforeunload', () => {
     if (hasPendingChanges.value) {
       flushSave()
@@ -728,6 +752,7 @@ onMounted(async () => {
 
 onBeforeUnmount(async () => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('folio:open-edit-book', handleOpenEditBookEvent)
   if (hasPendingChanges.value) {
     await flushSave()
   }
@@ -736,11 +761,14 @@ onBeforeUnmount(async () => {
 
 <template>
   <div class="flex h-full w-full overflow-hidden bg-[var(--bg-base)] relative p-3 md:p-4">
-    <!-- Modal para nuevo proyecto/libro -->
+    <!-- Modal para nuevo o editar proyecto/libro -->
     <ProjectModal
       v-if="isProjectModalOpen"
+      :mode="projectModalMode"
+      :project="projectToEdit"
       @close="isProjectModalOpen = false"
       @created="handleProjectChange"
+      @updated="handleProjectUpdated"
     />
 
     <!-- ================================================================= -->
@@ -760,7 +788,8 @@ onBeforeUnmount(async () => {
     >
       <!-- Selector Personalizado de Libros -->
       <BookSelector
-        @open-create-modal="isProjectModalOpen = true"
+        @open-create-modal="openCreateProjectModal"
+        @open-edit-modal="openEditProjectModal"
         @project-changed="handleProjectChange"
         @project-deleted="handleProjectDeleted"
       />

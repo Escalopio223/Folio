@@ -9,12 +9,14 @@ import {
   Plus,
   Sparkles,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Pencil
 } from 'lucide-vue-next'
 import type { Project } from '@shared/types'
 
 const emit = defineEmits<{
   (e: 'openCreateModal'): void
+  (e: 'openEditModal', project: Project): void
   (e: 'projectChanged', projectId: string): void
   (e: 'projectDeleted', projectId: string): void
 }>()
@@ -49,6 +51,18 @@ function handleCreateNew(): void {
   emit('openCreateModal')
 }
 
+function handleEditCurrent(): void {
+  if (projectStore.activeProject) {
+    isOpen.value = false
+    emit('openEditModal', projectStore.activeProject)
+  }
+}
+
+function handleEditProject(p: Project): void {
+  isOpen.value = false
+  emit('openEditModal', p)
+}
+
 function promptDelete(p: Project): void {
   projectToDelete.value = p
   isConfirmModalOpen.value = true
@@ -74,7 +88,7 @@ async function confirmDelete(): Promise<void> {
   <div ref="dropdownRef" class="relative w-full select-none" @keydown.esc="isOpen = false">
     <!-- Contenedor / Tarjeta del Libro Activo -->
     <div class="neu-well p-3 flex flex-col gap-2 shrink-0">
-      <!-- Fila superior: Etiqueta y botón directo de creación -->
+      <!-- Fila superior: Etiqueta y botones de acción (Editar y Nuevo) -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1.5 min-w-0">
           <BookOpen :size="13" class="text-[var(--accent)] shrink-0" />
@@ -83,15 +97,30 @@ async function confirmDelete(): Promise<void> {
           </span>
         </div>
 
-        <button
-          type="button"
-          class="neu-btn px-2 py-0.5 text-[10px] text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center gap-1 cursor-pointer"
-          title="Crear nuevo proyecto de novela"
-          @click="emit('openCreateModal')"
-        >
-          <Plus :size="11" />
-          <span>Nuevo Libro</span>
-        </button>
+        <div class="flex items-center gap-1">
+          <!-- Botón directo para editar el libro activo -->
+          <button
+            v-if="projectStore.activeProject"
+            type="button"
+            class="neu-btn px-2 py-0.5 text-[10px] text-[var(--text-secondary)] hover:!text-[var(--accent)] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+            title="Editar nombre, género y sinopsis de este libro"
+            @click="handleEditCurrent"
+          >
+            <Pencil :size="10" />
+            <span>Editar</span>
+          </button>
+
+          <!-- Botón directo de creación -->
+          <button
+            type="button"
+            class="neu-btn px-2 py-0.5 text-[10px] text-[var(--accent)] hover:!text-[var(--accent-hover)] font-medium flex items-center gap-1 cursor-pointer"
+            title="Crear nuevo proyecto de novela"
+            @click="emit('openCreateModal')"
+          >
+            <Plus :size="11" />
+            <span>Nuevo</span>
+          </button>
+        </div>
       </div>
 
       <!-- Gatillo táctil personalizado para abrir el menú -->
@@ -214,11 +243,21 @@ async function confirmDelete(): Promise<void> {
               </div>
             </div>
 
-            <!-- Acciones a la derecha: Check activo y Botón de borrar -->
+            <!-- Acciones a la derecha: Check activo, Editar libro y Botón de borrar -->
             <div class="flex items-center gap-1.5 shrink-0" @click.stop>
               <div v-if="p.id === projectStore.activeProjectId" class="text-[var(--accent)]">
                 <Check :size="14" />
               </div>
+
+              <!-- Botón Editar Libro -->
+              <button
+                type="button"
+                class="p-1 rounded text-[var(--text-muted)] hover:!text-[var(--accent)] hover:neu-well-sm transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                title="Editar título, género y sinopsis de este libro"
+                @click.stop="handleEditProject(p)"
+              >
+                <Pencil :size="12" />
+              </button>
 
               <!-- Botón Borrar Libro con confirmación modal -->
               <button
