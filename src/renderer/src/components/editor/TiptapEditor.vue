@@ -352,11 +352,18 @@ function handleEditorMouseOut(event: MouseEvent): void {
 
 function handleFocusEditor(): void {
   if (editor.value) {
-    editor.value.commands.focus()
+    editor.value.commands.focus('end')
+    nextTick(() => {
+      const dom = editor.value?.view?.dom as HTMLElement | undefined
+      if (dom) {
+        dom.focus()
+        dom.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    })
   } else {
     nextTick(() => {
       const el = document.querySelector(
-        '.tiptap-editor, .ProseMirror, [contenteditable="true"]'
+        '.tiptap-editor-content, .ProseMirror, [contenteditable="true"]'
       ) as HTMLElement | null
       el?.focus()
     })
@@ -465,7 +472,13 @@ defineExpose({
   editor,
   getHTML: () => editor.value?.getHTML() || '',
   getText: () => editor.value?.getText() || '',
-  focus: () => editor.value?.commands.focus(),
+  focus: (pos: 'start' | 'end' | 'all' | null = 'end') => {
+    if (editor.value) {
+      editor.value.commands.focus(pos)
+      const dom = editor.value.view?.dom as HTMLElement | undefined
+      dom?.focus()
+    }
+  },
   scrollToSceneBreak,
   navigateToMatch,
   recenterTypewriter: (smooth = true) => editor.value?.commands.recenterTypewriter(smooth),
