@@ -26,15 +26,33 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
   target:
     - target: dmg
       arch:
         - x64
         - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
+  title: ${productName} ${version}
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
 linux:
   target:
     - target: AppImage
