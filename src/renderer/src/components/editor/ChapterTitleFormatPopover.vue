@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom'
 import { onClickOutside } from '@vueuse/core'
 import {
   SlidersHorizontal,
@@ -27,9 +28,51 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
+const triggerBtnRef = ref<HTMLElement | null>(null)
 const popoverRef = ref<HTMLElement | null>(null)
 
-onClickOutside(popoverRef, () => {
+let cleanupFloating: (() => void) | null = null
+
+watch(isOpen, async (open) => {
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
+  }
+  if (!open) return
+
+  await nextTick()
+  if (!triggerBtnRef.value || !popoverRef.value) return
+
+  cleanupFloating = autoUpdate(triggerBtnRef.value, popoverRef.value, () => {
+    if (!triggerBtnRef.value || !popoverRef.value) return
+    computePosition(triggerBtnRef.value, popoverRef.value, {
+      placement: 'bottom-start',
+      strategy: 'fixed',
+      middleware: [
+        offset(6),
+        flip({ fallbackPlacements: ['top-start', 'bottom-end', 'top-end', 'bottom-start'] }),
+        shift({ padding: 12 })
+      ]
+    }).then(({ x, y }) => {
+      if (popoverRef.value) {
+        popoverRef.value.style.left = `${Math.round(x)}px`
+        popoverRef.value.style.top = `${Math.round(y)}px`
+      }
+    })
+  })
+})
+
+onBeforeUnmount(() => {
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
+  }
+})
+
+onClickOutside(popoverRef, (event) => {
+  if (triggerBtnRef.value && triggerBtnRef.value.contains(event.target as Node)) {
+    return
+  }
   isOpen.value = false
 })
 
@@ -128,8 +171,9 @@ function resetCurrentFormat(): void {
 </script>
 
 <template>
-  <div ref="popoverRef" class="relative inline-flex items-center">
+  <div class="relative inline-flex items-center">
     <button
+      ref="triggerBtnRef"
       type="button"
       class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-btn text-[11px] font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
       :class="{
@@ -147,18 +191,21 @@ function resetCurrentFormat(): void {
       ></span>
     </button>
 
-    <Transition
-      enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0 translate-y-1 scale-95"
-      enter-to-class="opacity-100 translate-y-0 scale-100"
-      leave-active-class="transition duration-100 ease-in"
-      leave-from-class="opacity-100 translate-y-0 scale-100"
-      leave-to-class="opacity-0 translate-y-1 scale-95"
-    >
-      <div
-        v-if="isOpen"
-        class="absolute left-0 top-full mt-2 z-50 w-80 neu-surface p-3.5 rounded-2xl border border-[var(--groove-dark)]/60 shadow-2xl space-y-3 text-xs select-none"
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="opacity-0 translate-y-1 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition duration-100 ease-in"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-1 scale-95"
       >
+        <div
+          v-if="isOpen"
+          ref="popoverRef"
+          class="fixed z-[9999] w-80 neu-surface p-3.5 rounded-2xl border border-[var(--groove-dark)]/60 shadow-2xl space-y-3 text-xs select-none bg-[var(--bg-surface)] text-[var(--text-primary)]"
+          @click.stop
+        >
         <!-- Encabezado y Selector de Ámbito (Libro Global vs. Capítulo Actual) -->
         <div class="flex items-center justify-between gap-2">
           <span class="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
@@ -382,6 +429,7 @@ function resetCurrentFormat(): void {
         </div>
       </div>
     </Transition>
+  </Teleport>
   </div>
 </template>
 

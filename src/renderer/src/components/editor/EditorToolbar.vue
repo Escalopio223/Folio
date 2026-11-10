@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
+import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom'
 import { onClickOutside } from '@vueuse/core'
 import {
   Undo,
@@ -46,12 +47,21 @@ const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | 'lineHeight' | null
 const activeModal = ref<ActiveModal>(null)
 
-const fontModalRef = ref<HTMLElement | null>(null)
-const colorModalRef = ref<HTMLElement | null>(null)
-const highlightModalRef = ref<HTMLElement | null>(null)
-const bulletModalRef = ref<HTMLElement | null>(null)
-const orderedModalRef = ref<HTMLElement | null>(null)
-const lineHeightModalRef = ref<HTMLElement | null>(null)
+// Referencias a los disparadores (botones en la barra)
+const fontTriggerRef = ref<HTMLElement | null>(null)
+const colorTriggerRef = ref<HTMLElement | null>(null)
+const highlightTriggerRef = ref<HTMLElement | null>(null)
+const bulletTriggerRef = ref<HTMLElement | null>(null)
+const orderedTriggerRef = ref<HTMLElement | null>(null)
+const lineHeightTriggerRef = ref<HTMLElement | null>(null)
+
+// Referencias a los popovers flotantes (teleportados al body)
+const fontPopoverRef = ref<HTMLElement | null>(null)
+const colorPopoverRef = ref<HTMLElement | null>(null)
+const highlightPopoverRef = ref<HTMLElement | null>(null)
+const bulletPopoverRef = ref<HTMLElement | null>(null)
+const orderedPopoverRef = ref<HTMLElement | null>(null)
+const lineHeightPopoverRef = ref<HTMLElement | null>(null)
 
 const currentBodyFontSize = ref<number>(18)
 
@@ -63,23 +73,117 @@ function closeModal(): void {
   activeModal.value = null
 }
 
-onClickOutside(fontModalRef, () => {
+// Limpieza y cálculo reactivo de posición flotante para popovers teleportados al body
+let cleanupFloating: (() => void) | null = null
+
+function updateActiveFloating(): void {
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
+  }
+
+  const modal = activeModal.value
+  if (!modal) return
+
+  nextTick(() => {
+    let trigger: HTMLElement | null = null
+    let popover: HTMLElement | null = null
+
+    switch (modal) {
+      case 'font':
+        trigger = fontTriggerRef.value
+        popover = fontPopoverRef.value
+        break
+      case 'color':
+        trigger = colorTriggerRef.value
+        popover = colorPopoverRef.value
+        break
+      case 'highlight':
+        trigger = highlightTriggerRef.value
+        popover = highlightPopoverRef.value
+        break
+      case 'lineHeight':
+        trigger = lineHeightTriggerRef.value
+        popover = lineHeightPopoverRef.value
+        break
+      case 'bulletList':
+        trigger = bulletTriggerRef.value
+        popover = bulletPopoverRef.value
+        break
+      case 'orderedList':
+        trigger = orderedTriggerRef.value
+        popover = orderedPopoverRef.value
+        break
+    }
+
+    if (!trigger || !popover) return
+
+    cleanupFloating = autoUpdate(trigger, popover, () => {
+      if (!trigger || !popover) return
+      computePosition(trigger, popover, {
+        placement: 'bottom-start',
+        strategy: 'fixed',
+        middleware: [
+          offset(6),
+          flip({ fallbackPlacements: ['top-start', 'bottom-end', 'top-end', 'bottom-start'] }),
+          shift({ padding: 12 })
+        ]
+      }).then(({ x, y }) => {
+        if (popover) {
+          popover.style.left = `${Math.round(x)}px`
+          popover.style.top = `${Math.round(y)}px`
+        }
+      })
+    })
+  })
+}
+
+watch(activeModal, () => {
+  updateActiveFloating()
+})
+
+// Detección de clics externos para cerrar los minimodales teleportados
+onClickOutside(fontPopoverRef, (event) => {
+  if (fontTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'font') closeModal()
 })
-onClickOutside(colorModalRef, () => {
+onClickOutside(colorPopoverRef, (event) => {
+  if (colorTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'color') closeModal()
 })
-onClickOutside(highlightModalRef, () => {
+onClickOutside(highlightPopoverRef, (event) => {
+  if (highlightTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'highlight') closeModal()
 })
-onClickOutside(bulletModalRef, () => {
+onClickOutside(bulletPopoverRef, (event) => {
+  if (bulletTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'bulletList') closeModal()
 })
-onClickOutside(orderedModalRef, () => {
+onClickOutside(orderedPopoverRef, (event) => {
+  if (orderedTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'orderedList') closeModal()
 })
-onClickOutside(lineHeightModalRef, () => {
+onClickOutside(lineHeightPopoverRef, (event) => {
+  if (lineHeightTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'lineHeight') closeModal()
+})
+
+function handleGlobalKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && activeModal.value !== null) {
+    closeModal()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
+  }
 })
 
 // Opciones de Listas Desordenadas (Viñetas)
@@ -443,7 +547,7 @@ function insertSceneBreak(): void {
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 
       <!-- 2. Minimodal de Fuente Tipográfica -->
-      <div ref="fontModalRef" class="relative shrink-0">
+      <div ref="fontTriggerRef" class="relative shrink-0">
         <button
           type="button"
           class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
@@ -458,34 +562,38 @@ function insertSceneBreak(): void {
         </button>
 
         <!-- Minimodal Flotante de Fuentes -->
-        <Transition
-          enter-active-class="transition duration-100 ease-out"
-          enter-from-class="opacity-0 translate-y-1 scale-95"
-          enter-to-class="opacity-100 translate-y-0 scale-100"
-          leave-active-class="transition duration-75 ease-in"
-          leave-from-class="opacity-100 translate-y-0 scale-100"
-          leave-to-class="opacity-0 translate-y-1 scale-95"
-        >
-          <div
-            v-if="activeModal === 'font'"
-            class="absolute left-0 top-full mt-2 z-50 neu-surface p-1.5 min-w-[180px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)]"
+        <Teleport to="body">
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
           >
-            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--groove-dark)]/30 mb-1">
-              Tipografía Editorial
-            </div>
-            <button
-              v-for="font in fontFamilies"
-              :key="font.label"
-              type="button"
-              class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer text-[var(--text-primary)]"
-              :class="font.preview"
-              @mousedown.prevent
-              @click="selectFontFamily(font.value)"
+            <div
+              v-if="activeModal === 'font'"
+              ref="fontPopoverRef"
+              class="fixed z-[9999] neu-surface p-1.5 min-w-[180px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)]"
+              @click.stop
             >
-              <span>{{ font.label }}</span>
-            </button>
-          </div>
-        </Transition>
+              <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--groove-dark)]/30 mb-1">
+                Tipografía Editorial
+              </div>
+              <button
+                v-for="font in fontFamilies"
+                :key="font.label"
+                type="button"
+                class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer text-[var(--text-primary)]"
+                :class="font.preview"
+                @mousedown.prevent
+                @click="selectFontFamily(font.value)"
+              >
+                <span>{{ font.label }}</span>
+              </button>
+            </div>
+          </Transition>
+        </Teleport>
       </div>
 
       <!-- 3. Selector de Tamaño de Fuente Híbrido (Preset + Input Manual con decimales) -->
@@ -616,7 +724,7 @@ function insertSceneBreak(): void {
       <!-- 6. Minimodales de Color & Resaltador -->
       <div class="flex items-center gap-0.5 shrink-0">
         <!-- Minimodal Color de Texto -->
-        <div ref="colorModalRef" class="relative">
+        <div ref="colorTriggerRef" class="relative">
           <button
             type="button"
             class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
@@ -629,52 +737,56 @@ function insertSceneBreak(): void {
             <span class="text-[11px] font-medium hidden xl:inline">Color</span>
           </button>
 
-          <Transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 translate-y-1 scale-95"
-            enter-to-class="opacity-100 translate-y-0 scale-100"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100 translate-y-0 scale-100"
-            leave-to-class="opacity-0 translate-y-1 scale-95"
-          >
-            <div
-              v-if="activeModal === 'color'"
-              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2.5 min-w-[190px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+          <Teleport to="body">
+            <Transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="opacity-0 translate-y-1 scale-95"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-1 scale-95"
             >
-              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider mb-0.5">
-                Color de Letra
-              </div>
-
-              <div class="grid grid-cols-4 gap-1.5">
-                <button
-                  v-for="color in textColors"
-                  :key="color.value"
-                  type="button"
-                  class="w-6 h-6 rounded-full border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
-                  :style="{ backgroundColor: color.value }"
-                  :title="color.label"
-                  @mousedown.prevent
-                  @click="selectColor(color.value)"
-                ></button>
-              </div>
-
-              <div class="neu-groove-h my-0.5"></div>
-
-              <button
-                type="button"
-                class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-                @mousedown.prevent
-                @click="resetColor"
+              <div
+                v-if="activeModal === 'color'"
+                ref="colorPopoverRef"
+                class="fixed z-[9999] neu-surface p-2.5 min-w-[190px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+                @click.stop
               >
-                <RotateCcw :size="11" />
-                <span>Restablecer color</span>
-              </button>
-            </div>
-          </Transition>
+                <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider mb-0.5">
+                  Color de Letra
+                </div>
+
+                <div class="grid grid-cols-4 gap-1.5">
+                  <button
+                    v-for="color in textColors"
+                    :key="color.value"
+                    type="button"
+                    class="w-6 h-6 rounded-full border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
+                    :style="{ backgroundColor: color.value }"
+                    :title="color.label"
+                    @mousedown.prevent
+                    @click="selectColor(color.value)"
+                  ></button>
+                </div>
+
+                <div class="neu-groove-h my-0.5"></div>
+
+                <button
+                  type="button"
+                  class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                  @mousedown.prevent
+                  @click="resetColor"
+                >
+                  <RotateCcw :size="11" />
+                  <span>Restablecer color</span>
+                </button>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
 
         <!-- Minimodal Resaltador -->
-        <div ref="highlightModalRef" class="relative">
+        <div ref="highlightTriggerRef" class="relative">
           <button
             type="button"
             class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
@@ -687,48 +799,52 @@ function insertSceneBreak(): void {
             <span class="text-[11px] font-medium hidden xl:inline">Resaltar</span>
           </button>
 
-          <Transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 translate-y-1 scale-95"
-            enter-to-class="opacity-100 translate-y-0 scale-100"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100 translate-y-0 scale-100"
-            leave-to-class="opacity-0 translate-y-1 scale-95"
-          >
-            <div
-              v-if="activeModal === 'highlight'"
-              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2.5 min-w-[180px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+          <Teleport to="body">
+            <Transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="opacity-0 translate-y-1 scale-95"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-1 scale-95"
             >
-              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider mb-0.5">
-                Color de Resaltado
-              </div>
-
-              <div class="flex items-center gap-1.5">
-                <button
-                  v-for="h in highlightColors"
-                  :key="h.value"
-                  type="button"
-                  class="w-6 h-6 rounded-md border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
-                  :style="{ backgroundColor: h.value }"
-                  :title="h.label"
-                  @mousedown.prevent
-                  @click="selectHighlight(h.value)"
-                ></button>
-              </div>
-
-              <div class="neu-groove-h my-0.5"></div>
-
-              <button
-                type="button"
-                class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-                @mousedown.prevent
-                @click="resetHighlight"
+              <div
+                v-if="activeModal === 'highlight'"
+                ref="highlightPopoverRef"
+                class="fixed z-[9999] neu-surface p-2.5 min-w-[180px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+                @click.stop
               >
-                <RotateCcw :size="11" />
-                <span>Quitar resaltado</span>
-              </button>
-            </div>
-          </Transition>
+                <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider mb-0.5">
+                  Color de Resaltado
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  <button
+                    v-for="h in highlightColors"
+                    :key="h.value"
+                    type="button"
+                    class="w-6 h-6 rounded-md border border-black/15 transition-transform hover:scale-115 active:scale-95 shadow-sm cursor-pointer"
+                    :style="{ backgroundColor: h.value }"
+                    :title="h.label"
+                    @mousedown.prevent
+                    @click="selectHighlight(h.value)"
+                  ></button>
+                </div>
+
+                <div class="neu-groove-h my-0.5"></div>
+
+                <button
+                  type="button"
+                  class="w-full px-2 py-1 rounded text-left text-xs flex items-center gap-2 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                  @mousedown.prevent
+                  @click="resetHighlight"
+                >
+                  <RotateCcw :size="11" />
+                  <span>Quitar resaltado</span>
+                </button>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
       </div>
 
@@ -784,7 +900,7 @@ function insertSceneBreak(): void {
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 
       <!-- 8. Interlineado & Salto de Línea (Espacio entre líneas y párrafos) -->
-      <div ref="lineHeightModalRef" class="relative shrink-0 flex items-center">
+      <div ref="lineHeightTriggerRef" class="relative shrink-0 flex items-center">
         <button
           type="button"
           class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
@@ -799,136 +915,140 @@ function insertSceneBreak(): void {
         </button>
 
         <!-- Minimodal Flotante de Interlineado -->
-        <Transition
-          enter-active-class="transition duration-100 ease-out"
-          enter-from-class="opacity-0 translate-y-1 scale-95"
-          enter-to-class="opacity-100 translate-y-0 scale-100"
-          leave-active-class="transition duration-75 ease-in"
-          leave-from-class="opacity-100 translate-y-0 scale-100"
-          leave-to-class="opacity-0 translate-y-1 scale-95"
-        >
-          <div
-            v-if="activeModal === 'lineHeight'"
-            class="absolute left-0 top-full mt-2 z-50 neu-surface p-2.5 min-w-[245px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+        <Teleport to="body">
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
           >
-            <div class="flex items-center justify-between border-b border-[var(--groove-dark)]/30 pb-1.5">
-              <span class="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
-                Interlineado (Líneas)
-              </span>
-              <span class="text-[10px] font-mono font-bold text-[var(--accent)]">
-                {{ currentLineHeightLabel }}
-              </span>
-            </div>
-
-            <!-- Ajuste fino numérico con +/- -->
-            <div class="flex items-center justify-between gap-1 neu-well-sm p-1 rounded-lg">
-              <button
-                type="button"
-                class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
-                title="Reducir interlineado en 0.1"
-                @mousedown.prevent
-                @click="adjustCustomLineHeight(-0.1)"
-              >
-                -
-              </button>
-              <div class="flex items-center gap-1 font-mono text-xs font-bold text-[var(--text-primary)]">
-                <span>{{ customLineHeight.toFixed(2) }}</span>
-                <span class="text-[9px] text-[var(--text-muted)] font-normal">espacio</span>
+            <div
+              v-if="activeModal === 'lineHeight'"
+              ref="lineHeightPopoverRef"
+              class="fixed z-[9999] neu-surface p-2.5 min-w-[245px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+              @click.stop
+            >
+              <div class="flex items-center justify-between border-b border-[var(--groove-dark)]/30 pb-1.5">
+                <span class="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                  Interlineado (Líneas)
+                </span>
+                <span class="text-[10px] font-mono font-bold text-[var(--accent)]">
+                  {{ currentLineHeightLabel }}
+                </span>
               </div>
-              <button
-                type="button"
-                class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
-                title="Aumentar interlineado en 0.1"
-                @mousedown.prevent
-                @click="adjustCustomLineHeight(0.1)"
-              >
-                +
-              </button>
-            </div>
 
-            <!-- Opciones predefinidas -->
-            <div class="grid grid-cols-2 gap-1">
-              <button
-                v-for="preset in lineHeightPresets"
-                :key="preset.value"
-                type="button"
-                class="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all cursor-pointer text-left"
-                :class="
-                  currentLineHeight === preset.value
-                    ? 'neu-well text-[var(--accent)] font-bold'
-                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
-                "
-                :title="preset.description"
-                @mousedown.prevent
-                @click="applyLineHeight(preset.value)"
-              >
-                <span class="font-mono font-semibold">{{ preset.value }}</span>
-                <span class="text-[10px] text-[var(--text-muted)] truncate ml-1">{{ preset.label.split(' ')[1] }}</span>
-              </button>
-            </div>
-
-            <!-- Separación entre párrafos (Margen) -->
-            <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex flex-col gap-1">
-              <div class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
-                Separación de Párrafos
-              </div>
-              <div class="grid grid-cols-3 gap-1">
+              <!-- Ajuste fino numérico con +/- -->
+              <div class="flex items-center justify-between gap-1 neu-well-sm p-1 rounded-lg">
                 <button
                   type="button"
-                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
-                  :class="currentParagraphGap === 'compact' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
-                  title="Separación compacta entre párrafos (0.65rem)"
+                  class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
+                  title="Reducir interlineado en 0.1"
                   @mousedown.prevent
-                  @click="setParagraphGap('compact')"
+                  @click="adjustCustomLineHeight(-0.1)"
                 >
-                  Compacto
+                  -
+                </button>
+                <div class="flex items-center gap-1 font-mono text-xs font-bold text-[var(--text-primary)]">
+                  <span>{{ customLineHeight.toFixed(2) }}</span>
+                  <span class="text-[9px] text-[var(--text-muted)] font-normal">espacio</span>
+                </div>
+                <button
+                  type="button"
+                  class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
+                  title="Aumentar interlineado en 0.1"
+                  @mousedown.prevent
+                  @click="adjustCustomLineHeight(0.1)"
+                >
+                  +
+                </button>
+              </div>
+
+              <!-- Opciones predefinidas -->
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="preset in lineHeightPresets"
+                  :key="preset.value"
+                  type="button"
+                  class="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all cursor-pointer text-left"
+                  :class="
+                    currentLineHeight === preset.value
+                      ? 'neu-well text-[var(--accent)] font-bold'
+                      : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                  "
+                  :title="preset.description"
+                  @mousedown.prevent
+                  @click="applyLineHeight(preset.value)"
+                >
+                  <span class="font-mono font-semibold">{{ preset.value }}</span>
+                  <span class="text-[10px] text-[var(--text-muted)] truncate ml-1">{{ preset.label.split(' ')[1] }}</span>
+                </button>
+              </div>
+
+              <!-- Separación entre párrafos (Margen) -->
+              <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex flex-col gap-1">
+                <div class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                  Separación de Párrafos
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                  <button
+                    type="button"
+                    class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                    :class="currentParagraphGap === 'compact' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                    title="Separación compacta entre párrafos (0.65rem)"
+                    @mousedown.prevent
+                    @click="setParagraphGap('compact')"
+                  >
+                    Compacto
+                  </button>
+                  <button
+                    type="button"
+                    class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                    :class="currentParagraphGap === 'normal' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                    title="Separación estándar entre párrafos (1.25rem)"
+                    @mousedown.prevent
+                    @click="setParagraphGap('normal')"
+                  >
+                    Estándar
+                  </button>
+                  <button
+                    type="button"
+                    class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                    :class="currentParagraphGap === 'relaxed' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                    title="Separación amplia entre párrafos (1.85rem)"
+                    @mousedown.prevent
+                    @click="setParagraphGap('relaxed')"
+                  >
+                    Amplio
+                  </button>
+                </div>
+              </div>
+
+              <!-- Acciones de ámbito -->
+              <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex items-center justify-between gap-1 text-[10px]">
+                <button
+                  type="button"
+                  class="px-2 py-1 rounded neu-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all cursor-pointer flex-1 text-center font-medium"
+                  title="Aplicar el interlineado actual a todos los párrafos del capítulo activo"
+                  @mousedown.prevent
+                  @click="applyLineHeightToChapter(String(customLineHeight))"
+                >
+                  A todo el capítulo
                 </button>
                 <button
                   type="button"
-                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
-                  :class="currentParagraphGap === 'normal' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
-                  title="Separación estándar entre párrafos (1.25rem)"
+                  class="px-1.5 py-1 rounded hover:text-rose-500 text-[var(--text-muted)] transition-all cursor-pointer"
+                  title="Restablecer interlineado predeterminado"
                   @mousedown.prevent
-                  @click="setParagraphGap('normal')"
+                  @click="resetLineHeight"
                 >
-                  Estándar
-                </button>
-                <button
-                  type="button"
-                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
-                  :class="currentParagraphGap === 'relaxed' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
-                  title="Separación amplia entre párrafos (1.85rem)"
-                  @mousedown.prevent
-                  @click="setParagraphGap('relaxed')"
-                >
-                  Amplio
+                  Restablecer
                 </button>
               </div>
             </div>
-
-            <!-- Acciones de ámbito -->
-            <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex items-center justify-between gap-1 text-[10px]">
-              <button
-                type="button"
-                class="px-2 py-1 rounded neu-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all cursor-pointer flex-1 text-center font-medium"
-                title="Aplicar el interlineado actual a todos los párrafos del capítulo activo"
-                @mousedown.prevent
-                @click="applyLineHeightToChapter(String(customLineHeight))"
-              >
-                A todo el capítulo
-              </button>
-              <button
-                type="button"
-                class="px-1.5 py-1 rounded hover:text-rose-500 text-[var(--text-muted)] transition-all cursor-pointer"
-                title="Restablecer interlineado predeterminado"
-                @mousedown.prevent
-                @click="resetLineHeight"
-              >
-                Restablecer
-              </button>
-            </div>
-          </div>
-        </Transition>
+          </Transition>
+        </Teleport>
       </div>
 
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
@@ -972,7 +1092,7 @@ function insertSceneBreak(): void {
       <!-- 9. Listas & Florón Narrativo Clásico -->
       <div class="flex items-center gap-1.5 shrink-0">
         <!-- Lista de viñetas con selector de estilo -->
-        <div ref="bulletModalRef" class="relative flex items-center">
+        <div ref="bulletTriggerRef" class="relative flex items-center">
           <div
             class="flex items-center rounded-lg overflow-hidden transition-all shadow-sm"
             :class="editor?.isActive('bulletList') ? 'neu-well' : 'neu-surface'"
@@ -1000,51 +1120,55 @@ function insertSceneBreak(): void {
           </div>
 
           <!-- Menú desplegable de viñetas -->
-          <Transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 translate-y-1 scale-95"
-            enter-to-class="opacity-100 translate-y-0 scale-100"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100 translate-y-0 scale-100"
-            leave-to-class="opacity-0 translate-y-1 scale-95"
-          >
-            <div
-              v-if="activeModal === 'bulletList'"
-              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2 min-w-[210px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+          <Teleport to="body">
+            <Transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="opacity-0 translate-y-1 scale-95"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-1 scale-95"
             >
-              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
-                Tipos de Viñetas
-              </div>
-
-              <button
-                v-for="opt in bulletOptions"
-                :key="opt.value"
-                type="button"
-                class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
-                :class="
-                  currentBulletStyle === opt.value && editor?.isActive('bulletList')
-                    ? 'neu-well text-[var(--accent)] font-bold'
-                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
-                "
-                @mousedown.prevent
-                @click="applyBulletListStyle(opt.value)"
+              <div
+                v-if="activeModal === 'bulletList'"
+                ref="bulletPopoverRef"
+                class="fixed z-[9999] neu-surface p-2 min-w-[210px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+                @click.stop
               >
-                <span
-                  class="w-6 h-6 rounded flex items-center justify-center text-sm font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-110 transition-transform"
-                >
-                  {{ opt.symbol }}
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
-                  <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
+                  Tipos de Viñetas
                 </div>
-              </button>
-            </div>
-          </Transition>
+
+                <button
+                  v-for="opt in bulletOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
+                  :class="
+                    currentBulletStyle === opt.value && editor?.isActive('bulletList')
+                      ? 'neu-well text-[var(--accent)] font-bold'
+                      : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                  "
+                  @mousedown.prevent
+                  @click="applyBulletListStyle(opt.value)"
+                >
+                  <span
+                    class="w-6 h-6 rounded flex items-center justify-center text-sm font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-110 transition-transform"
+                  >
+                    {{ opt.symbol }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                  </div>
+                </button>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
 
         <!-- Lista numerada con selector de formato -->
-        <div ref="orderedModalRef" class="relative flex items-center">
+        <div ref="orderedTriggerRef" class="relative flex items-center">
           <div
             class="flex items-center rounded-lg overflow-hidden transition-all shadow-sm"
             :class="editor?.isActive('orderedList') ? 'neu-well' : 'neu-surface'"
@@ -1072,47 +1196,51 @@ function insertSceneBreak(): void {
           </div>
 
           <!-- Menú desplegable de lista ordenada -->
-          <Transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 translate-y-1 scale-95"
-            enter-to-class="opacity-100 translate-y-0 scale-100"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100 translate-y-0 scale-100"
-            leave-to-class="opacity-0 translate-y-1 scale-95"
-          >
-            <div
-              v-if="activeModal === 'orderedList'"
-              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2 min-w-[230px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+          <Teleport to="body">
+            <Transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="opacity-0 translate-y-1 scale-95"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-1 scale-95"
             >
-              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
-                Formatos de Numeración
-              </div>
-
-              <button
-                v-for="opt in orderedOptions"
-                :key="opt.value"
-                type="button"
-                class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
-                :class="
-                  currentOrderedType === opt.value && editor?.isActive('orderedList')
-                    ? 'neu-well text-[var(--accent)] font-bold'
-                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
-                "
-                @mousedown.prevent
-                @click="applyOrderedListStyle(opt.value)"
+              <div
+                v-if="activeModal === 'orderedList'"
+                ref="orderedPopoverRef"
+                class="fixed z-[9999] neu-surface p-2 min-w-[230px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+                @click.stop
               >
-                <span
-                  class="w-7 h-6 rounded flex items-center justify-center text-xs font-mono font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-105 transition-transform"
-                >
-                  {{ opt.symbol.split(',')[0] }}.
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
-                  <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
+                  Formatos de Numeración
                 </div>
-              </button>
-            </div>
-          </Transition>
+
+                <button
+                  v-for="opt in orderedOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
+                  :class="
+                    currentOrderedType === opt.value && editor?.isActive('orderedList')
+                      ? 'neu-well text-[var(--accent)] font-bold'
+                      : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                  "
+                  @mousedown.prevent
+                  @click="applyOrderedListStyle(opt.value)"
+                >
+                  <span
+                    class="w-7 h-6 rounded flex items-center justify-center text-xs font-mono font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-105 transition-transform"
+                  >
+                    {{ opt.symbol.split(',')[0] }}.
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                  </div>
+                </button>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
 
         <!-- Florón Narrativo de Escena (* * *) Destacado -->

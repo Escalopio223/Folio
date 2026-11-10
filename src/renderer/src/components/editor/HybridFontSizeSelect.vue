@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom'
 import { onClickOutside } from '@vueuse/core'
 import { ChevronDown, Check, RotateCcw } from 'lucide-vue-next'
 
@@ -33,11 +34,14 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
+const popoverRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
 const isOpen = ref(false)
 const rawInput = ref<string>(
   props.modelValue !== null && props.modelValue !== undefined ? String(props.modelValue) : ''
 )
+
+let cleanupFloating: (() => void) | null = null
 
 watch(
   () => props.modelValue,
@@ -48,10 +52,47 @@ watch(
   }
 )
 
-onClickOutside(containerRef, () => {
-  if (isOpen.value) {
-    isOpen.value = false
+watch(isOpen, async (open) => {
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
   }
+  if (!open) return
+
+  await nextTick()
+  if (!containerRef.value || !popoverRef.value) return
+
+  cleanupFloating = autoUpdate(containerRef.value, popoverRef.value, () => {
+    if (!containerRef.value || !popoverRef.value) return
+    computePosition(containerRef.value, popoverRef.value, {
+      placement: 'bottom-start',
+      strategy: 'fixed',
+      middleware: [
+        offset(6),
+        flip({ fallbackPlacements: ['top-start', 'bottom-end', 'top-end', 'bottom-start'] }),
+        shift({ padding: 12 })
+      ]
+    }).then(({ x, y }) => {
+      if (popoverRef.value) {
+        popoverRef.value.style.left = `${Math.round(x)}px`
+        popoverRef.value.style.top = `${Math.round(y)}px`
+      }
+    })
+  })
+})
+
+onBeforeUnmount(() => {
+  if (cleanupFloating) {
+    cleanupFloating()
+    cleanupFloating = null
+  }
+})
+
+onClickOutside(popoverRef, (event) => {
+  if (containerRef.value && containerRef.value.contains(event.target as Node)) {
+    return
+  }
+  isOpen.value = false
 })
 
 function validateAndCommit(): void {
@@ -140,62 +181,66 @@ function handleReset(): void {
     </div>
 
     <!-- Menú Desplegable de Presets + Ayuda de decimales -->
-    <Transition
-      enter-active-class="transition duration-100 ease-out"
-      enter-from-class="opacity-0 translate-y-1 scale-95"
-      enter-to-class="opacity-100 translate-y-0 scale-100"
-      leave-active-class="transition duration-75 ease-in"
-      leave-from-class="opacity-100 translate-y-0 scale-100"
-      leave-to-class="opacity-0 translate-y-1 scale-95"
-    >
-      <div
-        v-if="isOpen"
-        class="absolute left-0 top-full mt-2 z-50 neu-surface p-1.5 min-w-[155px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)]"
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-100 ease-out"
+        enter-from-class="opacity-0 translate-y-1 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition duration-75 ease-in"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-1 scale-95"
       >
         <div
-          class="px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--groove-dark)]/30 mb-1 flex items-center justify-between"
+          v-if="isOpen"
+          ref="popoverRef"
+          class="fixed z-[9999] neu-surface p-1.5 min-w-[155px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)]"
+          @click.stop
         >
-          <span>Tamaño ({{ min }}–{{ max }}{{ unit }})</span>
-          <span class="text-[var(--accent)]">13.5 ok</span>
-        </div>
-
-        <div class="max-h-48 overflow-y-auto editorial-scrollbar space-y-0.5">
-          <button
-            v-for="preset in presets"
-            :key="preset"
-            type="button"
-            class="w-full px-2.5 py-1 rounded-lg text-left text-xs font-mono flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
-            :class="
-              Number(rawInput) === preset
-                ? 'text-[var(--accent)] font-bold neu-well-sm'
-                : 'text-[var(--text-primary)]'
-            "
-            @mousedown.prevent
-            @click="selectPreset(preset)"
+          <div
+            class="px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--groove-dark)]/30 mb-1 flex items-center justify-between"
           >
-            <span>{{ preset }} {{ unit }}</span>
-            <Check
-              v-if="Number(rawInput) === preset"
-              :size="11"
-              class="text-[var(--accent)] shrink-0"
-            />
-          </button>
-        </div>
+            <span>Tamaño ({{ min }}–{{ max }}{{ unit }})</span>
+            <span class="text-[var(--accent)]">13.5 ok</span>
+          </div>
 
-        <template v-if="allowReset">
-          <div class="neu-groove-h my-1"></div>
-          <button
-            type="button"
-            class="w-full px-2 py-1 rounded-lg text-left text-[11px] flex items-center gap-1.5 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-            @mousedown.prevent
-            @click="handleReset"
-          >
-            <RotateCcw :size="11" />
-            <span>Tamaño por defecto</span>
-          </button>
-        </template>
-      </div>
-    </Transition>
+          <div class="max-h-48 overflow-y-auto editorial-scrollbar space-y-0.5">
+            <button
+              v-for="preset in presets"
+              :key="preset"
+              type="button"
+              class="w-full px-2.5 py-1 rounded-lg text-left text-xs font-mono flex items-center justify-between hover:bg-[var(--bg-base)] transition-colors cursor-pointer"
+              :class="
+                Number(rawInput) === preset
+                  ? 'text-[var(--accent)] font-bold neu-well-sm'
+                  : 'text-[var(--text-primary)]'
+              "
+              @mousedown.prevent
+              @click="selectPreset(preset)"
+            >
+              <span>{{ preset }} {{ unit }}</span>
+              <Check
+                v-if="Number(rawInput) === preset"
+                :size="11"
+                class="text-[var(--accent)] shrink-0"
+              />
+            </button>
+          </div>
+
+          <template v-if="allowReset">
+            <div class="neu-groove-h my-1"></div>
+            <button
+              type="button"
+              class="w-full px-2 py-1 rounded-lg text-left text-[11px] flex items-center gap-1.5 hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+              @mousedown.prevent
+              @click="handleReset"
+            >
+              <RotateCcw :size="11" />
+              <span>Tamaño por defecto</span>
+            </button>
+          </template>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
