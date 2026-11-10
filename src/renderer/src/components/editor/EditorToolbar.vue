@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 import { onClickOutside } from '@vueuse/core'
 import {
@@ -33,6 +33,7 @@ import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
 import SpellcheckLanguageToggle from './SpellcheckLanguageToggle.vue'
 import { useSpellcheck } from '../../composables/useSpellcheck'
 import { modKey } from '../../utils/platform'
+import type { BulletListStyle, OrderedListType } from './extensions/ListExtensions'
 
 const props = defineProps<{
   editor: Editor | null | undefined
@@ -40,13 +41,15 @@ const props = defineProps<{
 
 const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 
-// Minimodales: Fuente, Color, Resaltado
-type ActiveModal = 'font' | 'color' | 'highlight' | null
+// Minimodales: Fuente, Color, Resaltado, Listas
+type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | null
 const activeModal = ref<ActiveModal>(null)
 
 const fontModalRef = ref<HTMLElement | null>(null)
 const colorModalRef = ref<HTMLElement | null>(null)
 const highlightModalRef = ref<HTMLElement | null>(null)
+const bulletModalRef = ref<HTMLElement | null>(null)
+const orderedModalRef = ref<HTMLElement | null>(null)
 
 const currentBodyFontSize = ref<number>(18)
 
@@ -67,6 +70,124 @@ onClickOutside(colorModalRef, () => {
 onClickOutside(highlightModalRef, () => {
   if (activeModal.value === 'highlight') closeModal()
 })
+onClickOutside(bulletModalRef, () => {
+  if (activeModal.value === 'bulletList') closeModal()
+})
+onClickOutside(orderedModalRef, () => {
+  if (activeModal.value === 'orderedList') closeModal()
+})
+
+// Opciones de Listas Desordenadas (Viñetas)
+interface BulletOption {
+  value: BulletListStyle
+  label: string
+  symbol: string
+  description: string
+}
+
+const bulletOptions: BulletOption[] = [
+  { value: 'disc', label: 'Disco (Clásico)', symbol: '•', description: 'Punto relleno estándar' },
+  { value: 'circle', label: 'Círculo hueco', symbol: '◦', description: 'Círculo sutil editorial' },
+  { value: 'square', label: 'Cuadrado', symbol: '▪', description: 'Cuadrado geométrico' },
+  { value: 'dash', label: 'Guión narrativo', symbol: '–', description: 'Raya literaria de diálogo' }
+]
+
+// Opciones de Listas Ordenadas (Numeración)
+interface OrderedOption {
+  value: OrderedListType
+  label: string
+  symbol: string
+  description: string
+}
+
+const orderedOptions: OrderedOption[] = [
+  { value: '1', label: 'Decimales (1, 2, 3)', symbol: '1, 2, 3', description: '1. 2. 3. Números estándar' },
+  { value: 'a', label: 'Letras minúsculas (a, b, c)', symbol: 'a, b, c', description: 'a. b. c. Letras en minúscula' },
+  { value: 'A', label: 'Letras mayúsculas (A, B, C)', symbol: 'A, B, C', description: 'A. B. C. Letras en mayúscula' },
+  { value: 'i', label: 'Romanos minúsculas (i, ii, iii)', symbol: 'i, ii, iii', description: 'i. ii. iii. Números romanos' },
+  { value: 'I', label: 'Romanos mayúsculas (I, II, III)', symbol: 'I, II, III', description: 'I. II. III. Números romanos clásicos' }
+]
+
+const lastBulletStyle = ref<BulletListStyle>('disc')
+const lastOrderedType = ref<OrderedListType>('1')
+
+const currentBulletStyle = computed<BulletListStyle>(() => {
+  if (!props.editor?.isActive('bulletList')) return lastBulletStyle.value
+  return props.editor.getAttributes('bulletList').listStyle || 'disc'
+})
+
+const currentOrderedType = computed<OrderedListType>(() => {
+  if (!props.editor?.isActive('orderedList')) return lastOrderedType.value
+  return props.editor.getAttributes('orderedList').type || '1'
+})
+
+function toggleBulletListDefault(): void {
+  if (!props.editor) return
+  if (props.editor.isActive('bulletList')) {
+    props.editor.chain().focus().toggleBulletList().run()
+  } else {
+    props.editor
+      .chain()
+      .focus()
+      .toggleBulletList()
+      .updateAttributes('bulletList', { listStyle: lastBulletStyle.value })
+      .run()
+  }
+}
+
+function applyBulletListStyle(style: BulletListStyle): void {
+  if (!props.editor) return
+  lastBulletStyle.value = style
+  if (props.editor.isActive('bulletList')) {
+    if (props.editor.getAttributes('bulletList').listStyle === style) {
+      props.editor.chain().focus().toggleBulletList().run()
+    } else {
+      props.editor.chain().focus().updateAttributes('bulletList', { listStyle: style }).run()
+    }
+  } else {
+    props.editor
+      .chain()
+      .focus()
+      .toggleBulletList()
+      .updateAttributes('bulletList', { listStyle: style })
+      .run()
+  }
+  closeModal()
+}
+
+function toggleOrderedListDefault(): void {
+  if (!props.editor) return
+  if (props.editor.isActive('orderedList')) {
+    props.editor.chain().focus().toggleOrderedList().run()
+  } else {
+    props.editor
+      .chain()
+      .focus()
+      .toggleOrderedList()
+      .updateAttributes('orderedList', { type: lastOrderedType.value })
+      .run()
+  }
+}
+
+function applyOrderedListStyle(type: OrderedListType): void {
+  if (!props.editor) return
+  lastOrderedType.value = type
+  if (props.editor.isActive('orderedList')) {
+    if (props.editor.getAttributes('orderedList').type === type) {
+      props.editor.chain().focus().toggleOrderedList().run()
+    } else {
+      props.editor.chain().focus().updateAttributes('orderedList', { type }).run()
+    }
+  } else {
+    props.editor
+      .chain()
+      .focus()
+      .toggleOrderedList()
+      .updateAttributes('orderedList', { type })
+      .run()
+  }
+  closeModal()
+}
 
 // Fuentes disponibles
 const fontFamilies = [
@@ -584,28 +705,150 @@ function insertSceneBreak(): void {
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
 
       <!-- 9. Listas & Florón Narrativo Clásico -->
-      <div class="flex items-center gap-1 shrink-0">
-        <button
-          type="button"
-          class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
-          :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('bulletList') }"
-          title="Lista con viñetas"
-          @mousedown.prevent
-          @click="editor?.chain().focus().toggleBulletList().run()"
-        >
-          <List :size="13" />
-        </button>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- Lista de viñetas con selector de estilo -->
+        <div ref="bulletModalRef" class="relative flex items-center">
+          <div
+            class="flex items-center rounded-lg overflow-hidden transition-all shadow-sm"
+            :class="editor?.isActive('bulletList') ? 'neu-well' : 'neu-surface'"
+          >
+            <button
+              type="button"
+              class="w-6 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              :class="{ '!text-[var(--accent)] font-bold': editor?.isActive('bulletList') }"
+              title="Alternar lista de viñetas"
+              @mousedown.prevent
+              @click="toggleBulletListDefault"
+            >
+              <List :size="13" />
+            </button>
+            <button
+              type="button"
+              class="w-4 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-elevated)]/50 border-l border-[var(--groove-dark)]/20"
+              :class="{ '!text-[var(--accent)] bg-[var(--accent)]/10': activeModal === 'bulletList' }"
+              title="Elegir tipo de viñeta (disco, círculo, cuadrado, guión)"
+              @mousedown.prevent
+              @click="toggleModal('bulletList')"
+            >
+              <ChevronDown :size="10" />
+            </button>
+          </div>
 
-        <button
-          type="button"
-          class="neu-btn w-7 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)]"
-          :class="{ 'neu-well !text-[var(--accent)] font-bold': editor?.isActive('orderedList') }"
-          title="Lista numerada"
-          @mousedown.prevent
-          @click="editor?.chain().focus().toggleOrderedList().run()"
-        >
-          <ListOrdered :size="13" />
-        </button>
+          <!-- Menú desplegable de viñetas -->
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
+          >
+            <div
+              v-if="activeModal === 'bulletList'"
+              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2 min-w-[210px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+            >
+              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
+                Tipos de Viñetas
+              </div>
+
+              <button
+                v-for="opt in bulletOptions"
+                :key="opt.value"
+                type="button"
+                class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
+                :class="
+                  currentBulletStyle === opt.value && editor?.isActive('bulletList')
+                    ? 'neu-well text-[var(--accent)] font-bold'
+                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                "
+                @mousedown.prevent
+                @click="applyBulletListStyle(opt.value)"
+              >
+                <span
+                  class="w-6 h-6 rounded flex items-center justify-center text-sm font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-110 transition-transform"
+                >
+                  {{ opt.symbol }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
+                  <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                </div>
+              </button>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Lista numerada con selector de formato -->
+        <div ref="orderedModalRef" class="relative flex items-center">
+          <div
+            class="flex items-center rounded-lg overflow-hidden transition-all shadow-sm"
+            :class="editor?.isActive('orderedList') ? 'neu-well' : 'neu-surface'"
+          >
+            <button
+              type="button"
+              class="w-6 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              :class="{ '!text-[var(--accent)] font-bold': editor?.isActive('orderedList') }"
+              title="Alternar lista numerada"
+              @mousedown.prevent
+              @click="toggleOrderedListDefault"
+            >
+              <ListOrdered :size="13" />
+            </button>
+            <button
+              type="button"
+              class="w-4 h-7 flex items-center justify-center transition-all cursor-pointer text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-elevated)]/50 border-l border-[var(--groove-dark)]/20"
+              :class="{ '!text-[var(--accent)] bg-[var(--accent)]/10': activeModal === 'orderedList' }"
+              title="Elegir formato numerado (1, a, A, i, I)"
+              @mousedown.prevent
+              @click="toggleModal('orderedList')"
+            >
+              <ChevronDown :size="10" />
+            </button>
+          </div>
+
+          <!-- Menú desplegable de lista ordenada -->
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
+          >
+            <div
+              v-if="activeModal === 'orderedList'"
+              class="absolute left-0 top-full mt-2 z-50 neu-surface p-2 min-w-[230px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-1"
+            >
+              <div class="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider px-2 py-0.5">
+                Formatos de Numeración
+              </div>
+
+              <button
+                v-for="opt in orderedOptions"
+                :key="opt.value"
+                type="button"
+                class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer group"
+                :class="
+                  currentOrderedType === opt.value && editor?.isActive('orderedList')
+                    ? 'neu-well text-[var(--accent)] font-bold'
+                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                "
+                @mousedown.prevent
+                @click="applyOrderedListStyle(opt.value)"
+              >
+                <span
+                  class="w-7 h-6 rounded flex items-center justify-center text-xs font-mono font-bold bg-[var(--bg-base)] text-[var(--accent)] shrink-0 shadow-inner group-hover:scale-105 transition-transform"
+                >
+                  {{ opt.symbol.split(',')[0] }}.
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold leading-tight">{{ opt.label }}</div>
+                  <div class="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5 truncate">{{ opt.description }}</div>
+                </div>
+              </button>
+            </div>
+          </Transition>
+        </div>
 
         <!-- Florón Narrativo de Escena (* * *) Destacado -->
         <button

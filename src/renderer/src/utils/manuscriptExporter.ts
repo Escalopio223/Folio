@@ -53,6 +53,33 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
+function toRomanNumeral(num: number): string {
+  const romanMap: [number, string][] = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I']
+  ]
+  let result = ''
+  let n = num
+  for (const [val, letter] of romanMap) {
+    while (n >= val) {
+      result += letter
+      n -= val
+    }
+  }
+  return result || 'I'
+}
+
 /**
  * Convierte el HTML de TipTap en bloques estructurados y XHTML válido para EPUB/DOCX/PDF.
  */
@@ -99,12 +126,50 @@ function parseChapterHtml(rawHtml: string): {
       const items = Array.from(node.querySelectorAll('li'))
         .map((li) => (li.textContent || '').trim())
         .filter(Boolean)
-      for (const itemText of items) {
-        blocks.push({ type: 'p', text: `• ${itemText}` })
+      const listStyle = node.getAttribute('data-list-style') || ''
+      const typeAttrVal = node.getAttribute('type') || ''
+      const styleAttrVal = node.getAttribute('style') || ''
+
+      let bulletSymbol = '• '
+      if (tag === 'ul') {
+        if (listStyle === 'circle') bulletSymbol = '◦ '
+        else if (listStyle === 'square') bulletSymbol = '▪ '
+        else if (listStyle === 'dash') bulletSymbol = '– '
       }
+
+      items.forEach((itemText, i) => {
+        let prefix = bulletSymbol
+        if (tag === 'ol') {
+          const type =
+            typeAttrVal ||
+            (listStyle === 'lower-alpha'
+              ? 'a'
+              : listStyle === 'upper-alpha'
+                ? 'A'
+                : listStyle === 'lower-roman'
+                  ? 'i'
+                  : listStyle === 'upper-roman'
+                    ? 'I'
+                    : '1')
+          if (type === 'a') prefix = `${String.fromCharCode(97 + (i % 26))}. `
+          else if (type === 'A') prefix = `${String.fromCharCode(65 + (i % 26))}. `
+          else if (type === 'i') prefix = `${toRomanNumeral(i + 1).toLowerCase()}. `
+          else if (type === 'I') prefix = `${toRomanNumeral(i + 1)}. `
+          else prefix = `${i + 1}. `
+        }
+        blocks.push({ type: 'p', text: `${prefix}${itemText}` })
+      })
+
       if (items.length > 0) {
         const liXml = items.map((i) => `<li>${escapeXml(i)}</li>`).join('')
-        xhtmlParts.push(`<${tag}>${liXml}</${tag}>`)
+        const extraAttrs = [
+          typeAttrVal ? `type="${escapeXml(typeAttrVal)}"` : '',
+          listStyle ? `data-list-style="${escapeXml(listStyle)}"` : '',
+          styleAttrVal ? `style="${escapeXml(styleAttrVal)}"` : ''
+        ]
+          .filter(Boolean)
+          .join(' ')
+        xhtmlParts.push(`<${tag}${extraAttrs ? ' ' + extraAttrs : ''}>${liXml}</${tag}>`)
       }
     } else {
       blocks.push({ type: 'p', text })
@@ -566,6 +631,29 @@ export async function exportManuscriptToPdf(manuscript: CompiledManuscript): Pro
       margin: 14pt 20pt;
       font-style: italic;
       color: #44403c;
+    }
+    .chapter-body ul {
+      margin: 8pt 0 8pt 24pt;
+      padding: 0;
+      list-style-type: disc;
+    }
+    .chapter-body ul[data-list-style='circle'], .chapter-body ul[type='circle'] { list-style-type: circle; }
+    .chapter-body ul[data-list-style='square'], .chapter-body ul[type='square'] { list-style-type: square; }
+    .chapter-body ul[data-list-style='dash'], .chapter-body ul[type='dash'] { list-style-type: '- '; }
+    .chapter-body ol {
+      margin: 8pt 0 8pt 24pt;
+      padding: 0;
+      list-style-type: decimal;
+    }
+    .chapter-body ol[type='a'], .chapter-body ol[data-list-style='lower-alpha'] { list-style-type: lower-alpha; }
+    .chapter-body ol[type='A'], .chapter-body ol[data-list-style='upper-alpha'] { list-style-type: upper-alpha; }
+    .chapter-body ol[type='i'], .chapter-body ol[data-list-style='lower-roman'] { list-style-type: lower-roman; }
+    .chapter-body ol[type='I'], .chapter-body ol[data-list-style='upper-roman'] { list-style-type: upper-roman; }
+    .chapter-body ol[type='1'], .chapter-body ol[data-list-style='decimal'] { list-style-type: decimal; }
+    .chapter-body li {
+      margin-bottom: 4pt;
+      text-indent: 0;
+      text-align: left;
     }
   </style>
 </head>

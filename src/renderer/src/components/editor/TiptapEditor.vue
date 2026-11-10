@@ -13,6 +13,7 @@ import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import { SearchHighlight } from './extensions/SearchHighlight'
+import { CustomBulletList, CustomOrderedList } from './extensions/ListExtensions'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
 import { TypewriterExtension } from './extensions/TypewriterExtension'
 import { detectLanguage } from '../../nlp/languageDetector'
@@ -162,10 +163,14 @@ const editor = useEditor({
   extensions: [
     StarterKit.configure({
       horizontalRule: false, // Reemplazado por SceneBreak (* * *)
+      bulletList: false,
+      orderedList: false,
       heading: {
         levels: [1, 2, 3]
       }
     }),
+    CustomBulletList,
+    CustomOrderedList,
     Underline,
     TextStyle,
     FontSize,
@@ -578,17 +583,63 @@ defineExpose({
   opacity: 0.45;
 }
 
-/* Listas */
+/* Listas Desordenadas */
 .ProseMirror ul {
   list-style-type: disc;
   padding-left: 1.5rem;
   margin: 1rem 0;
 }
 
+.ProseMirror ul[data-list-style='disc'],
+.ProseMirror ul[type='disc'] {
+  list-style-type: disc;
+}
+
+.ProseMirror ul[data-list-style='circle'],
+.ProseMirror ul[type='circle'] {
+  list-style-type: circle;
+}
+
+.ProseMirror ul[data-list-style='square'],
+.ProseMirror ul[type='square'] {
+  list-style-type: square;
+}
+
+.ProseMirror ul[data-list-style='dash'],
+.ProseMirror ul[type='dash'] {
+  list-style-type: '- ';
+}
+
+/* Listas Ordenadas */
 .ProseMirror ol {
   list-style-type: decimal;
   padding-left: 1.5rem;
   margin: 1rem 0;
+}
+
+.ProseMirror ol[type='1'],
+.ProseMirror ol[data-list-style='decimal'] {
+  list-style-type: decimal;
+}
+
+.ProseMirror ol[type='a'],
+.ProseMirror ol[data-list-style='lower-alpha'] {
+  list-style-type: lower-alpha;
+}
+
+.ProseMirror ol[type='A'],
+.ProseMirror ol[data-list-style='upper-alpha'] {
+  list-style-type: upper-alpha;
+}
+
+.ProseMirror ol[type='i'],
+.ProseMirror ol[data-list-style='lower-roman'] {
+  list-style-type: lower-roman;
+}
+
+.ProseMirror ol[type='I'],
+.ProseMirror ol[data-list-style='upper-roman'] {
+  list-style-type: upper-roman;
 }
 
 .ProseMirror li {
