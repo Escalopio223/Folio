@@ -531,10 +531,21 @@ export const useUiStore = defineStore('ui', () => {
   const isFocusMode = ref(false)
   const isTypewriterMode = ref(false)
   const isTypewriterSoundEnabled = ref(localStorage.getItem('folio:typewriter_sound') !== 'false')
+  const isSmartCapitalizationEnabled = ref(localStorage.getItem('folio:smart_capitalization') !== 'false')
 
   function toggleTypewriterSound(): void {
     isTypewriterSoundEnabled.value = !isTypewriterSoundEnabled.value
     localStorage.setItem('folio:typewriter_sound', String(isTypewriterSoundEnabled.value))
+  }
+
+  function toggleSmartCapitalization(): void {
+    isSmartCapitalizationEnabled.value = !isSmartCapitalizationEnabled.value
+    localStorage.setItem('folio:smart_capitalization', String(isSmartCapitalizationEnabled.value))
+  }
+
+  function setSmartCapitalization(val: boolean): void {
+    isSmartCapitalizationEnabled.value = val
+    localStorage.setItem('folio:smart_capitalization', String(isSmartCapitalizationEnabled.value))
   }
 
   let wasLeftSidebarOpenBeforeFocus = isLeftSidebarOpen.value
@@ -732,6 +743,9 @@ export const useUiStore = defineStore('ui', () => {
     toggleTypewriterSound,
     isTypewriterMode,
     toggleTypewriterMode,
-    setTypewriterMode
+    setTypewriterMode,
+    isSmartCapitalizationEnabled,
+    toggleSmartCapitalization,
+    setSmartCapitalization
   }
 })

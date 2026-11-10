@@ -34,6 +34,7 @@ import { setHeadingSmart, setParagraphSmart, setBlockquoteSmart } from './utils/
 import HybridFontSizeSelect from './HybridFontSizeSelect.vue'
 import SpellcheckLanguageToggle from './SpellcheckLanguageToggle.vue'
 import { useSpellcheck } from '../../composables/useSpellcheck'
+import { useUiStore } from '../../stores/uiStore'
 import { modKey } from '../../utils/platform'
 import type { BulletListStyle, OrderedListType } from './extensions/ListExtensions'
 
@@ -41,6 +42,7 @@ const props = defineProps<{
   editor: Editor | null | undefined
 }>()
 
+const uiStore = useUiStore()
 const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 
 // Minimodales: Fuente, Color, Resaltado, Listas, Interlineado, Letra Capitular
@@ -1700,6 +1702,29 @@ const dropCapColorOptions = [
         :detected-lang="detectedLang"
         @update:lang="setSpellcheckLanguage"
       />
+
+      <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
+
+      <!-- 11. Mayúscula y Espacio Inteligente tras Punto -->
+      <button
+        type="button"
+        class="neu-btn px-2 h-7 flex items-center gap-1.5 transition-all cursor-pointer text-xs rounded-lg shadow-sm"
+        :class="
+          uiStore.isSmartCapitalizationEnabled
+            ? 'neu-btn-active text-[var(--accent)] font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] opacity-70'
+        "
+        :title="
+          uiStore.isSmartCapitalizationEnabled
+            ? 'Mayúscula y espacio inteligente tras punto: Activado (Haz clic para desactivar)'
+            : 'Mayúscula y espacio inteligente tras punto: Desactivado (Haz clic para activar)'
+        "
+        @mousedown.prevent
+        @click="uiStore.toggleSmartCapitalization()"
+      >
+        <span class="font-serif font-bold text-xs">A<span class="text-[9px] text-[var(--accent)]">.</span>a</span>
+        <span class="text-[10px] hidden xl:inline">Auto-mayús</span>
+      </button>
     </div>
   </div>
 </template>

@@ -18,6 +18,7 @@ import { SearchHighlight } from './extensions/SearchHighlight'
 import { CustomBulletList, CustomOrderedList } from './extensions/ListExtensions'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
 import { TypewriterExtension } from './extensions/TypewriterExtension'
+import { AutoCapitalizeExtension } from './extensions/AutoCapitalizeExtension'
 import { detectLanguage } from '../../nlp/languageDetector'
 import { useSpellcheck } from '../../composables/useSpellcheck'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
@@ -199,6 +200,9 @@ const editor = useEditor({
     TypewriterExtension.configure({
       enabled: () => uiStore.isTypewriterMode,
       getScrollContainer: () => props.scrollContainer
+    }),
+    AutoCapitalizeExtension.configure({
+      enabled: () => uiStore.isSmartCapitalizationEnabled
     })
   ],
   editorProps: {
