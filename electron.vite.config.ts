@@ -1,3 +1,5 @@
+delete process.env.ELECTRON_RUN_AS_NODE
+
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
