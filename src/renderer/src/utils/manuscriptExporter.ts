@@ -16,6 +16,7 @@ export interface CompiledChapter {
   blocks: Array<{
     type: 'p' | 'h1' | 'h2' | 'h3' | 'blockquote' | 'scenebreak'
     text: string
+    lineHeight?: number
   }>
 }
 
@@ -172,8 +173,13 @@ function parseChapterHtml(rawHtml: string): {
         xhtmlParts.push(`<${tag}${extraAttrs ? ' ' + extraAttrs : ''}>${liXml}</${tag}>`)
       }
     } else {
-      blocks.push({ type: 'p', text })
-      xhtmlParts.push(`<p>${escapeXml(text)}</p>`)
+      const el = node as HTMLElement
+      const rawLineHeight = el.getAttribute?.('data-line-height') || el.style?.lineHeight
+      const numLineHeight = rawLineHeight ? parseFloat(rawLineHeight) : undefined
+      const lineHeight = numLineHeight && !isNaN(numLineHeight) ? numLineHeight : undefined
+      blocks.push({ type: 'p', text, lineHeight })
+      const styleAttr = el.getAttribute?.('style') ? ` style="${escapeXml(el.getAttribute('style')!)}"` : ''
+      xhtmlParts.push(`<p${styleAttr}>${escapeXml(text)}</p>`)
     }
   }
 
@@ -744,9 +750,10 @@ export async function exportManuscriptToDocx(manuscript: CompiledManuscript): Pr
             <w:r><w:rPr><w:i/><w:sz w:val="24"/></w:rPr><w:t>${escapeXml(block.text)}</w:t></w:r>
           </w:p>`)
       } else {
+        const wLine = block.lineHeight ? Math.round(block.lineHeight * 240) : 360
         docParagraphs.push(`
           <w:p>
-            <w:pPr><w:jc w:val="both"/><w:ind w:firstLine="420"/><w:spacing w:after="160" w:line="360" w:lineRule="auto"/></w:pPr>
+            <w:pPr><w:jc w:val="both"/><w:ind w:firstLine="420"/><w:spacing w:after="160" w:line="${wLine}" w:lineRule="auto"/></w:pPr>
             <w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${escapeXml(block.text)}</w:t></w:r>
           </w:p>`)
       }

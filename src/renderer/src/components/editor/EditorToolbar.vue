@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 import { onClickOutside } from '@vueuse/core'
 import {
@@ -20,6 +20,7 @@ import {
   AlignCenter,
   AlignJustify,
   AlignRight,
+  MoveVertical,
   IndentIncrease,
   IndentDecrease,
   List,
@@ -41,8 +42,8 @@ const props = defineProps<{
 
 const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 
-// Minimodales: Fuente, Color, Resaltado, Listas
-type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | null
+// Minimodales: Fuente, Color, Resaltado, Listas, Interlineado
+type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | 'lineHeight' | null
 const activeModal = ref<ActiveModal>(null)
 
 const fontModalRef = ref<HTMLElement | null>(null)
@@ -50,6 +51,7 @@ const colorModalRef = ref<HTMLElement | null>(null)
 const highlightModalRef = ref<HTMLElement | null>(null)
 const bulletModalRef = ref<HTMLElement | null>(null)
 const orderedModalRef = ref<HTMLElement | null>(null)
+const lineHeightModalRef = ref<HTMLElement | null>(null)
 
 const currentBodyFontSize = ref<number>(18)
 
@@ -75,6 +77,9 @@ onClickOutside(bulletModalRef, () => {
 })
 onClickOutside(orderedModalRef, () => {
   if (activeModal.value === 'orderedList') closeModal()
+})
+onClickOutside(lineHeightModalRef, () => {
+  if (activeModal.value === 'lineHeight') closeModal()
 })
 
 // Opciones de Listas Desordenadas (Viñetas)
@@ -189,6 +194,116 @@ function applyOrderedListStyle(type: OrderedListType): void {
   closeModal()
 }
 
+// =========================================================================
+// INTERLINEADO & ESPACIADO VERTICAL (Line Spacing)
+// =========================================================================
+interface LineHeightOption {
+  value: string
+  label: string
+  description: string
+}
+
+const lineHeightPresets: LineHeightOption[] = [
+  { value: '1.0', label: '1.0 Sencillo', description: 'Espacio compacto y cerrado' },
+  { value: '1.15', label: '1.15 Estándar', description: 'Lectura digital moderna' },
+  { value: '1.25', label: '1.25 Cómodo', description: 'Equilibrado y fluido' },
+  { value: '1.5', label: '1.5 Editorial', description: 'Clásico de publicación literaria' },
+  { value: '1.75', label: '1.75 Holgado', description: 'Amplio para vista descansada' },
+  { value: '2.0', label: '2.0 Doble', description: 'Manuscrito para corrección' }
+]
+
+const customLineHeight = ref<number>(1.5)
+
+const currentLineHeight = computed<string>(() => {
+  if (!props.editor) return '1.5'
+  const pAttrs = props.editor.getAttributes('paragraph')
+  if (pAttrs?.lineHeight) return String(pAttrs.lineHeight)
+  const hAttrs = props.editor.getAttributes('heading')
+  if (hAttrs?.lineHeight) return String(hAttrs.lineHeight)
+  const bAttrs = props.editor.getAttributes('blockquote')
+  if (bAttrs?.lineHeight) return String(bAttrs.lineHeight)
+  return 'Auto'
+})
+
+const currentLineHeightLabel = computed<string>(() => {
+  if (currentLineHeight.value === 'Auto') return '1.5'
+  return currentLineHeight.value
+})
+
+function applyLineHeight(val: string): void {
+  if (!props.editor) return
+  const num = parseFloat(val)
+  if (!isNaN(num)) {
+    customLineHeight.value = num
+  }
+  props.editor.chain().focus().setLineHeight(val).run()
+  closeModal()
+}
+
+function applyLineHeightToChapter(val: string): void {
+  if (!props.editor) return
+  const num = parseFloat(val)
+  if (!isNaN(num)) {
+    customLineHeight.value = num
+  }
+  const { tr, doc } = props.editor.state
+  let changed = false
+  doc.descendants((node, pos) => {
+    if (['paragraph', 'heading', 'blockquote', 'listItem'].includes(node.type.name)) {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        lineHeight: val
+      })
+      changed = true
+    }
+  })
+  if (changed) {
+    props.editor.view.dispatch(tr)
+  }
+  closeModal()
+}
+
+function adjustCustomLineHeight(delta: number): void {
+  const next = Math.max(0.8, Math.min(3.5, Math.round((customLineHeight.value + delta) * 100) / 100))
+  customLineHeight.value = next
+  applyLineHeight(String(next))
+}
+
+function resetLineHeight(): void {
+  if (!props.editor) return
+  customLineHeight.value = 1.5
+  props.editor.chain().focus().unsetLineHeight().run()
+  closeModal()
+}
+
+// Separación de párrafos (Margen inferior entre párrafos)
+const currentParagraphGap = ref<'compact' | 'normal' | 'relaxed'>(
+  (localStorage.getItem('folio_paragraph_gap') as 'compact' | 'normal' | 'relaxed') || 'normal'
+)
+
+function setParagraphGap(val: 'compact' | 'normal' | 'relaxed'): void {
+  currentParagraphGap.value = val
+  localStorage.setItem('folio_paragraph_gap', val)
+  const remMap = {
+    compact: '0.65rem',
+    normal: '1.25rem',
+    relaxed: '1.85rem'
+  }
+  document.documentElement.style.setProperty('--editorial-paragraph-gap', remMap[val])
+}
+
+onMounted(() => {
+  const remMap = {
+    compact: '0.65rem',
+    normal: '1.25rem',
+    relaxed: '1.85rem'
+  }
+  document.documentElement.style.setProperty(
+    '--editorial-paragraph-gap',
+    remMap[currentParagraphGap.value] || '1.25rem'
+  )
+})
+
 // Fuentes disponibles
 const fontFamilies = [
   { label: 'Editorial (Serif)', value: "'Newsreader', 'Playfair Display', Georgia, serif", preview: 'font-editorial' },
@@ -296,10 +411,10 @@ function insertSceneBreak(): void {
 
 <template>
   <div
-    class="editor-toolbar w-full neu-surface px-2.5 py-1 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30"
+    class="editor-toolbar w-full neu-surface px-2.5 py-1.5 text-xs select-none border-b border-[var(--groove-dark)]/30 backdrop-blur-md relative z-30 transition-all"
   >
-    <!-- Contenedor horizontal en una sola fila fija (nunca se parte ni se descoloca) -->
-    <div class="flex items-center gap-1 flex-nowrap w-full">
+    <!-- Contenedor flexible con salto de línea automático por colisión (flex-wrap) para pantallas pequeñas -->
+    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 w-full">
       <!-- 1. Deshacer / Rehacer -->
       <div class="flex items-center gap-0.5 shrink-0">
         <button
@@ -664,6 +779,156 @@ function insertSceneBreak(): void {
         >
           <AlignRight :size="13" />
         </button>
+      </div>
+
+      <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
+
+      <!-- 8. Interlineado & Salto de Línea (Espacio entre líneas y párrafos) -->
+      <div ref="lineHeightModalRef" class="relative shrink-0 flex items-center">
+        <button
+          type="button"
+          class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': activeModal === 'lineHeight' }"
+          title="Modificar interlineado y espacio entre líneas de texto"
+          @mousedown.prevent
+          @click="toggleModal('lineHeight')"
+        >
+          <MoveVertical :size="13" class="text-[var(--accent)]" />
+          <span class="text-[11px] font-mono font-medium">{{ currentLineHeightLabel }}</span>
+          <ChevronDown :size="10" class="opacity-70" />
+        </button>
+
+        <!-- Minimodal Flotante de Interlineado -->
+        <Transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="opacity-0 translate-y-1 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 translate-y-1 scale-95"
+        >
+          <div
+            v-if="activeModal === 'lineHeight'"
+            class="absolute left-0 top-full mt-2 z-50 neu-surface p-2.5 min-w-[245px] shadow-2xl rounded-xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2"
+          >
+            <div class="flex items-center justify-between border-b border-[var(--groove-dark)]/30 pb-1.5">
+              <span class="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                Interlineado (Líneas)
+              </span>
+              <span class="text-[10px] font-mono font-bold text-[var(--accent)]">
+                {{ currentLineHeightLabel }}
+              </span>
+            </div>
+
+            <!-- Ajuste fino numérico con +/- -->
+            <div class="flex items-center justify-between gap-1 neu-well-sm p-1 rounded-lg">
+              <button
+                type="button"
+                class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
+                title="Reducir interlineado en 0.1"
+                @mousedown.prevent
+                @click="adjustCustomLineHeight(-0.1)"
+              >
+                -
+              </button>
+              <div class="flex items-center gap-1 font-mono text-xs font-bold text-[var(--text-primary)]">
+                <span>{{ customLineHeight.toFixed(2) }}</span>
+                <span class="text-[9px] text-[var(--text-muted)] font-normal">espacio</span>
+              </div>
+              <button
+                type="button"
+                class="w-6 h-6 rounded neu-btn flex items-center justify-center font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] active:scale-95 cursor-pointer"
+                title="Aumentar interlineado en 0.1"
+                @mousedown.prevent
+                @click="adjustCustomLineHeight(0.1)"
+              >
+                +
+              </button>
+            </div>
+
+            <!-- Opciones predefinidas -->
+            <div class="grid grid-cols-2 gap-1">
+              <button
+                v-for="preset in lineHeightPresets"
+                :key="preset.value"
+                type="button"
+                class="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all cursor-pointer text-left"
+                :class="
+                  currentLineHeight === preset.value
+                    ? 'neu-well text-[var(--accent)] font-bold'
+                    : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                "
+                :title="preset.description"
+                @mousedown.prevent
+                @click="applyLineHeight(preset.value)"
+              >
+                <span class="font-mono font-semibold">{{ preset.value }}</span>
+                <span class="text-[10px] text-[var(--text-muted)] truncate ml-1">{{ preset.label.split(' ')[1] }}</span>
+              </button>
+            </div>
+
+            <!-- Separación entre párrafos (Margen) -->
+            <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex flex-col gap-1">
+              <div class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                Separación de Párrafos
+              </div>
+              <div class="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                  :class="currentParagraphGap === 'compact' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                  title="Separación compacta entre párrafos (0.65rem)"
+                  @mousedown.prevent
+                  @click="setParagraphGap('compact')"
+                >
+                  Compacto
+                </button>
+                <button
+                  type="button"
+                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                  :class="currentParagraphGap === 'normal' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                  title="Separación estándar entre párrafos (1.25rem)"
+                  @mousedown.prevent
+                  @click="setParagraphGap('normal')"
+                >
+                  Estándar
+                </button>
+                <button
+                  type="button"
+                  class="py-1 px-1.5 rounded text-[10px] font-medium text-center transition-all cursor-pointer"
+                  :class="currentParagraphGap === 'relaxed' ? 'neu-well text-[var(--accent)] font-bold' : 'neu-btn text-[var(--text-secondary)]'"
+                  title="Separación amplia entre párrafos (1.85rem)"
+                  @mousedown.prevent
+                  @click="setParagraphGap('relaxed')"
+                >
+                  Amplio
+                </button>
+              </div>
+            </div>
+
+            <!-- Acciones de ámbito -->
+            <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex items-center justify-between gap-1 text-[10px]">
+              <button
+                type="button"
+                class="px-2 py-1 rounded neu-btn text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all cursor-pointer flex-1 text-center font-medium"
+                title="Aplicar el interlineado actual a todos los párrafos del capítulo activo"
+                @mousedown.prevent
+                @click="applyLineHeightToChapter(String(customLineHeight))"
+              >
+                A todo el capítulo
+              </button>
+              <button
+                type="button"
+                class="px-1.5 py-1 rounded hover:text-rose-500 text-[var(--text-muted)] transition-all cursor-pointer"
+                title="Restablecer interlineado predeterminado"
+                @mousedown.prevent
+                @click="resetLineHeight"
+              >
+                Restablecer
+              </button>
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
