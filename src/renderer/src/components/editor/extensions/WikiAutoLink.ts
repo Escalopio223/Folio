@@ -60,14 +60,18 @@ function buildWikiDecorations(
     }
 
     // 2. Alias de la entidad (ej: Dani, Daniiii, D)
-    if (Array.isArray(ent.aliases)) {
-      for (const rawAlias of ent.aliases) {
-        if (!rawAlias) continue
-        const cleanAlias = String(rawAlias).trim()
-        if (cleanAlias.length >= 1 && !seenPerEntity.has(cleanAlias.toLowerCase())) {
-          candidates.push({ term: cleanAlias, entity: ent })
-          seenPerEntity.add(cleanAlias.toLowerCase())
-        }
+    const aliases = Array.isArray(ent.aliases)
+      ? ent.aliases
+      : typeof ent.aliases === 'object' && ent.aliases !== null
+        ? Object.values(ent.aliases)
+        : []
+
+    for (const rawAlias of aliases) {
+      if (!rawAlias) continue
+      const cleanAlias = String(rawAlias).trim()
+      if (cleanAlias.length >= 1 && !seenPerEntity.has(cleanAlias.toLowerCase())) {
+        candidates.push({ term: cleanAlias, entity: ent })
+        seenPerEntity.add(cleanAlias.toLowerCase())
       }
     }
   }
@@ -151,10 +155,12 @@ export const WikiAutoLink = Extension.create<WikiAutoLinkOptions>({
   },
 
   addCommands() {
+    const extension = this
     return {
       setWikiEntities:
         (entities: WikiEntityTerm[]) =>
         ({ tr, dispatch }) => {
+          extension.options.entities = entities || []
           if (dispatch) {
             tr.setMeta(wikiAutoLinkPluginKey, { entities })
           }

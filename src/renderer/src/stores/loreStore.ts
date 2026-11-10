@@ -66,8 +66,9 @@ export const useLoreStore = defineStore('lore', () => {
   async function createLore(input: CreateLoreInput): Promise<LoreItem | null> {
     try {
       isLoading.value = true
-      const created = await window.api.lore.create(input)
-      items.value.push(created)
+      const cleanInput = JSON.parse(JSON.stringify(input))
+      const created = await window.api.lore.create(cleanInput)
+      items.value = [...items.value, created]
       selectLore(created.id)
       await useGoalsStore().checkAchievements()
       return created
@@ -81,24 +82,28 @@ export const useLoreStore = defineStore('lore', () => {
 
   async function updateLore(input: UpdateLoreInput): Promise<LoreItem | null> {
     try {
-      const updated = await window.api.lore.update(input)
-      const index = items.value.findIndex((i) => i.id === updated.id)
+      const cleanInput = JSON.parse(JSON.stringify(input))
+      const updated = await window.api.lore.update(cleanInput)
+      const nextItems = [...items.value]
+      const index = nextItems.findIndex((i) => i.id === updated.id)
       if (index !== -1) {
         if (updated.isArchived) {
-          items.value.splice(index, 1)
+          nextItems.splice(index, 1)
+          items.value = nextItems
           trashedItems.value.unshift(updated)
           if (activeLoreId.value === updated.id) {
             activeLoreId.value = items.value[0]?.id || null
           }
         } else {
-          items.value[index] = updated
+          nextItems[index] = updated
+          items.value = nextItems
         }
       } else {
         const trashIndex = trashedItems.value.findIndex((i) => i.id === updated.id)
         if (trashIndex !== -1) {
           if (!updated.isArchived) {
             trashedItems.value.splice(trashIndex, 1)
-            items.value.unshift(updated)
+            items.value = [updated, ...items.value]
             selectLore(updated.id)
           } else {
             trashedItems.value[trashIndex] = updated

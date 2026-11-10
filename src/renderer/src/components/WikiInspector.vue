@@ -205,6 +205,39 @@ watch(
 // Auto-guardado debounced por tarjeta
 const saveQueue: Record<string, () => void> = {}
 
+async function saveCardNow(itemId: string): Promise<void> {
+  const targetDraft = cardDrafts[itemId]
+  if (!targetDraft) return
+
+  targetDraft.saveStatus = 'saving'
+  const attrsObj: Record<string, string> = {}
+  for (const attr of targetDraft.attributes) {
+    if (attr.key.trim()) {
+      attrsObj[attr.key.trim()] = attr.value.trim()
+    }
+  }
+
+  const cleanAliases = Array.from(targetDraft.aliases || [])
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+
+  const updated = await loreStore.updateLore({
+    id: itemId,
+    name: targetDraft.name.trim() || 'Sin nombre',
+    category: targetDraft.category.trim() || 'general',
+    summary: targetDraft.summary,
+    content: targetDraft.content,
+    aliases: cleanAliases,
+    attributes: attrsObj,
+    colorTag: targetDraft.colorTag
+  })
+
+  targetDraft.saveStatus = 'saved'
+  if (updated && Array.isArray(updated.aliases)) {
+    targetDraft.aliases = [...updated.aliases]
+  }
+}
+
 function triggerCardSave(itemId: string): void {
   const draft = cardDrafts[itemId]
   if (!draft) return
@@ -213,29 +246,7 @@ function triggerCardSave(itemId: string): void {
 
   if (!saveQueue[itemId]) {
     saveQueue[itemId] = useDebounceFn(async () => {
-      const targetDraft = cardDrafts[itemId]
-      if (!targetDraft) return
-
-      targetDraft.saveStatus = 'saving'
-      const attrsObj: Record<string, string> = {}
-      for (const attr of targetDraft.attributes) {
-        if (attr.key.trim()) {
-          attrsObj[attr.key.trim()] = attr.value.trim()
-        }
-      }
-
-      await loreStore.updateLore({
-        id: itemId,
-        name: targetDraft.name.trim() || 'Sin nombre',
-        category: targetDraft.category.trim() || 'general',
-        summary: targetDraft.summary,
-        content: targetDraft.content,
-        aliases: targetDraft.aliases,
-        attributes: attrsObj,
-        colorTag: targetDraft.colorTag
-      })
-
-      targetDraft.saveStatus = 'saved'
+      await saveCardNow(itemId)
     }, 600)
   }
 
@@ -260,14 +271,14 @@ function handleAddAlias(item: LoreItem): void {
   }
   draft.newAlias = ''
   if (changed) {
-    triggerCardSave(item.id)
+    saveCardNow(item.id)
   }
 }
 
 function handleRemoveAlias(item: LoreItem, index: number): void {
   const draft = ensureDraft(item)
   draft.aliases.splice(index, 1)
-  triggerCardSave(item.id)
+  saveCardNow(item.id)
 }
 
 function handleAddAttribute(item: LoreItem): void {

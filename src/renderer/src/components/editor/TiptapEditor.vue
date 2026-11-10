@@ -298,7 +298,7 @@ watch(
     if (!editor.value) return
     editor.value.commands.setWikiEntities(entities || [])
   },
-  { deep: true }
+  { deep: true, immediate: true }
 )
 
 // Sincronizar idioma del corrector ortográfico en el DOM

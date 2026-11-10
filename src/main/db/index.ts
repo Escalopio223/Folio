@@ -188,6 +188,27 @@ function mapFolio(row: schema.FolioSelect): Folio {
   }
 }
 
+export function normalizeAliases(raw: any): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        return parsed.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+      }
+    } catch {
+      return raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    }
+  }
+  if (typeof raw === 'object') {
+    return Object.values(raw).filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+  }
+  return []
+}
+
 function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
   let parsedAttrs: Record<string, string>
   try {
@@ -196,27 +217,12 @@ function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
     parsedAttrs = {}
   }
 
-  let parsedAliases: string[] = []
-  try {
-    const rawAliases = (row as any).aliases
-    if (typeof rawAliases === 'string') {
-      const parsed = JSON.parse(rawAliases)
-      if (Array.isArray(parsed)) {
-        parsedAliases = parsed.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
-      }
-    } else if (Array.isArray(rawAliases)) {
-      parsedAliases = rawAliases.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
-    }
-  } catch {
-    parsedAliases = []
-  }
-
   return {
     id: row.id,
     projectId: row.projectId,
     category: row.category,
     name: row.name,
-    aliases: parsedAliases,
+    aliases: normalizeAliases((row as any).aliases),
     summary: row.summary,
     content: row.content,
     attributes: parsedAttrs,
@@ -1192,11 +1198,7 @@ export function createLore(input: CreateLoreInput): LoreItem {
       projectId: input.projectId,
       category: input.category.toLowerCase().trim() || 'personaje',
       name: input.name.trim() || 'Nuevo Registro',
-      aliases: JSON.stringify(
-        Array.isArray(input.aliases)
-          ? input.aliases.map((s) => String(s).trim()).filter(Boolean)
-          : []
-      ),
+      aliases: JSON.stringify(normalizeAliases(input.aliases)),
       summary: input.summary?.trim() || '',
       content: input.content ?? '',
       attributes: JSON.stringify(input.attributes || {}),
@@ -1224,11 +1226,7 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
   if (input.category !== undefined) values.category = input.category.toLowerCase().trim()
   if (input.name !== undefined) values.name = input.name
   if (input.aliases !== undefined) {
-    values.aliases = JSON.stringify(
-      Array.isArray(input.aliases)
-        ? input.aliases.map((s) => String(s).trim()).filter(Boolean)
-        : []
-    )
+    values.aliases = JSON.stringify(normalizeAliases(input.aliases))
   }
   if (input.summary !== undefined) values.summary = input.summary
   if (input.content !== undefined) values.content = input.content
