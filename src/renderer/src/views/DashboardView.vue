@@ -30,6 +30,7 @@ import EditorToolbar from '../components/editor/EditorToolbar.vue'
 import EditorFindBar from '../components/editor/EditorFindBar.vue'
 import WikiHoverPreview from '../components/editor/WikiHoverPreview.vue'
 import ChapterTitleFormatPopover from '../components/editor/ChapterTitleFormatPopover.vue'
+import ColorTagPicker from '../components/common/ColorTagPicker.vue'
 import type { WikiEntityTerm } from '../components/editor/extensions/WikiAutoLink'
 import type { Editor } from '@tiptap/vue-3'
 import type { Folio, FolioType, FolioStatus, ChapterTitleFormat, Project } from '@shared/types'
@@ -701,6 +702,10 @@ async function handleCreateChapter(type: FolioType = 'chapter'): Promise<void> {
   }
 }
 
+async function handleUpdateChapterColor(id: string, colorTag: string | null): Promise<void> {
+  await folioStore.setChapterColor(id, colorTag)
+}
+
 // Project Change con salvaguarda de datos pendientes
 async function handleProjectChange(projectId: string): Promise<void> {
   if (hasPendingChanges.value) {
@@ -840,10 +845,11 @@ onBeforeUnmount(async () => {
               dragOverChapterId === chap.id ? 'ring-2 ring-[var(--accent)]/60 scale-[1.01]' : '',
               draggedChapterId === chap.id ? 'opacity-50' : ''
             ]"
+            :style="chap.colorTag ? { borderLeftColor: chap.colorTag, borderLeftWidth: '4px' } : {}"
             @click="selectChapter(chap)"
             @dblclick.stop="startInlineEdit(chap)"
           >
-            <!-- Línea 1: Drag handle, Punto de Estado, Icono de Tipo, Título editable y Acciones -->
+            <!-- Línea 1: Drag handle, Punto de Estado, Título editable y Acciones -->
             <div class="flex items-center justify-between gap-2 min-w-0">
               <div class="flex items-center gap-1.5 min-w-0 flex-1">
                 <GripVertical
@@ -880,8 +886,19 @@ onBeforeUnmount(async () => {
                 </span>
               </div>
 
-              <!-- Botones rápidos del capítulo: Renombrar y Papelera -->
+              <!-- Botones rápidos del capítulo: Etiqueta de Color, Renombrar y Papelera -->
               <div class="flex items-center gap-1 shrink-0" @click.stop>
+                <!-- Etiqueta de Color / Categoría Visual -->
+                <div :class="chap.colorTag ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity'">
+                  <ColorTagPicker
+                    :model-value="chap.colorTag"
+                    align="left"
+                    size="sm"
+                    title="Etiqueta de color del capítulo"
+                    @update:model-value="(newColor) => handleUpdateChapterColor(chap.id, newColor)"
+                  />
+                </div>
+
                 <button
                   type="button"
                   class="w-6 h-6 rounded-lg neu-btn flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-all cursor-pointer active:scale-95"
@@ -1049,6 +1066,13 @@ onBeforeUnmount(async () => {
             <span class="text-xs font-semibold text-[var(--text-primary)] truncate font-editorial">
               {{ editFolioTitle || 'Sin título' }}
             </span>
+            <ColorTagPicker
+              :model-value="folioStore.activeFolio.colorTag"
+              align="left"
+              size="sm"
+              title="Etiqueta de color del capítulo activo"
+              @update:model-value="(newColor) => handleUpdateChapterColor(folioStore.activeFolio!.id, newColor)"
+            />
           </div>
 
           <!-- Controles Superiores de Capítulo y Guardado -->

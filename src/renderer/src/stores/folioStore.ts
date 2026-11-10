@@ -25,6 +25,7 @@ export interface CreateChapterOptions {
   includeInExport?: boolean
   content?: string
   status?: FolioStatus
+  colorTag?: string | null
 }
 
 export const useFolioStore = defineStore('folio', () => {
@@ -224,6 +225,7 @@ export const useFolioStore = defineStore('folio', () => {
         | 'status'
         | 'targetWords'
         | 'includeInExport'
+        | 'colorTag'
       >
     >
   ): Promise<Folio | null> {
@@ -231,6 +233,10 @@ export const useFolioStore = defineStore('folio', () => {
       id,
       ...meta
     })
+  }
+
+  async function setChapterColor(id: string, colorTag: string | null): Promise<Folio | null> {
+    return updateFolio({ id, colorTag })
   }
 
   async function updateChapterContent(
@@ -422,6 +428,7 @@ export const useFolioStore = defineStore('folio', () => {
     createChapter,
     createFolio,
     updateChapterMeta,
+    setChapterColor,
     updateChapterContent,
     reorderChapters,
     updateFolio,

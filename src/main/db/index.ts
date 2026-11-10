@@ -180,6 +180,7 @@ function mapFolio(row: schema.FolioSelect): Folio {
     wordCount,
     orderIndex: row.orderIndex ?? 0,
     icon: row.icon || 'FileText',
+    colorTag: row.colorTag ?? null,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
     createdAt: row.createdAt,
@@ -204,6 +205,7 @@ function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
     content: row.content,
     attributes: parsedAttrs,
     icon: row.icon || 'User',
+    colorTag: row.colorTag ?? null,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
     createdAt: row.createdAt,
@@ -264,6 +266,7 @@ export function initDatabase(): {
       word_count INTEGER NOT NULL DEFAULT 0,
       order_index INTEGER NOT NULL DEFAULT 0,
       icon TEXT DEFAULT 'FileText',
+      color_tag TEXT,
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -280,6 +283,7 @@ export function initDatabase(): {
       content TEXT NOT NULL DEFAULT '',
       attributes TEXT NOT NULL DEFAULT '{}',
       icon TEXT DEFAULT 'User',
+      color_tag TEXT,
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -389,6 +393,9 @@ export function initDatabase(): {
     }
     if (!folioCols.has('word_count')) {
       sqliteInstance.exec('ALTER TABLE folios ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0;')
+    }
+    if (!folioCols.has('color_tag')) {
+      sqliteInstance.exec('ALTER TABLE folios ADD COLUMN color_tag TEXT;')
     }
     if (!folioCols.has('order_index')) {
       sqliteInstance.exec('ALTER TABLE folios ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0;')
@@ -524,6 +531,11 @@ export function initDatabase(): {
     }
     if (!scratchpadCols.has('color_tag')) {
       sqliteInstance.exec('ALTER TABLE scratchpad_notes ADD COLUMN color_tag TEXT;')
+    }
+
+    const loreCols = getTableCols('lore_items')
+    if (!loreCols.has('color_tag')) {
+      sqliteInstance.exec('ALTER TABLE lore_items ADD COLUMN color_tag TEXT;')
     }
 
     const rulesCols = getTableCols('world_rules')
@@ -990,6 +1002,7 @@ export function createFolio(input: CreateFolioInput): Folio {
       wordCount,
       orderIndex: nextOrderIndex,
       icon: input.icon || 'FileText',
+      colorTag: input.colorTag ?? null,
       isFavorite: false,
       isArchived: false,
       createdAt: now,
@@ -1032,6 +1045,7 @@ export function updateFolio(input: UpdateFolioInput): Folio {
   if (input.orderIndex !== undefined) values.orderIndex = input.orderIndex
   if (input.status !== undefined) values.status = normalizeFolioStatus(input.status)
   if (input.icon !== undefined) values.icon = input.icon
+  if (input.colorTag !== undefined) values.colorTag = input.colorTag
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
 
@@ -1142,6 +1156,7 @@ export function createLore(input: CreateLoreInput): LoreItem {
       content: input.content ?? '',
       attributes: JSON.stringify(input.attributes || {}),
       icon: input.icon || 'User',
+      colorTag: input.colorTag ?? null,
       isFavorite: false,
       isArchived: false,
       createdAt: now,
@@ -1166,6 +1181,7 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
   if (input.content !== undefined) values.content = input.content
   if (input.attributes !== undefined) values.attributes = JSON.stringify(input.attributes)
   if (input.icon !== undefined) values.icon = input.icon
+  if (input.colorTag !== undefined) values.colorTag = input.colorTag
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
 

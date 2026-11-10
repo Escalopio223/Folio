@@ -339,6 +339,7 @@ const featureModules = computed<FeatureModule[]>(() => [
       'Organiza tu libro en capítulos, preliminares (prólogos, dedicatorias) y epílogos.',
       'Reordena capítulos y escenas cómodamente arrastrando y soltando (Drag & Drop).',
       'Edita títulos en línea con un simple clic y controla el estado editorial (Borrador, En curso, Finalizado).',
+      'Etiquetas de color configurables a mano para distinguir visualmente tramas, tonos y capítulos a simple vista.',
       'Inserta descansos de escena (* * *) para dividir y navegar ágilmente por sub-escenas.'
     ]
   },
@@ -373,6 +374,7 @@ const featureModules = computed<FeatureModule[]>(() => [
     shortcut: formatShortcut('Ctrl+3'),
     bullets: [
       'Crea fichas ordenadas para Personajes, Lugares, Objetos y Facciones de tu universo.',
+      'Etiquetas de color personalizables a mano para categorizar visualmente y reconocer de inmediato cada entrada.',
       'Detección automática en el editor: Folio reconoce los nombres de tus personajes mientras redactas y los subraya sutilmente sin ensuciar el texto.',
       `Hover Preview & ${modKey}+Clic: reposa el ratón sobre cualquier mención para ver su resumen, o pulsa ${modKey}+Clic para saltar directamente a su ficha en la Wiki.`,
       'Reglas del Mundo: documenta axiomas, leyes mágicas y códigos inquebrantables de tu universo narrativo.'

@@ -50,6 +50,7 @@ export interface Folio {
   wordCount: number
   orderIndex: number
   icon: string
+  colorTag: string | null
   isFavorite: boolean
   isArchived: boolean
   createdAt: string | Date
@@ -73,6 +74,7 @@ export interface CreateFolioInput {
   wordCount?: number
   orderIndex?: number
   icon?: string
+  colorTag?: string | null
 }
 
 export interface UpdateFolioInput {
@@ -92,6 +94,7 @@ export interface UpdateFolioInput {
   wordCount?: number
   orderIndex?: number
   icon?: string
+  colorTag?: string | null
   isFavorite?: boolean
   isArchived?: boolean
 }
@@ -105,6 +108,7 @@ export interface LoreItem {
   content: string
   attributes: Record<string, string>
   icon: string
+  colorTag: string | null
   isFavorite: boolean
   isArchived: boolean
   createdAt: string | Date
@@ -119,6 +123,7 @@ export interface CreateLoreInput {
   content?: string
   attributes?: Record<string, string>
   icon?: string
+  colorTag?: string | null
 }
 
 export interface UpdateLoreInput {
@@ -129,6 +134,7 @@ export interface UpdateLoreInput {
   content?: string
   attributes?: Record<string, string>
   icon?: string
+  colorTag?: string | null
   isFavorite?: boolean
   isArchived?: boolean
 }

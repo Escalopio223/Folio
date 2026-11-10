@@ -187,6 +187,7 @@ defineExpose({
         v-if="isVisible && currentEntity"
         ref="floatingEl"
         class="fixed z-[120] w-72 max-w-[85vw] neu-surface rounded-2xl border border-[var(--groove-dark)]/70 shadow-2xl overflow-hidden p-3 select-none backdrop-blur-md bg-[var(--bg-surface)] text-[var(--text-primary)]"
+        :style="currentEntity.colorTag ? { borderLeftColor: currentEntity.colorTag, borderLeftWidth: '4px' } : {}"
         role="tooltip"
         @mouseenter="onPopoverMouseEnter"
         @mouseleave="onPopoverMouseLeave"
@@ -210,11 +211,19 @@ defineExpose({
               <h4 class="font-editorial font-bold text-sm text-[var(--text-primary)] truncate leading-tight">
                 {{ currentEntity.name }}
               </h4>
-              <span
-                class="inline-block text-[9px] font-mono uppercase tracking-wider text-[var(--accent)] font-semibold neu-well-sm px-1.5 py-0.2 rounded mt-0.5"
-              >
-                {{ currentEntity.category }}
-              </span>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span
+                  class="inline-block text-[9px] font-mono uppercase tracking-wider text-[var(--accent)] font-semibold neu-well-sm px-1.5 py-0.2 rounded"
+                >
+                  {{ currentEntity.category }}
+                </span>
+                <span
+                  v-if="currentEntity.colorTag"
+                  class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm border border-black/15"
+                  :style="{ backgroundColor: currentEntity.colorTag }"
+                  title="Etiqueta de color"
+                />
+              </div>
             </div>
           </div>
 

@@ -112,6 +112,10 @@ export const useLoreStore = defineStore('lore', () => {
     }
   }
 
+  async function setLoreColor(id: string, colorTag: string | null): Promise<LoreItem | null> {
+    return updateLore({ id, colorTag })
+  }
+
   async function moveToTrash(id: string): Promise<boolean> {
     const res = await updateLore({ id, isArchived: true })
     return Boolean(res)
@@ -167,6 +171,7 @@ export const useLoreStore = defineStore('lore', () => {
     fetchLore,
     createLore,
     updateLore,
+    setLoreColor,
     moveToTrash,
     restoreFromTrash,
     deletePermanently

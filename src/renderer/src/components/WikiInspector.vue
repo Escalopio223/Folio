@@ -24,6 +24,7 @@ import {
 } from 'lucide-vue-next'
 import type { LoreItem } from '@shared/types'
 import WorldRulesList from './rules/WorldRulesList.vue'
+import ColorTagPicker from './common/ColorTagPicker.vue'
 import { modKey } from '../utils/platform'
 
 const loreStore = useLoreStore()
@@ -44,6 +45,7 @@ interface CardEditState {
   attributes: Array<{ key: string; value: string }>
   newKey: string
   newValue: string
+  colorTag: string | null
   saveStatus: 'saved' | 'saving' | 'pending'
 }
 
@@ -70,6 +72,7 @@ function ensureDraft(item: LoreItem): CardEditState {
       attributes: Object.entries(item.attributes || {}).map(([key, value]) => ({ key, value })),
       newKey: '',
       newValue: '',
+      colorTag: item.colorTag || null,
       saveStatus: 'saved'
     }
   }
@@ -162,7 +165,8 @@ function triggerCardSave(itemId: string): void {
         category: targetDraft.category.trim() || 'general',
         summary: targetDraft.summary,
         content: targetDraft.content,
-        attributes: attrsObj
+        attributes: attrsObj,
+        colorTag: targetDraft.colorTag
       })
 
       targetDraft.saveStatus = 'saved'
@@ -219,6 +223,13 @@ async function handleDeleteLore(id: string): Promise<void> {
   delete cardDrafts[id]
 }
 
+async function handleUpdateLoreColor(id: string, colorTag: string | null): Promise<void> {
+  if (cardDrafts[id]) {
+    cardDrafts[id].colorTag = colorTag
+  }
+  await loreStore.setLoreColor(id, colorTag)
+}
+
 // Mantener drafts sincronizados si cambia el proyecto o se recarga
 watch(
   () => loreStore.items,
@@ -230,6 +241,7 @@ watch(
         d.category = item.category
         d.summary = item.summary || ''
         d.content = item.content || ''
+        d.colorTag = item.colorTag || null
         d.attributes = Object.entries(item.attributes || {}).map(([key, value]) => ({ key, value }))
       }
     }
@@ -366,12 +378,13 @@ watch(
         v-for="item in displayItems"
         :key="item.id"
         :id="'lore-card-' + item.id"
-        class="neu-surface overflow-hidden transition-all duration-200 border"
+        class="neu-surface overflow-hidden transition-all duration-200 border group"
         :class="
           isExpanded(item.id)
             ? 'border-l-4 border-l-[var(--accent)] border-t-[var(--groove-light)] border-r-[var(--groove-light)] border-b-[var(--groove-light)] shadow-md'
             : 'border-[var(--groove-light)] hover:border-[var(--accent)]/40'
         "
+        :style="item.colorTag ? { borderLeftColor: item.colorTag, borderLeftWidth: '4px' } : {}"
       >
         <!-- CABECERA DEL ACORDEÓN (Siempre visible, clic para colapsar/desplegar) -->
         <div
@@ -408,6 +421,17 @@ watch(
 
           <!-- Acciones de cabecera -->
           <div class="flex items-center gap-1 shrink-0" @click.stop>
+            <!-- Etiqueta de color / Categoría visual -->
+            <div :class="item.colorTag ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity'">
+              <ColorTagPicker
+                :model-value="item.colorTag"
+                align="right"
+                size="sm"
+                title="Etiqueta de color de la ficha"
+                @update:model-value="(newColor) => handleUpdateLoreColor(item.id, newColor)"
+              />
+            </div>
+
             <span
               v-if="Object.keys(item.attributes || {}).length > 0"
               class="text-[9px] font-mono px-1 py-0.5 rounded text-[var(--text-muted)] opacity-75"
@@ -459,7 +483,7 @@ watch(
                 @input="triggerCardSave(item.id)"
               />
 
-              <div class="flex items-center gap-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
                 <div class="neu-well-sm px-2 py-0.5 flex items-center gap-1 text-[10px] text-[var(--accent)] shrink-0">
                   <Tag :size="11" />
                   <input
@@ -471,11 +495,20 @@ watch(
                   />
                 </div>
 
+                <!-- Selector de etiqueta de color en ficha expandida -->
+                <ColorTagPicker
+                  :model-value="cardDrafts[item.id].colorTag"
+                  align="left"
+                  size="sm"
+                  title="Etiqueta de color"
+                  @update:model-value="(c) => { cardDrafts[item.id].colorTag = c; triggerCardSave(item.id); }"
+                />
+
                 <input
                   v-model="cardDrafts[item.id].summary"
                   type="text"
                   placeholder="Resumen o rol breve..."
-                  class="flex-1 text-[11px] italic text-[var(--text-secondary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50"
+                  class="flex-1 min-w-[130px] text-[11px] italic text-[var(--text-secondary)] bg-transparent border-none focus:outline-none placeholder:text-[var(--text-muted)]/50"
                   @input="triggerCardSave(item.id)"
                 />
               </div>
