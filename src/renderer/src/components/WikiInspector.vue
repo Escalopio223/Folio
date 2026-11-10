@@ -20,7 +20,8 @@ import {
   MapPin,
   Box,
   Lightbulb,
-  Sparkles
+  Sparkles,
+  GripVertical
 } from 'lucide-vue-next'
 import type { LoreItem } from '@shared/types'
 import WorldRulesList from './rules/WorldRulesList.vue'
@@ -35,6 +36,65 @@ const rulesStore = useRulesStore()
 // Búsqueda y Filtros
 const searchQuery = ref('')
 const expandedItemIds = reactive<Record<string, boolean>>({})
+
+// =========================================================================
+// DRAG & DROP DE FICHAS DE WIKI
+// =========================================================================
+const draggedLoreId = ref<string | null>(null)
+const dragOverLoreId = ref<string | null>(null)
+
+function onDragStartLore(e: DragEvent, loreId: string): void {
+  const target = e.target as HTMLElement | null
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    e.preventDefault()
+    return
+  }
+  draggedLoreId.value = loreId
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', loreId)
+  }
+}
+
+function onDragOverLore(e: DragEvent, loreId: string): void {
+  e.preventDefault()
+  if (draggedLoreId.value && draggedLoreId.value !== loreId) {
+    dragOverLoreId.value = loreId
+  }
+}
+
+function onDragLeaveLore(loreId: string): void {
+  if (dragOverLoreId.value === loreId) {
+    dragOverLoreId.value = null
+  }
+}
+
+async function onDropLore(e: DragEvent, targetLoreId: string): Promise<void> {
+  e.preventDefault()
+  const sourceId = draggedLoreId.value
+  draggedLoreId.value = null
+  dragOverLoreId.value = null
+
+  if (!sourceId || sourceId === targetLoreId) return
+
+  // Lista global de items para reordenar
+  const currentList = [...loreStore.items.map((i) => i.id)]
+  const sourceIdx = currentList.indexOf(sourceId)
+  const targetIdx = currentList.indexOf(targetLoreId)
+
+  if (sourceIdx === -1 || targetIdx === -1) return
+
+  currentList.splice(sourceIdx, 1)
+  const newTargetIdx = currentList.indexOf(targetLoreId)
+  currentList.splice(newTargetIdx, 0, sourceId)
+
+  await loreStore.reorderLore(currentList)
+}
+
+function onDragEndLore(): void {
+  draggedLoreId.value = null
+  dragOverLoreId.value = null
+}
 
 // Estado editable temporal por cada tarjeta abierta para autosave independiente
 interface CardEditState {
@@ -379,17 +439,25 @@ watch(
         :key="item.id"
         :id="'lore-card-' + item.id"
         class="neu-surface overflow-hidden transition-all duration-200 border group"
+        :draggable="!searchQuery.trim()"
         :class="[
           isExpanded(item.id)
             ? 'border-l-4 border-t-[var(--groove-light)] border-r-[var(--groove-light)] border-b-[var(--groove-light)] shadow-md'
             : 'border-[var(--groove-light)] hover:border-[var(--accent)]/40',
-          isExpanded(item.id) && !item.colorTag ? 'border-l-[var(--accent)]' : ''
+          isExpanded(item.id) && !item.colorTag ? 'border-l-[var(--accent)]' : '',
+          dragOverLoreId === item.id ? 'ring-2 ring-[var(--accent)]/60 scale-[1.01]' : '',
+          draggedLoreId === item.id ? 'opacity-50' : ''
         ]"
         :style="
           item.colorTag
             ? { borderLeftColor: `${item.colorTag} !important`, borderLeftWidth: '4px' }
             : {}
         "
+        @dragstart="onDragStartLore($event, item.id)"
+        @dragover="onDragOverLore($event, item.id)"
+        @dragleave="onDragLeaveLore(item.id)"
+        @drop="onDropLore($event, item.id)"
+        @dragend="onDragEndLore"
       >
         <!-- CABECERA DEL ACORDEÓN (Siempre visible, clic para colapsar/desplegar) -->
         <div
@@ -397,7 +465,15 @@ watch(
           :class="isExpanded(item.id) ? 'bg-[var(--bg-surface)]' : 'hover:bg-[var(--bg-base)]/40'"
           @click="toggleExpand(item)"
         >
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <!-- Drag handle -->
+            <GripVertical
+              :size="12"
+              class="text-[var(--text-muted)] opacity-40 group-hover:opacity-90 shrink-0 cursor-grab active:cursor-grabbing"
+              title="Arrastrar para reordenar ficha"
+              @click.stop
+            />
+
             <!-- Icono de categoría -->
             <div
               class="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[var(--accent)]"

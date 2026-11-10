@@ -55,6 +55,7 @@ export const loreItems = sqliteTable(
     attributes: text('attributes').notNull().default('{}'),
     icon: text('icon').default('User'),
     colorTag: text('color_tag'),
+    orderIndex: integer('order_index').notNull().default(0),
     isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -63,6 +64,7 @@ export const loreItems = sqliteTable(
   (table) => [
     index('idx_lore_project_id').on(table.projectId),
     index('idx_lore_category').on(table.category),
+    index('idx_lore_order_index').on(table.orderIndex),
     index('idx_lore_is_archived').on(table.isArchived)
   ]
 )

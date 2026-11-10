@@ -109,6 +109,7 @@ export interface LoreItem {
   attributes: Record<string, string>
   icon: string
   colorTag: string | null
+  orderIndex: number
   isFavorite: boolean
   isArchived: boolean
   createdAt: string | Date
@@ -124,6 +125,7 @@ export interface CreateLoreInput {
   attributes?: Record<string, string>
   icon?: string
   colorTag?: string | null
+  orderIndex?: number
 }
 
 export interface UpdateLoreInput {
@@ -135,6 +137,7 @@ export interface UpdateLoreInput {
   attributes?: Record<string, string>
   icon?: string
   colorTag?: string | null
+  orderIndex?: number
   isFavorite?: boolean
   isArchived?: boolean
 }
@@ -264,6 +267,7 @@ export interface FolioApi {
     getById: (id: string) => Promise<LoreItem | null>
     create: (input: CreateLoreInput) => Promise<LoreItem>
     update: (input: UpdateLoreInput) => Promise<LoreItem>
+    reorder: (ids: string[]) => Promise<boolean>
     restore: (id: string) => Promise<LoreItem>
     deletePermanent: (id: string) => Promise<boolean>
   }

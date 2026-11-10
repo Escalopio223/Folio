@@ -206,6 +206,7 @@ function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
     attributes: parsedAttrs,
     icon: row.icon || 'User',
     colorTag: row.colorTag ?? null,
+    orderIndex: row.orderIndex ?? 0,
     isFavorite: Boolean(row.isFavorite),
     isArchived: Boolean(row.isArchived),
     createdAt: row.createdAt,
@@ -284,6 +285,7 @@ export function initDatabase(): {
       attributes TEXT NOT NULL DEFAULT '{}',
       icon TEXT DEFAULT 'User',
       color_tag TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
       is_favorite INTEGER NOT NULL DEFAULT 0,
       is_archived INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -537,6 +539,12 @@ export function initDatabase(): {
     if (!loreCols.has('color_tag')) {
       sqliteInstance.exec('ALTER TABLE lore_items ADD COLUMN color_tag TEXT;')
     }
+    if (!loreCols.has('order_index')) {
+      sqliteInstance.exec(
+        'ALTER TABLE lore_items ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0;'
+      )
+      sqliteInstance.exec('UPDATE lore_items SET order_index = rowid WHERE order_index = 0;')
+    }
 
     const rulesCols = getTableCols('world_rules')
     if (!rulesCols.has('details')) {
@@ -603,6 +611,7 @@ export function initDatabase(): {
 
     CREATE INDEX IF NOT EXISTS idx_lore_project_id ON lore_items(project_id);
     CREATE INDEX IF NOT EXISTS idx_lore_category ON lore_items(category);
+    CREATE INDEX IF NOT EXISTS idx_lore_order_index ON lore_items(order_index);
     CREATE INDEX IF NOT EXISTS idx_lore_is_archived ON lore_items(is_archived);
 
     CREATE INDEX IF NOT EXISTS idx_scratchpad_project_id ON scratchpad_notes(project_id);
@@ -1113,7 +1122,7 @@ export function getAllLore(projectId?: string, category?: string): LoreItem[] {
     .select()
     .from(schema.loreItems)
     .where(and(...conditions))
-    .orderBy(desc(schema.loreItems.updatedAt))
+    .orderBy(asc(schema.loreItems.orderIndex), desc(schema.loreItems.updatedAt))
     .all()
 
   return rows.map(mapLoreItem)
@@ -1145,6 +1154,18 @@ export function createLore(input: CreateLoreInput): LoreItem {
   const now = new Date()
   const newId = crypto.randomUUID()
 
+  let orderIndex = input.orderIndex
+  if (orderIndex === undefined) {
+    const maxRow = db
+      .select({ maxOrder: schema.loreItems.orderIndex })
+      .from(schema.loreItems)
+      .where(eq(schema.loreItems.projectId, input.projectId))
+      .orderBy(desc(schema.loreItems.orderIndex))
+      .limit(1)
+      .get()
+    orderIndex = (maxRow?.maxOrder ?? 0) + 1
+  }
+
   const inserted = db
     .insert(schema.loreItems)
     .values({
@@ -1157,6 +1178,7 @@ export function createLore(input: CreateLoreInput): LoreItem {
       attributes: JSON.stringify(input.attributes || {}),
       icon: input.icon || 'User',
       colorTag: input.colorTag ?? null,
+      orderIndex,
       isFavorite: false,
       isArchived: false,
       createdAt: now,
@@ -1182,6 +1204,7 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
   if (input.attributes !== undefined) values.attributes = JSON.stringify(input.attributes)
   if (input.icon !== undefined) values.icon = input.icon
   if (input.colorTag !== undefined) values.colorTag = input.colorTag
+  if (input.orderIndex !== undefined) values.orderIndex = input.orderIndex
   if (input.isFavorite !== undefined) values.isFavorite = input.isFavorite
   if (input.isArchived !== undefined) values.isArchived = input.isArchived
 
@@ -1194,6 +1217,19 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
 
   if (!updated) throw new Error(`Registro ${input.id} no encontrado en la librería`)
   return mapLoreItem(updated)
+}
+
+export function reorderLore(ids: string[]): boolean {
+  const sqlite = getSqlite()
+  const stmt = sqlite.prepare('UPDATE lore_items SET order_index = ?, updated_at = ? WHERE id = ?')
+  const now = Date.now()
+  const tx = sqlite.transaction((loreIds: string[]) => {
+    for (let i = 0; i < loreIds.length; i++) {
+      stmt.run(i + 1, now, loreIds[i])
+    }
+  })
+  tx(ids)
+  return true
 }
 
 export function deleteLorePermanent(id: string): boolean {

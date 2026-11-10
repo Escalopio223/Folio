@@ -6,7 +6,8 @@ import {
   createLore,
   updateLore,
   restoreLore,
-  deleteLorePermanent
+  deleteLorePermanent,
+  reorderLore
 } from '../db'
 import type { CreateLoreInput, UpdateLoreInput } from '@shared/types'
 
@@ -52,5 +53,12 @@ export function registerLoreHandlers(): void {
       throw new Error('Valid lore ID is required for deletion')
     }
     return deleteLorePermanent(id)
+  })
+
+  ipcMain.handle('lore:reorder', async (_event, ids: string[]) => {
+    if (!Array.isArray(ids)) {
+      throw new Error('Valid lore IDs array is required for reordering')
+    }
+    return reorderLore(ids)
   })
 }

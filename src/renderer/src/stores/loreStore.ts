@@ -67,7 +67,7 @@ export const useLoreStore = defineStore('lore', () => {
     try {
       isLoading.value = true
       const created = await window.api.lore.create(input)
-      items.value.unshift(created)
+      items.value.push(created)
       selectLore(created.id)
       await useGoalsStore().checkAchievements()
       return created
@@ -114,6 +114,29 @@ export const useLoreStore = defineStore('lore', () => {
 
   async function setLoreColor(id: string, colorTag: string | null): Promise<LoreItem | null> {
     return updateLore({ id, colorTag })
+  }
+
+  async function reorderLore(orderedIds: string[]): Promise<boolean> {
+    try {
+      // Actualización optimista en memoria
+      const orderMap = new Map<string, number>()
+      orderedIds.forEach((id, idx) => {
+        orderMap.set(id, idx + 1)
+      })
+      items.value = items.value.map((item) => {
+        const nextOrder = orderMap.get(item.id)
+        if (nextOrder !== undefined) {
+          return { ...item, orderIndex: nextOrder }
+        }
+        return item
+      })
+      items.value.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+
+      return await window.api.lore.reorder(orderedIds)
+    } catch (err) {
+      console.error('[Lore Store] reorderLore failed:', err)
+      return false
+    }
   }
 
   async function moveToTrash(id: string): Promise<boolean> {
@@ -172,6 +195,7 @@ export const useLoreStore = defineStore('lore', () => {
     createLore,
     updateLore,
     setLoreColor,
+    reorderLore,
     moveToTrash,
     restoreFromTrash,
     deletePermanently

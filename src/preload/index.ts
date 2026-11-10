@@ -45,6 +45,7 @@ const api: FolioApi = {
     getById: (id: string): Promise<LoreItem | null> => ipcRenderer.invoke('lore:getById', id),
     create: (input: CreateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:create', input),
     update: (input: UpdateLoreInput): Promise<LoreItem> => ipcRenderer.invoke('lore:update', input),
+    reorder: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('lore:reorder', ids),
     restore: (id: string): Promise<LoreItem> => ipcRenderer.invoke('lore:restore', id),
     deletePermanent: (id: string): Promise<boolean> => ipcRenderer.invoke('lore:deletePermanent', id)
   },
