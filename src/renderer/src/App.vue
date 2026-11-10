@@ -12,6 +12,7 @@ import SessionGoalPromptModal from './components/goals/SessionGoalPromptModal.vu
 import AchievementToast from './components/goals/AchievementToast.vue'
 import ThemeCustomizerModal from './components/ThemeCustomizerModal.vue'
 import HelpGuideModal from './components/HelpGuideModal.vue'
+import GlobalContextMenu from './components/common/GlobalContextMenu.vue'
 import { Feather, Sparkles } from 'lucide-vue-next'
 import { modKey } from './utils/platform'
 
@@ -126,6 +127,9 @@ onBeforeUnmount(() => {
 
     <!-- Guia y Manual de Usuario / Atajos de Teclado (F1) -->
     <HelpGuideModal />
+
+    <!-- Menú Contextual Táctil Global (Clic Derecho en Windows y macOS: Copiar, Pegar, Cortar) -->
+    <GlobalContextMenu />
   </div>
 </template>
 

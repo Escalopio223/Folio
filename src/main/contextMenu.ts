@@ -1,11 +1,18 @@
-import { Menu, BrowserWindow, MenuItemConstructorOptions, clipboard } from 'electron'
+import { Menu, BrowserWindow, MenuItemConstructorOptions } from 'electron'
 
 /**
  * Configura el menú contextual nativo (clic derecho) para Windows y macOS,
  * asegurando la presencia y funcionamiento fluido de Copiar, Pegar, Cortar y Seleccionar todo.
+ *
+ * NOTA CRÍTICA: Este manejador DEBE ser 100% sincrónico. Cualquier llamada asíncrona (await)
+ * libera el loop de mensajes nativo de Windows (WM_CONTEXTMENU) / macOS antes de abrir el popup,
+ * provocando que el menú nunca aparezca en pantalla.
  */
 export function setupContextMenu(window: BrowserWindow): void {
-  window.webContents.on('context-menu', async (_event, params) => {
+  // Evitar listeners duplicados en la misma ventana
+  window.webContents.removeAllListeners('context-menu')
+
+  window.webContents.on('context-menu', (_event, params) => {
     const template: MenuItemConstructorOptions[] = []
 
     // 1. Sugerencias del corrector ortográfico si hay palabra marcada
@@ -26,7 +33,7 @@ export function setupContextMenu(window: BrowserWindow): void {
       template.push({ type: 'separator' })
     }
 
-    // 2. Cortar (disponible cuando el elemento es editable)
+    // 2. Cortar (disponible cuando el elemento es editable y hay texto seleccionado)
     if (params.isEditable) {
       template.push({
         label: 'Cortar',
@@ -47,19 +54,11 @@ export function setupContextMenu(window: BrowserWindow): void {
 
     // 4. Pegar (disponible en Windows y macOS con Ctrl+V / Cmd+V)
     if (params.isEditable) {
-      let hasClipboardContent = false
-      try {
-        const text = await clipboard.readText()
-        hasClipboardContent = text.length > 0
-      } catch {
-        hasClipboardContent = false
-      }
-
       template.push({
         label: 'Pegar',
         role: 'paste',
         accelerator: 'CmdOrCtrl+V',
-        enabled: params.editFlags.canPaste || hasClipboardContent
+        enabled: params.editFlags.canPaste
       })
     } else {
       template.push({
@@ -80,6 +79,6 @@ export function setupContextMenu(window: BrowserWindow): void {
     })
 
     const menu = Menu.buildFromTemplate(template)
-    menu.popup({ window })
+    menu.popup({ window, x: params.x, y: params.y })
   })
 }
