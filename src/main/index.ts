@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
+import { setupContextMenu } from './contextMenu'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -41,6 +42,9 @@ function createWindow(): BrowserWindow {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Activar menú contextual nativo (Copiar, Pegar, Cortar, Seleccionar todo)
+  setupContextMenu(mainWindow)
 
   return mainWindow
 }
@@ -80,6 +84,7 @@ app.whenReady().then(() => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+    setupContextMenu(window)
   })
 
   createWindow()
