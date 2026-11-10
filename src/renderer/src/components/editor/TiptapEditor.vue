@@ -13,6 +13,7 @@ import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
 import { BlockLineHeight } from './extensions/LineHeightExtension'
+import { DropCapExtension } from './extensions/DropCapExtension'
 import { SearchHighlight } from './extensions/SearchHighlight'
 import { CustomBulletList, CustomOrderedList } from './extensions/ListExtensions'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
@@ -187,6 +188,7 @@ const editor = useEditor({
     FocusMode,
     Indent,
     BlockLineHeight,
+    DropCapExtension,
     SearchHighlight,
     WikiAutoLink.configure({
       entities: props.wikiEntities,

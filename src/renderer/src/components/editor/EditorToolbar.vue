@@ -43,8 +43,8 @@ const props = defineProps<{
 
 const { spellcheckLang, detectedLang, setSpellcheckLanguage } = useSpellcheck()
 
-// Minimodales: Fuente, Color, Resaltado, Listas, Interlineado
-type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | 'lineHeight' | null
+// Minimodales: Fuente, Color, Resaltado, Listas, Interlineado, Letra Capitular
+type ActiveModal = 'font' | 'color' | 'highlight' | 'bulletList' | 'orderedList' | 'lineHeight' | 'dropCap' | null
 const activeModal = ref<ActiveModal>(null)
 
 // Referencias a los disparadores (botones en la barra)
@@ -54,6 +54,7 @@ const highlightTriggerRef = ref<HTMLElement | null>(null)
 const bulletTriggerRef = ref<HTMLElement | null>(null)
 const orderedTriggerRef = ref<HTMLElement | null>(null)
 const lineHeightTriggerRef = ref<HTMLElement | null>(null)
+const dropCapTriggerRef = ref<HTMLElement | null>(null)
 
 // Referencias a los popovers flotantes (teleportados al body)
 const fontPopoverRef = ref<HTMLElement | null>(null)
@@ -62,6 +63,7 @@ const highlightPopoverRef = ref<HTMLElement | null>(null)
 const bulletPopoverRef = ref<HTMLElement | null>(null)
 const orderedPopoverRef = ref<HTMLElement | null>(null)
 const lineHeightPopoverRef = ref<HTMLElement | null>(null)
+const dropCapPopoverRef = ref<HTMLElement | null>(null)
 
 const currentBodyFontSize = ref<number>(18)
 
@@ -113,6 +115,10 @@ function updateActiveFloating(): void {
       case 'orderedList':
         trigger = orderedTriggerRef.value
         popover = orderedPopoverRef.value
+        break
+      case 'dropCap':
+        trigger = dropCapTriggerRef.value
+        popover = dropCapPopoverRef.value
         break
     }
 
@@ -166,6 +172,10 @@ onClickOutside(orderedPopoverRef, (event) => {
 onClickOutside(lineHeightPopoverRef, (event) => {
   if (lineHeightTriggerRef.value?.contains(event.target as Node)) return
   if (activeModal.value === 'lineHeight') closeModal()
+})
+onClickOutside(dropCapPopoverRef, (event) => {
+  if (dropCapTriggerRef.value?.contains(event.target as Node)) return
+  if (activeModal.value === 'dropCap') closeModal()
 })
 
 function handleGlobalKeydown(e: KeyboardEvent): void {
@@ -535,6 +545,223 @@ function insertSceneBreak(): void {
   if (!props.editor) return
   props.editor.chain().focus().setSceneBreak().run()
 }
+
+// =========================================================================
+// LETRA CAPITULAR (DROP CAP) - CONFIGURACIÓN Y ESTILOS
+// =========================================================================
+const currentParagraphAttrs = computed(() => {
+  if (!props.editor) return null
+  return props.editor.getAttributes('paragraph')
+})
+
+const isCurrentParagraphDropCap = computed<boolean>(() => {
+  if (!props.editor) return false
+  const attrs = props.editor.getAttributes('paragraph')
+  return Boolean(attrs.dropCap)
+})
+
+const selectedDropCapStyle = ref<string>('classic')
+const selectedDropCapFont = ref<string>('Cinzel Decorative')
+const selectedDropCapLines = ref<number>(3)
+const selectedDropCapColor = ref<string>('')
+
+// Extraer la primera letra del párrafo activo para previsualización interactiva
+const currentFirstLetter = computed<string>(() => {
+  if (!props.editor) return 'A'
+  const { state } = props.editor
+  const { selection } = state
+  for (let d = selection.$from.depth; d > 0; d--) {
+    const node = selection.$from.node(d)
+    if (node.type.name === 'paragraph') {
+      const cleanText = node.textContent?.trim()
+      if (cleanText && cleanText.length > 0) {
+        return cleanText[0].toUpperCase()
+      }
+      break
+    }
+  }
+  return 'A'
+})
+
+watch(
+  () => currentParagraphAttrs.value,
+  (attrs) => {
+    if (attrs && attrs.dropCap) {
+      if (attrs.dropCapStyle) selectedDropCapStyle.value = attrs.dropCapStyle
+      if (attrs.dropCapFont) selectedDropCapFont.value = attrs.dropCapFont
+      if (attrs.dropCapLines) selectedDropCapLines.value = Number(attrs.dropCapLines) || 3
+      if (attrs.dropCapColor !== undefined) selectedDropCapColor.value = attrs.dropCapColor || ''
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+function toggleDropCapCheckbox(event: Event): void {
+  if (!props.editor) return
+  const target = event.target as HTMLInputElement
+  const checked = target.checked
+  if (checked) {
+    props.editor
+      .chain()
+      .focus()
+      .setDropCap({
+        style: selectedDropCapStyle.value,
+        font: selectedDropCapFont.value,
+        lines: selectedDropCapLines.value,
+        color: selectedDropCapColor.value
+      })
+      .run()
+  } else {
+    props.editor.chain().focus().unsetDropCap().run()
+  }
+}
+
+function applyDropCapStyle(style: string): void {
+  selectedDropCapStyle.value = style
+  if (!props.editor) return
+  props.editor
+    .chain()
+    .focus()
+    .setDropCap({
+      style,
+      font: selectedDropCapFont.value,
+      lines: selectedDropCapLines.value,
+      color: selectedDropCapColor.value
+    })
+    .run()
+}
+
+function applyDropCapFont(font: string): void {
+  selectedDropCapFont.value = font
+  if (!props.editor) return
+  props.editor
+    .chain()
+    .focus()
+    .setDropCap({
+      style: selectedDropCapStyle.value,
+      font,
+      lines: selectedDropCapLines.value,
+      color: selectedDropCapColor.value
+    })
+    .run()
+}
+
+function applyDropCapLines(lines: number): void {
+  selectedDropCapLines.value = lines
+  if (!props.editor) return
+  props.editor
+    .chain()
+    .focus()
+    .setDropCap({
+      style: selectedDropCapStyle.value,
+      font: selectedDropCapFont.value,
+      lines,
+      color: selectedDropCapColor.value
+    })
+    .run()
+}
+
+function applyDropCapColor(color: string): void {
+  selectedDropCapColor.value = color
+  if (!props.editor) return
+  props.editor
+    .chain()
+    .focus()
+    .setDropCap({
+      style: selectedDropCapStyle.value,
+      font: selectedDropCapFont.value,
+      lines: selectedDropCapLines.value,
+      color
+    })
+    .run()
+}
+
+const dropCapStyleOptions = [
+  {
+    value: 'classic',
+    label: 'Clásica',
+    desc: 'Editorial sobria',
+    previewClass: 'text-[var(--text-primary)]'
+  },
+  {
+    value: 'terracotta',
+    label: 'Terracota',
+    desc: 'Color distintivo Folio',
+    previewClass: 'text-[var(--accent)] font-semibold'
+  },
+  {
+    value: 'boxed',
+    label: 'Enmarcada',
+    desc: 'Recuadro neumórfico',
+    previewClass: 'neu-well-sm border border-[var(--groove-dark)]/80 text-[var(--accent)] shadow-inner'
+  },
+  {
+    value: 'illuminated',
+    label: 'Iluminada',
+    desc: 'Manuscrito cálido dorado',
+    previewClass: 'bg-gradient-to-br from-[var(--accent)]/20 to-[var(--bg-surface)] border border-[var(--accent)] text-[var(--accent)] shadow-sm'
+  },
+  {
+    value: 'gothic',
+    label: 'Gótica Relieve',
+    desc: 'Sombra monumental',
+    previewClass: 'text-[var(--text-primary)] drop-shadow-[2px_2px_0px_color-mix(in_oklab,var(--accent)_45%,transparent)]'
+  }
+]
+
+const dropCapFontOptions = [
+  {
+    label: 'Cinzel Decorative',
+    value: 'Cinzel Decorative',
+    fontFamily: "'Cinzel Decorative', serif",
+    category: 'Ornada Clásica'
+  },
+  {
+    label: 'Playfair Display',
+    value: 'Playfair Display',
+    fontFamily: "'Playfair Display', serif",
+    category: 'Elegante Cursiva'
+  },
+  {
+    label: 'Unifraktur (Gótica)',
+    value: 'UnifrakturMaguntia',
+    fontFamily: "'UnifrakturMaguntia', serif",
+    category: 'Medieval Manuscrito'
+  },
+  {
+    label: 'Cinzel Imperial',
+    value: 'Cinzel',
+    fontFamily: "'Cinzel', serif",
+    category: 'Grabado Romano'
+  },
+  {
+    label: 'EB Garamond',
+    value: 'EB Garamond',
+    fontFamily: "'EB Garamond', Georgia, serif",
+    category: 'Renacentista'
+  },
+  {
+    label: 'Newsreader',
+    value: 'Newsreader',
+    fontFamily: "'Newsreader', Georgia, serif",
+    category: 'Editorial Moderna'
+  }
+]
+
+const dropCapLineOptions = [
+  { lines: 2, label: '2 lín', desc: 'Discreta' },
+  { lines: 3, label: '3 lín', desc: 'Estándar' },
+  { lines: 4, label: '4 lín', desc: 'Monumental' }
+]
+
+const dropCapColorOptions = [
+  { value: '', label: 'Texto', bg: 'var(--text-primary)' },
+  { value: 'accent', label: 'Terracota', bg: 'var(--accent)' },
+  { value: 'gold', label: 'Oro', bg: '#b48228' },
+  { value: 'crimson', label: 'Carmesí', bg: '#9f1239' },
+  { value: 'navy', label: 'Azul', bg: '#1e3a8a' },
+  { value: 'emerald', label: 'Esmeralda', bg: '#065f46' }
+]
 </script>
 
 <template>
@@ -1069,6 +1296,191 @@ function insertSceneBreak(): void {
                 >
                   Restablecer
                 </button>
+              </div>
+            </div>
+          </Transition>
+        </Teleport>
+      </div>
+
+      <div class="neu-groove-v h-4 my-auto shrink-0 mx-0.5"></div>
+
+      <!-- Letra Capitular (Drop Cap) con selector de estilo, fuentes y líneas -->
+      <div ref="dropCapTriggerRef" class="relative shrink-0 flex items-center">
+        <button
+          type="button"
+          class="neu-btn px-2 h-7 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+          :class="{ 'neu-well !text-[var(--accent)] font-semibold': isCurrentParagraphDropCap || activeModal === 'dropCap' }"
+          title="Letra capitular: destacar la primera letra del párrafo con estilo y tipografía"
+          @mousedown.prevent
+          @click="toggleModal('dropCap')"
+        >
+          <span class="font-editorial font-bold text-sm text-[var(--accent)] leading-none select-none">A</span>
+          <span class="text-[11px] font-mono font-medium hidden md:inline">Capitular</span>
+          <ChevronDown :size="10" class="opacity-70" />
+        </button>
+
+        <!-- Minimodal Flotante de Letra Capitular -->
+        <Teleport to="body">
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
+          >
+            <div
+              v-if="activeModal === 'dropCap'"
+              ref="dropCapPopoverRef"
+              class="fixed z-[9999] neu-surface p-3 min-w-[285px] max-w-[325px] shadow-2xl rounded-2xl border border-[var(--groove-dark)]/60 backdrop-blur-lg bg-[var(--bg-surface)] flex flex-col gap-2.5 text-[var(--text-primary)] select-none"
+              @click.stop
+            >
+              <!-- 1. Checkbox principal de activación -->
+              <label class="flex items-center justify-between p-2 rounded-xl neu-well-sm cursor-pointer select-none group transition-colors">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="isCurrentParagraphDropCap"
+                    class="w-4 h-4 accent-[var(--accent)] rounded cursor-pointer"
+                    @change="toggleDropCapCheckbox"
+                  />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                      Letra capitular
+                    </span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono leading-tight">
+                      Aplica al inicio del párrafo actual
+                    </span>
+                  </div>
+                </div>
+                <span
+                  class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded transition-colors"
+                  :class="isCurrentParagraphDropCap ? 'neu-well text-[var(--accent)]' : 'text-[var(--text-muted)] opacity-60'"
+                >
+                  {{ isCurrentParagraphDropCap ? 'ACTIVA' : 'OFF' }}
+                </span>
+              </label>
+
+              <!-- 2. Previsualización dinámica de la capitular -->
+              <div class="neu-well p-2.5 rounded-xl flex items-center gap-3">
+                <div
+                  class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 border border-[var(--groove-dark)]/30 transition-all"
+                  :class="dropCapStyleOptions.find((s) => s.value === selectedDropCapStyle)?.previewClass"
+                  :style="{
+                    color: selectedDropCapColor ? (selectedDropCapColor === 'accent' ? 'var(--accent)' : selectedDropCapColor) : undefined
+                  }"
+                >
+                  <span
+                    class="text-3xl font-bold leading-none select-none transition-all"
+                    :style="{
+                      fontFamily: dropCapFontOptions.find((f) => f.value === selectedDropCapFont)?.fontFamily || 'Cinzel Decorative'
+                    }"
+                  >
+                    {{ currentFirstLetter }}
+                  </span>
+                </div>
+                <div class="min-w-0 flex-1 text-xs">
+                  <div class="font-bold text-[var(--text-primary)] truncate">
+                    {{ dropCapFontOptions.find((f) => f.value === selectedDropCapFont)?.label || selectedDropCapFont }}
+                  </div>
+                  <div class="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">
+                    Estilo {{ dropCapStyleOptions.find((s) => s.value === selectedDropCapStyle)?.label }} · {{ selectedDropCapLines }} líneas
+                  </div>
+                  <div class="text-[9px] text-[var(--accent)] font-editorial italic mt-0.5">
+                    {{ isCurrentParagraphDropCap ? 'Modifica en vivo el párrafo' : 'Marca la casilla para activar' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. Selección de Estilos Visuales -->
+              <div class="space-y-1">
+                <div class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                  Estilo Decorativo
+                </div>
+                <div class="grid grid-cols-2 gap-1">
+                  <button
+                    v-for="st in dropCapStyleOptions"
+                    :key="st.value"
+                    type="button"
+                    class="px-2 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer flex items-center gap-1.5"
+                    :class="
+                      selectedDropCapStyle === st.value
+                        ? 'neu-well text-[var(--accent)] font-bold'
+                        : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                    "
+                    @mousedown.prevent
+                    @click="applyDropCapStyle(st.value)"
+                  >
+                    <span class="w-2 h-2 rounded-full shrink-0" :class="selectedDropCapStyle === st.value ? 'bg-[var(--accent)]' : 'bg-[var(--groove-dark)]'"></span>
+                    <span class="truncate text-[11px] font-medium">{{ st.label }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4. Selección de Tipografía -->
+              <div class="space-y-1 pt-1 border-t border-[var(--groove-dark)]/30">
+                <div class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                  Fuente de la Capitular
+                </div>
+                <div class="grid grid-cols-2 gap-1 max-h-[140px] overflow-y-auto editorial-scrollbar pr-0.5">
+                  <button
+                    v-for="f in dropCapFontOptions"
+                    :key="f.value"
+                    type="button"
+                    class="px-2 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer flex flex-col min-w-0"
+                    :class="
+                      selectedDropCapFont === f.value
+                        ? 'neu-well text-[var(--accent)] font-bold'
+                        : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                    "
+                    @mousedown.prevent
+                    @click="applyDropCapFont(f.value)"
+                  >
+                    <span class="text-xs truncate font-medium" :style="{ fontFamily: f.fontFamily }">
+                      {{ f.label }}
+                    </span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono leading-none mt-0.5">
+                      {{ f.category }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 5. Altura en Líneas & Color -->
+              <div class="pt-1 border-t border-[var(--groove-dark)]/30 flex items-center justify-between gap-2">
+                <!-- Altura en líneas -->
+                <div class="flex items-center gap-1">
+                  <span class="text-[9px] font-mono uppercase text-[var(--text-muted)]">Líneas:</span>
+                  <div class="flex items-center neu-well-sm p-0.5 rounded-lg gap-0.5">
+                    <button
+                      v-for="l in dropCapLineOptions"
+                      :key="l.lines"
+                      type="button"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-all"
+                      :class="selectedDropCapLines === l.lines ? 'neu-well font-bold text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                      :title="`${l.lines} líneas (${l.desc})`"
+                      @mousedown.prevent
+                      @click="applyDropCapLines(l.lines)"
+                    >
+                      {{ l.lines }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Paleta de Color -->
+                <div class="flex items-center gap-1">
+                  <button
+                    v-for="c in dropCapColorOptions"
+                    :key="c.value"
+                    type="button"
+                    class="w-4 h-4 rounded-full border border-black/20 cursor-pointer transition-transform hover:scale-125"
+                    :class="{ 'ring-2 ring-[var(--accent)] ring-offset-1': selectedDropCapColor === c.value }"
+                    :style="{ backgroundColor: c.bg }"
+                    :title="c.label"
+                    @mousedown.prevent
+                    @click="applyDropCapColor(c.value)"
+                  />
+                </div>
               </div>
             </div>
           </Transition>

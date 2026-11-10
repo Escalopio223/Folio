@@ -661,6 +661,34 @@ export async function exportManuscriptToPdf(manuscript: CompiledManuscript): Pro
       text-indent: 0;
       text-align: left;
     }
+    .chapter-body p[data-drop-cap="true"]::first-letter,
+    .chapter-body p.has-drop-cap::first-letter {
+      float: left;
+      font-size: 3.2em;
+      line-height: 0.82;
+      margin-right: 0.14em;
+      margin-top: 0.05em;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+    }
+    .chapter-body p[data-drop-cap-lines="2"]::first-letter { font-size: 2.3em; }
+    .chapter-body p[data-drop-cap-lines="4"]::first-letter { font-size: 4.2em; }
+    .chapter-body p[data-drop-cap-style="terracotta"]::first-letter { color: #c2593f; }
+    .chapter-body p[data-drop-cap-style="boxed"]::first-letter {
+      padding: 0.06em 0.16em;
+      margin-right: 0.20em;
+      border: 1pt solid #c2593f;
+      color: #c2593f;
+      background-color: #faf7f2;
+    }
+    .chapter-body p[data-drop-cap-style="illuminated"]::first-letter {
+      padding: 0.06em 0.18em;
+      margin-right: 0.22em;
+      border: 1.5pt solid #b48228;
+      color: #b48228;
+      background-color: #fdfaf0;
+    }
   </style>
 </head>
 <body>

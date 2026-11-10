@@ -504,3 +504,153 @@ textarea,
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35) !important;
   transform: translateY(0.5px);
 }
+
+/* =========================================================================
+   LETRA CAPITULAR (DROP CAP) EDITORIAL
+   ========================================================================= */
+
+.ProseMirror p[data-drop-cap="true"]::first-letter,
+.ProseMirror p.has-drop-cap::first-letter,
+.editorial-preview p[data-drop-cap="true"]::first-letter,
+.editorial-preview p.has-drop-cap::first-letter {
+  float: left;
+  line-height: 0.82;
+  margin-right: 0.14em;
+  margin-top: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Tamaños de Capitular según número de líneas */
+.ProseMirror p[data-drop-cap-lines="2"]::first-letter,
+.editorial-preview p[data-drop-cap-lines="2"]::first-letter {
+  font-size: 2.3em;
+  line-height: 0.85;
+  margin-right: 0.12em;
+}
+
+.ProseMirror p[data-drop-cap-lines="3"]::first-letter,
+.ProseMirror p[data-drop-cap="true"]:not([data-drop-cap-lines])::first-letter,
+.editorial-preview p[data-drop-cap-lines="3"]::first-letter,
+.editorial-preview p[data-drop-cap="true"]:not([data-drop-cap-lines])::first-letter {
+  font-size: 3.35em;
+  line-height: 0.82;
+  margin-right: 0.14em;
+}
+
+.ProseMirror p[data-drop-cap-lines="4"]::first-letter,
+.editorial-preview p[data-drop-cap-lines="4"]::first-letter {
+  font-size: 4.4em;
+  line-height: 0.80;
+  margin-right: 0.16em;
+}
+
+/* Tipografías de la Capitular */
+.ProseMirror p[data-drop-cap-font*="Cinzel Decorative"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Cinzel Decorative"]::first-letter {
+  font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+}
+
+.ProseMirror p[data-drop-cap-font*="Playfair"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Playfair"]::first-letter {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+}
+
+.ProseMirror p[data-drop-cap-font*="Unifraktur"]::first-letter,
+.ProseMirror p[data-drop-cap-font*="Gothic"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Unifraktur"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Gothic"]::first-letter {
+  font-family: 'UnifrakturMaguntia', 'Cinzel Decorative', Georgia, serif;
+  font-size: 3.6em;
+  line-height: 0.76;
+}
+
+.ProseMirror p[data-drop-cap-font*="Cinzel"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Cinzel"]::first-letter {
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  letter-spacing: 0.04em;
+}
+
+.ProseMirror p[data-drop-cap-font*="Garamond"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Garamond"]::first-letter {
+  font-family: 'EB Garamond', Garamond, Georgia, serif;
+}
+
+.ProseMirror p[data-drop-cap-font*="Newsreader"]::first-letter,
+.editorial-preview p[data-drop-cap-font*="Newsreader"]::first-letter {
+  font-family: 'Newsreader', 'Playfair Display', Georgia, serif;
+}
+
+/* Estilos Visuales de la Capitular */
+/* 1. Clásica Editorial */
+.ProseMirror p[data-drop-cap-style="classic"]::first-letter,
+.editorial-preview p[data-drop-cap-style="classic"]::first-letter {
+  color: var(--text-primary);
+}
+
+/* 2. Terracota (Color insignia de Folio) */
+.ProseMirror p[data-drop-cap-style="terracotta"]::first-letter,
+.editorial-preview p[data-drop-cap-style="terracotta"]::first-letter {
+  color: var(--accent);
+}
+
+/* 3. Enmarcada / Recuadro Neumórfico */
+.ProseMirror p[data-drop-cap-style="boxed"]::first-letter,
+.editorial-preview p[data-drop-cap-style="boxed"]::first-letter {
+  padding: 0.06em 0.16em;
+  margin-right: 0.20em;
+  margin-top: 0.04em;
+  border-radius: 0.18em;
+  background-color: var(--bg-surface);
+  border: 1px solid color-mix(in oklab, var(--groove-dark) 80%, transparent);
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.08), -2px -2px 5px rgba(255, 255, 255, 0.6);
+  color: var(--accent);
+}
+
+/* 4. Iluminada / Manuscrito Dorado */
+.ProseMirror p[data-drop-cap-style="illuminated"]::first-letter,
+.editorial-preview p[data-drop-cap-style="illuminated"]::first-letter {
+  padding: 0.06em 0.18em;
+  margin-right: 0.22em;
+  margin-top: 0.04em;
+  border-radius: 0.18em;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 22%, var(--bg-surface)), var(--bg-surface));
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* 5. Gótica con Sombra en Relieve */
+.ProseMirror p[data-drop-cap-style="gothic"]::first-letter,
+.editorial-preview p[data-drop-cap-style="gothic"]::first-letter {
+  color: var(--text-primary);
+  text-shadow: 2px 2px 0px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* Variaciones de Color Específicas */
+.ProseMirror p[data-drop-cap-color="accent"]::first-letter,
+.editorial-preview p[data-drop-cap-color="accent"]::first-letter {
+  color: var(--accent) !important;
+}
+
+.ProseMirror p[data-drop-cap-color="gold"]::first-letter,
+.editorial-preview p[data-drop-cap-color="gold"]::first-letter {
+  color: #b48228 !important;
+}
+
+.ProseMirror p[data-drop-cap-color="crimson"]::first-letter,
+.editorial-preview p[data-drop-cap-color="crimson"]::first-letter {
+  color: #9f1239 !important;
+}
+
+.ProseMirror p[data-drop-cap-color="navy"]::first-letter,
+.editorial-preview p[data-drop-cap-color="navy"]::first-letter {
+  color: #1e3a8a !important;
+}
+
+.ProseMirror p[data-drop-cap-color="emerald"]::first-letter,
+.editorial-preview p[data-drop-cap-color="emerald"]::first-letter {
+  color: #065f46 !important;
+}
+
