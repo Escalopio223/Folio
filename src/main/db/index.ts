@@ -196,11 +196,27 @@ function mapLoreItem(row: schema.LoreItemSelect): LoreItem {
     parsedAttrs = {}
   }
 
+  let parsedAliases: string[] = []
+  try {
+    const rawAliases = (row as any).aliases
+    if (typeof rawAliases === 'string') {
+      const parsed = JSON.parse(rawAliases)
+      if (Array.isArray(parsed)) {
+        parsedAliases = parsed.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+      }
+    } else if (Array.isArray(rawAliases)) {
+      parsedAliases = rawAliases.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+    }
+  } catch {
+    parsedAliases = []
+  }
+
   return {
     id: row.id,
     projectId: row.projectId,
     category: row.category,
     name: row.name,
+    aliases: parsedAliases,
     summary: row.summary,
     content: row.content,
     attributes: parsedAttrs,
@@ -536,6 +552,9 @@ export function initDatabase(): {
     }
 
     const loreCols = getTableCols('lore_items')
+    if (!loreCols.has('aliases')) {
+      sqliteInstance.exec("ALTER TABLE lore_items ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]';")
+    }
     if (!loreCols.has('color_tag')) {
       sqliteInstance.exec('ALTER TABLE lore_items ADD COLUMN color_tag TEXT;')
     }
@@ -1173,6 +1192,11 @@ export function createLore(input: CreateLoreInput): LoreItem {
       projectId: input.projectId,
       category: input.category.toLowerCase().trim() || 'personaje',
       name: input.name.trim() || 'Nuevo Registro',
+      aliases: JSON.stringify(
+        Array.isArray(input.aliases)
+          ? input.aliases.map((s) => String(s).trim()).filter(Boolean)
+          : []
+      ),
       summary: input.summary?.trim() || '',
       content: input.content ?? '',
       attributes: JSON.stringify(input.attributes || {}),
@@ -1199,6 +1223,13 @@ export function updateLore(input: UpdateLoreInput): LoreItem {
   }
   if (input.category !== undefined) values.category = input.category.toLowerCase().trim()
   if (input.name !== undefined) values.name = input.name
+  if (input.aliases !== undefined) {
+    values.aliases = JSON.stringify(
+      Array.isArray(input.aliases)
+        ? input.aliases.map((s) => String(s).trim()).filter(Boolean)
+        : []
+    )
+  }
   if (input.summary !== undefined) values.summary = input.summary
   if (input.content !== undefined) values.content = input.content
   if (input.attributes !== undefined) values.attributes = JSON.stringify(input.attributes)

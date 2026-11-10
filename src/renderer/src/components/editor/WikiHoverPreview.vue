@@ -257,6 +257,23 @@ defineExpose({
           </p>
         </div>
 
+        <!-- Alias si existen -->
+        <div
+          v-if="currentEntity.aliases && currentEntity.aliases.length > 0"
+          class="flex items-center gap-1 flex-wrap pt-1.5 border-t border-[var(--groove-dark)]/20 mt-1"
+        >
+          <span class="text-[9px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-semibold shrink-0">
+            Alias:
+          </span>
+          <span
+            v-for="alias in currentEntity.aliases"
+            :key="alias"
+            class="inline-block text-[9px] font-mono neu-well-sm px-1.5 py-0.2 rounded text-[var(--text-secondary)]"
+          >
+            {{ alias }}
+          </span>
+        </div>
+
         <!-- Atributos rápidos si existen -->
         <div
           v-if="currentEntity.attributes && Object.keys(currentEntity.attributes).length > 0"

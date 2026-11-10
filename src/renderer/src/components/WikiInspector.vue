@@ -102,6 +102,8 @@ interface CardEditState {
   category: string
   summary: string
   content: string
+  aliases: string[]
+  newAlias: string
   attributes: Array<{ key: string; value: string }>
   newKey: string
   newValue: string
@@ -129,6 +131,8 @@ function ensureDraft(item: LoreItem): CardEditState {
       category: item.category,
       summary: item.summary || '',
       content: item.content || '',
+      aliases: Array.isArray(item.aliases) ? [...item.aliases] : [],
+      newAlias: '',
       attributes: Object.entries(item.attributes || {}).map(([key, value]) => ({ key, value })),
       newKey: '',
       newValue: '',
@@ -147,13 +151,14 @@ const displayItems = computed<LoreItem[]>(() => {
   if (q) {
     list = list.filter((item) => {
       const matchName = item.name.toLowerCase().includes(q)
+      const matchAliases = (item.aliases || []).some((a) => a.toLowerCase().includes(q))
       const matchCat = item.category.toLowerCase().includes(q)
       const matchSummary = (item.summary || '').toLowerCase().includes(q)
       const matchContent = (item.content || '').toLowerCase().includes(q)
       const matchAttr = Object.entries(item.attributes || {}).some(
         ([k, v]) => k.toLowerCase().includes(q) || v.toLowerCase().includes(q)
       )
-      return matchName || matchCat || matchSummary || matchContent || matchAttr
+      return matchName || matchAliases || matchCat || matchSummary || matchContent || matchAttr
     })
   }
 
@@ -225,6 +230,7 @@ function triggerCardSave(itemId: string): void {
         category: targetDraft.category.trim() || 'general',
         summary: targetDraft.summary,
         content: targetDraft.content,
+        aliases: targetDraft.aliases,
         attributes: attrsObj,
         colorTag: targetDraft.colorTag
       })
@@ -234,6 +240,34 @@ function triggerCardSave(itemId: string): void {
   }
 
   saveQueue[itemId]()
+}
+
+function handleAddAlias(item: LoreItem): void {
+  const draft = ensureDraft(item)
+  const raw = draft.newAlias.trim()
+  if (!raw) return
+
+  // Permitir agregar múltiples alias separados por comas, punto y coma o saltos de línea (ej. Dani, Daniiii, D)
+  const parts = raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+  let changed = false
+  for (const p of parts) {
+    const isDuplicate = draft.aliases.some((a) => a.toLowerCase() === p.toLowerCase())
+    const isMainName = draft.name.trim().toLowerCase() === p.toLowerCase()
+    if (!isDuplicate && !isMainName) {
+      draft.aliases.push(p)
+      changed = true
+    }
+  }
+  draft.newAlias = ''
+  if (changed) {
+    triggerCardSave(item.id)
+  }
+}
+
+function handleRemoveAlias(item: LoreItem, index: number): void {
+  const draft = ensureDraft(item)
+  draft.aliases.splice(index, 1)
+  triggerCardSave(item.id)
 }
 
 function handleAddAttribute(item: LoreItem): void {
@@ -265,6 +299,7 @@ async function handleCreateLore(): Promise<void> {
     projectId: projectStore.activeProjectId,
     category: defaultCategory,
     name: 'Nueva Entrada Wiki',
+    aliases: [],
     summary: '',
     content: ''
   })
@@ -274,6 +309,7 @@ async function handleCreateLore(): Promise<void> {
     const draft = ensureDraft(created)
     draft.name = created.name
     draft.category = created.category
+    draft.aliases = []
   }
 }
 
@@ -302,6 +338,7 @@ watch(
         d.summary = item.summary || ''
         d.content = item.content || ''
         d.colorTag = item.colorTag || null
+        d.aliases = Array.isArray(item.aliases) ? [...item.aliases] : []
         d.attributes = Object.entries(item.attributes || {}).map(([key, value]) => ({ key, value }))
       }
     }
@@ -492,10 +529,14 @@ watch(
                 </span>
               </div>
               <p
-                v-if="!isExpanded(item.id) && item.summary"
-                class="text-[10px] text-[var(--text-muted)] truncate mt-0.5 italic"
+                v-if="!isExpanded(item.id) && (item.summary || (item.aliases && item.aliases.length > 0))"
+                class="text-[10px] text-[var(--text-muted)] truncate mt-0.5"
               >
-                {{ item.summary }}
+                <span v-if="item.summary" class="italic">{{ item.summary }}</span>
+                <span v-if="item.summary && item.aliases && item.aliases.length > 0" class="mx-1 opacity-50">·</span>
+                <span v-if="item.aliases && item.aliases.length > 0" class="font-mono text-[9px] text-[var(--accent)]/90">
+                  Alias: {{ item.aliases.join(', ') }}
+                </span>
               </p>
             </div>
           </div>
@@ -512,6 +553,14 @@ watch(
                 @update:model-value="(newColor) => handleUpdateLoreColor(item.id, newColor)"
               />
             </div>
+
+            <span
+              v-if="item.aliases && item.aliases.length > 0"
+              class="text-[9px] font-mono px-1 py-0.5 rounded text-[var(--accent)] opacity-85 neu-well-sm"
+              title="Alias configurados"
+            >
+              {{ item.aliases.length }} alias
+            </span>
 
             <span
               v-if="Object.keys(item.attributes || {}).length > 0"
@@ -593,6 +642,62 @@ watch(
                   @input="triggerCardSave(item.id)"
                 />
               </div>
+            </div>
+
+            <!-- Sección de Alias y Nombres Alternativos (Activa autolink en el editor) -->
+            <div class="neu-well p-2.5 space-y-2 rounded-lg">
+              <div class="flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
+                <span class="flex items-center gap-1 font-semibold text-[var(--text-secondary)]">
+                  <Sparkles :size="11" class="text-[var(--accent)]" />
+                  <span>Alias & Nombres Alternativos</span>
+                </span>
+                <span>{{ cardDrafts[item.id].aliases.length }} alias</span>
+              </div>
+
+              <!-- Chips de alias existentes -->
+              <div
+                v-if="cardDrafts[item.id].aliases.length > 0"
+                class="flex flex-wrap gap-1.5"
+              >
+                <div
+                  v-for="(alias, aIdx) in cardDrafts[item.id].aliases"
+                  :key="aIdx"
+                  class="neu-well-sm px-2 py-0.5 text-[11px] flex items-center gap-1.5 group bg-[var(--bg-surface)] rounded-md border border-[var(--groove-dark)]/40"
+                >
+                  <span class="text-[var(--text-primary)] font-mono text-[11px] font-medium">{{ alias }}</span>
+                  <button
+                    type="button"
+                    class="text-[var(--text-muted)] hover:text-rose-400 opacity-60 group-hover:opacity-100 transition-opacity ml-0.5 cursor-pointer"
+                    title="Eliminar alias"
+                    @click="handleRemoveAlias(item, aIdx)"
+                  >
+                    <X :size="10" />
+                  </button>
+                </div>
+              </div>
+
+              <!-- Input para agregar alias -->
+              <div class="flex items-center gap-1.5 pt-0.5">
+                <input
+                  v-model="cardDrafts[item.id].newAlias"
+                  type="text"
+                  placeholder="Nuevo alias (ej. Dani, Daniiii, D) + Enter"
+                  class="neu-well-sm px-2 py-1 text-[11px] bg-transparent border-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/50 focus:outline-none flex-1 min-w-0 font-mono"
+                  @keydown.enter.prevent="handleAddAlias(item)"
+                />
+                <button
+                  type="button"
+                  class="neu-btn px-2 py-1 text-[10px] text-[var(--accent)] font-semibold flex items-center gap-0.5 shrink-0 cursor-pointer active:scale-95"
+                  title="Añadir alias a esta ficha"
+                  @click="handleAddAlias(item)"
+                >
+                  <Plus :size="10" />
+                  <span>Añadir</span>
+                </button>
+              </div>
+              <p class="text-[9px] text-[var(--text-muted)] font-mono leading-tight">
+                Se detectará en el texto para previsualización al pasar el ratón y <strong class="text-[var(--accent)]">{{ modKey }}+Clic</strong>.
+              </p>
             </div>
 
             <!-- Sección de Atributos Clave-Valor Dinámicos -->

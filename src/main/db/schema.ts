@@ -50,6 +50,7 @@ export const loreItems = sqliteTable(
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
     category: text('category').notNull().default('personaje'),
     name: text('name').notNull(),
+    aliases: text('aliases').notNull().default('[]'),
     summary: text('summary').notNull().default(''),
     content: text('content').notNull().default(''),
     attributes: text('attributes').notNull().default('{}'),

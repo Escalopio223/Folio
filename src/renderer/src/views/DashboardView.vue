@@ -329,13 +329,14 @@ const activeEditor = shallowRef<Editor | null>(null)
 // Entidades activas de la Wiki sincronizadas para escaneo y autolink en ProseMirror
 const wikiAutoLinkEntities = computed<WikiEntityTerm[]>(() => {
   return loreStore.items
-    .filter((item) => !item.isArchived && item.name && item.name.trim().length >= 2)
+    .filter((item) => !item.isArchived && item.name && item.name.trim().length >= 1)
     .map((item) => ({
       id: item.id,
       name: item.name.trim(),
       category: item.category,
       summary: item.summary || '',
-      icon: item.icon
+      icon: item.icon,
+      aliases: item.aliases || []
     }))
 })
 

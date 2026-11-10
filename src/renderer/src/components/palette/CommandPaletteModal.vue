@@ -278,6 +278,7 @@ const filteredLore = computed<PaletteItem[]>(() => {
   const results: PaletteItem[] = []
   for (const item of items) {
     const matchName = normalize(item.name).includes(q)
+    const matchAliases = (item.aliases || []).some((a) => normalize(a).includes(q))
     const matchCategory = normalize(item.category).includes(q)
     const matchSummary = normalize(item.summary || '').includes(q)
     const matchContent = normalize(item.content || '').includes(q)
@@ -285,8 +286,11 @@ const filteredLore = computed<PaletteItem[]>(() => {
       ([k, v]) => normalize(k).includes(q) || normalize(v).includes(q)
     )
 
-    if (matchName || matchCategory || matchSummary || matchContent || matchAttrs) {
-      const snippet = extractSnippet(item.summary || item.content, paletteStore.query)
+    if (matchName || matchAliases || matchCategory || matchSummary || matchContent || matchAttrs) {
+      const matchedAlias = (item.aliases || []).find((a) => normalize(a).includes(q))
+      const snippet = matchedAlias
+        ? `Alias: ${matchedAlias} · ${(item.summary || item.content || '').replace(/<[^>]*>/g, ' ').slice(0, 50)}`
+        : extractSnippet(item.summary || item.content, paletteStore.query)
       results.push({
         id: `lore-${item.id}`,
         title: item.name,

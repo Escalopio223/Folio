@@ -104,6 +104,7 @@ export interface LoreItem {
   projectId: string
   category: string
   name: string
+  aliases?: string[]
   summary: string
   content: string
   attributes: Record<string, string>
@@ -120,6 +121,7 @@ export interface CreateLoreInput {
   projectId: string
   category: string
   name: string
+  aliases?: string[]
   summary?: string
   content?: string
   attributes?: Record<string, string>
@@ -132,6 +134,7 @@ export interface UpdateLoreInput {
   id: string
   category?: string
   name?: string
+  aliases?: string[]
   summary?: string
   content?: string
   attributes?: Record<string, string>

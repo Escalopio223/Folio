@@ -9,6 +9,7 @@ export interface WikiEntityTerm {
   category: string
   summary: string
   icon?: string
+  aliases?: string[]
 }
 
 export interface WikiAutoLinkOptions {
@@ -28,7 +29,8 @@ declare module '@tiptap/core' {
 
 /**
  * Compila y construye un conjunto de decoraciones dinámicas para todas las menciones
- * de entidades de la wiki sin mutar el documento ni el almacenamiento SQLite.
+ * de entidades de la wiki (incluyendo sus alias configurados) sin mutar el documento
+ * ni el almacenamiento SQLite.
  */
 function buildWikiDecorations(
   doc: Parameters<DecorationSet['find']>[0] extends undefined ? any : any,
@@ -38,26 +40,55 @@ function buildWikiDecorations(
     return DecorationSet.empty
   }
 
-  // Filtrar entidades válidas y ordenarlas de mayor a menor longitud
-  // para que si existe "Reino de Valoria" y "Valoria", coincida primero la frase más específica
-  const validEntities = entities
-    .filter((e) => e && e.name && e.name.trim().length >= 2)
-    .sort((a, b) => b.name.trim().length - a.name.trim().length)
+  // Recopilar todos los términos candidatos (nombre principal y alias)
+  interface CandidateTerm {
+    term: string
+    entity: WikiEntityTerm
+  }
 
-  if (validEntities.length === 0) {
+  const candidates: CandidateTerm[] = []
+
+  for (const ent of entities) {
+    if (!ent || !ent.id) continue
+    const seenPerEntity = new Set<string>()
+
+    // 1. Nombre principal de la entidad
+    if (ent.name && ent.name.trim().length >= 1) {
+      const cleanName = ent.name.trim()
+      candidates.push({ term: cleanName, entity: ent })
+      seenPerEntity.add(cleanName.toLowerCase())
+    }
+
+    // 2. Alias de la entidad (ej: Dani, Daniiii, D)
+    if (Array.isArray(ent.aliases)) {
+      for (const rawAlias of ent.aliases) {
+        if (!rawAlias) continue
+        const cleanAlias = String(rawAlias).trim()
+        if (cleanAlias.length >= 1 && !seenPerEntity.has(cleanAlias.toLowerCase())) {
+          candidates.push({ term: cleanAlias, entity: ent })
+          seenPerEntity.add(cleanAlias.toLowerCase())
+        }
+      }
+    }
+  }
+
+  if (candidates.length === 0) {
     return DecorationSet.empty
   }
+
+  // Ordenar candidatos de mayor a menor longitud para que frases largas
+  // o alias específicos tengan prioridad sobre términos cortos
+  candidates.sort((a, b) => b.term.length - a.term.length)
 
   // Mapa de búsqueda rápida por término normalizado en minúsculas
   const termMap = new Map<string, WikiEntityTerm>()
   const escapedTerms: string[] = []
 
-  for (const ent of validEntities) {
-    const termClean = ent.name.trim()
-    const lowerKey = termClean.toLowerCase()
+  for (const cand of candidates) {
+    const lowerKey = cand.term.toLowerCase()
     if (!termMap.has(lowerKey)) {
-      termMap.set(lowerKey, ent)
-      escapedTerms.push(escapeRegExp(termClean))
+      termMap.set(lowerKey, cand.entity)
+      escapedTerms.push(escapeRegExp(cand.term))
     }
   }
 
@@ -65,8 +96,7 @@ function buildWikiDecorations(
     return DecorationSet.empty
   }
 
-  // Regex con límites de palabras (\b) y banderas global e insensible a mayúsculas/minúsculas
-  // Usamos límites contextuales compatibles con caracteres internacionales y acentos
+  // Regex con límites de palabras contextuales compatibles con caracteres internacionales y acentos
   const regexPattern = `(?<=^|[\\s.,;:¡!¿?«»"'\\[\\](){}<>—–-])(${escapedTerms.join('|')})(?=[\\s.,;:¡!¿?«»"'\\[\\](){}<>—–-]|\$)`
   let regex: RegExp
   try {
@@ -98,6 +128,7 @@ function buildWikiDecorations(
             class: 'wiki-entity-mention',
             'data-wiki-id': entity.id,
             'data-wiki-title': entity.name,
+            'data-wiki-matched': matchText,
             'data-wiki-category': entity.category
           })
         )
