@@ -187,7 +187,7 @@ defineExpose({
         v-if="isVisible && currentEntity"
         ref="floatingEl"
         class="fixed z-[120] w-72 max-w-[85vw] neu-surface rounded-2xl border border-[var(--groove-dark)]/70 shadow-2xl overflow-hidden p-3 select-none backdrop-blur-md bg-[var(--bg-surface)] text-[var(--text-primary)]"
-        :style="currentEntity.colorTag ? { borderLeftColor: currentEntity.colorTag, borderLeftWidth: '4px' } : {}"
+        :style="currentEntity.colorTag ? { borderLeftColor: `${currentEntity.colorTag} !important`, borderLeftWidth: '4px' } : {}"
         role="tooltip"
         @mouseenter="onPopoverMouseEnter"
         @mouseleave="onPopoverMouseLeave"

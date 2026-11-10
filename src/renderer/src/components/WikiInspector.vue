@@ -379,12 +379,17 @@ watch(
         :key="item.id"
         :id="'lore-card-' + item.id"
         class="neu-surface overflow-hidden transition-all duration-200 border group"
-        :class="
+        :class="[
           isExpanded(item.id)
-            ? 'border-l-4 border-l-[var(--accent)] border-t-[var(--groove-light)] border-r-[var(--groove-light)] border-b-[var(--groove-light)] shadow-md'
-            : 'border-[var(--groove-light)] hover:border-[var(--accent)]/40'
+            ? 'border-l-4 border-t-[var(--groove-light)] border-r-[var(--groove-light)] border-b-[var(--groove-light)] shadow-md'
+            : 'border-[var(--groove-light)] hover:border-[var(--accent)]/40',
+          isExpanded(item.id) && !item.colorTag ? 'border-l-[var(--accent)]' : ''
+        ]"
+        :style="
+          item.colorTag
+            ? { borderLeftColor: `${item.colorTag} !important`, borderLeftWidth: '4px' }
+            : {}
         "
-        :style="item.colorTag ? { borderLeftColor: item.colorTag, borderLeftWidth: '4px' } : {}"
       >
         <!-- CABECERA DEL ACORDEÓN (Siempre visible, clic para colapsar/desplegar) -->
         <div

@@ -840,12 +840,22 @@ onBeforeUnmount(async () => {
             class="w-full p-2.5 rounded-xl flex flex-col gap-1.5 group transition-all cursor-pointer relative"
             :class="[
               folioStore.activeFolioId === chap.id
-                ? 'neu-well border-l-4 !border-l-[var(--accent)] shadow-inner'
+                ? 'neu-well border-l-4 shadow-inner'
                 : 'neu-btn',
+              folioStore.activeFolioId === chap.id && !chap.colorTag
+                ? 'border-l-[var(--accent)]'
+                : '',
               dragOverChapterId === chap.id ? 'ring-2 ring-[var(--accent)]/60 scale-[1.01]' : '',
               draggedChapterId === chap.id ? 'opacity-50' : ''
             ]"
-            :style="chap.colorTag ? { borderLeftColor: chap.colorTag, borderLeftWidth: '4px' } : {}"
+            :style="
+              chap.colorTag
+                ? {
+                    borderLeftColor: `${chap.colorTag} !important`,
+                    borderLeftWidth: '4px'
+                  }
+                : {}
+            "
             @click="selectChapter(chap)"
             @dblclick.stop="startInlineEdit(chap)"
           >
