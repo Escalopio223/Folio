@@ -5,13 +5,14 @@ import type { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
-import { TextStyle, FontSize, FontFamily, Color, LineHeight } from '@tiptap/extension-text-style'
+import { TextStyle, FontSize, FontFamily, Color } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import { SceneBreak } from './extensions/SceneBreak'
 import { TabIndent } from './extensions/TabIndent'
 import { FocusMode } from './extensions/FocusMode'
 import { Indent } from './extensions/Indent'
+import { BlockLineHeight } from './extensions/LineHeightExtension'
 import { SearchHighlight } from './extensions/SearchHighlight'
 import { CustomBulletList, CustomOrderedList } from './extensions/ListExtensions'
 import { WikiAutoLink, type WikiEntityTerm } from './extensions/WikiAutoLink'
@@ -185,9 +186,7 @@ const editor = useEditor({
     TabIndent,
     FocusMode,
     Indent,
-    LineHeight.configure({
-      types: ['heading', 'paragraph', 'blockquote', 'listItem']
-    }),
+    BlockLineHeight,
     SearchHighlight,
     WikiAutoLink.configure({
       entities: props.wikiEntities,
@@ -497,6 +496,7 @@ defineExpose({
 
 .ProseMirror p {
   margin-bottom: var(--editorial-paragraph-gap, 1.25rem);
+  line-height: var(--editorial-line-height, 1.65);
 }
 
 .ProseMirror p:last-child {

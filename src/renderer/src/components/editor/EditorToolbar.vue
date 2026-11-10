@@ -316,10 +316,10 @@ const lineHeightPresets: LineHeightOption[] = [
   { value: '2.0', label: '2.0 Doble', description: 'Manuscrito para corrección' }
 ]
 
-const customLineHeight = ref<number>(1.5)
+const customLineHeight = ref<number>(1.65)
 
 const currentLineHeight = computed<string>(() => {
-  if (!props.editor) return '1.5'
+  if (!props.editor) return '1.65'
   const pAttrs = props.editor.getAttributes('paragraph')
   if (pAttrs?.lineHeight) return String(pAttrs.lineHeight)
   const hAttrs = props.editor.getAttributes('heading')
@@ -330,9 +330,35 @@ const currentLineHeight = computed<string>(() => {
 })
 
 const currentLineHeightLabel = computed<string>(() => {
-  if (currentLineHeight.value === 'Auto') return '1.5'
-  return currentLineHeight.value
+  if (currentLineHeight.value === 'Auto') {
+    return customLineHeight.value ? customLineHeight.value.toFixed(2) : '1.65'
+  }
+  const parsed = parseFloat(currentLineHeight.value)
+  return isNaN(parsed) ? currentLineHeight.value : parsed.toFixed(2)
 })
+
+watch(
+  () => currentLineHeight.value,
+  (val) => {
+    if (val && val !== 'Auto') {
+      const num = parseFloat(val)
+      if (!isNaN(num)) {
+        customLineHeight.value = num
+      }
+    }
+  }
+)
+
+function isPresetActive(presetVal: string): boolean {
+  const target = parseFloat(presetVal)
+  if (currentLineHeight.value !== 'Auto') {
+    const cur = parseFloat(currentLineHeight.value)
+    if (!isNaN(cur)) {
+      return Math.abs(cur - target) < 0.01
+    }
+  }
+  return Math.abs(customLineHeight.value - target) < 0.01
+}
 
 function applyLineHeight(val: string): void {
   if (!props.editor) return
@@ -340,8 +366,8 @@ function applyLineHeight(val: string): void {
   if (!isNaN(num)) {
     customLineHeight.value = num
   }
-  props.editor.chain().focus().setLineHeight(val).run()
-  closeModal()
+  // Aplica a la selección o al párrafo activo sin cerrar el modal
+  props.editor.chain().setLineHeight(val).run()
 }
 
 function applyLineHeightToChapter(val: string): void {
@@ -350,21 +376,9 @@ function applyLineHeightToChapter(val: string): void {
   if (!isNaN(num)) {
     customLineHeight.value = num
   }
-  const { tr, doc } = props.editor.state
-  let changed = false
-  doc.descendants((node, pos) => {
-    if (['paragraph', 'heading', 'blockquote', 'listItem'].includes(node.type.name)) {
-      tr.setNodeMarkup(pos, undefined, {
-        ...node.attrs,
-        lineHeight: val
-      })
-      changed = true
-    }
-  })
-  if (changed) {
-    props.editor.view.dispatch(tr)
-  }
-  closeModal()
+  document.documentElement.style.setProperty('--editorial-line-height', String(customLineHeight.value))
+  localStorage.setItem('folio_line_height', String(customLineHeight.value))
+  props.editor.chain().setAllLineHeight(val).run()
 }
 
 function adjustCustomLineHeight(delta: number): void {
@@ -375,9 +389,10 @@ function adjustCustomLineHeight(delta: number): void {
 
 function resetLineHeight(): void {
   if (!props.editor) return
-  customLineHeight.value = 1.5
-  props.editor.chain().focus().unsetLineHeight().run()
-  closeModal()
+  customLineHeight.value = 1.65
+  document.documentElement.style.setProperty('--editorial-line-height', '1.65')
+  localStorage.removeItem('folio_line_height')
+  props.editor.chain().unsetLineHeight().run()
 }
 
 // Separación de párrafos (Margen inferior entre párrafos)
@@ -406,6 +421,15 @@ onMounted(() => {
     '--editorial-paragraph-gap',
     remMap[currentParagraphGap.value] || '1.25rem'
   )
+
+  const savedLineHeight = localStorage.getItem('folio_line_height')
+  if (savedLineHeight) {
+    const num = parseFloat(savedLineHeight)
+    if (!isNaN(num)) {
+      customLineHeight.value = num
+      document.documentElement.style.setProperty('--editorial-line-height', savedLineHeight)
+    }
+  }
 })
 
 // Fuentes disponibles
@@ -973,7 +997,7 @@ function insertSceneBreak(): void {
                   type="button"
                   class="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all cursor-pointer text-left"
                   :class="
-                    currentLineHeight === preset.value
+                    isPresetActive(preset.value)
                       ? 'neu-well text-[var(--accent)] font-bold'
                       : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
                   "
