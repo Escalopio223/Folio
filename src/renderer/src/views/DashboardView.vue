@@ -1057,7 +1057,7 @@ onBeforeUnmount(async () => {
     >
       <template v-if="folioStore.activeFolio">
         <!-- Cabecera de Herramientas del Editor -->
-        <header class="editor-metadata flex items-center justify-between gap-3 shrink-0">
+        <header class="editor-metadata flex items-center justify-between gap-3 shrink-0 relative z-40">
           <div class="flex items-center gap-2 min-w-0">
             <Bookmark :size="14" class="text-[var(--accent)] shrink-0" />
             <span class="text-xs text-[var(--text-muted)] font-mono shrink-0">
