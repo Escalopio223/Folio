@@ -16,6 +16,16 @@ function logToFile(msg: string): void {
   } catch {}
 }
 
+function cleanPendingUpdateCache(): void {
+  try {
+    const pendingDir = path.join(app.getPath('userData'), '..', 'folio-updater', 'pending')
+    if (fs.existsSync(pendingDir)) {
+      fs.rmSync(pendingDir, { recursive: true, force: true })
+      logToFile('[Updater] Carpeta temporal pending limpiada tras actualizar para liberar espacio.')
+    }
+  } catch {}
+}
+
 let mainWindowRef: BrowserWindow | null = null
 let isQuittingForUpdate = false
 
@@ -105,6 +115,8 @@ export function setupAutoUpdater(window: BrowserWindow): void {
   autoUpdater.on('update-not-available', () => {
     console.log('[Updater] La aplicación está al día.')
     sendStatusToRenderer({ status: 'up-to-date' })
+    // Liberar espacio eliminando el instalador descargado en pending una vez que ya estamos al día
+    cleanPendingUpdateCache()
   })
 
   autoUpdater.on('download-progress', (progress: ProgressInfo) => {
