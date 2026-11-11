@@ -18,6 +18,7 @@ import {
 } from 'lucide-vue-next'
 import FolioLogo from './FolioLogo.vue'
 import ExportManuscriptMenu from './ExportManuscriptMenu.vue'
+import UpdateNotificationBtn from './UpdateNotificationBtn.vue'
 import { useUiStore } from '../stores/uiStore'
 import { usePaletteStore } from '../stores/paletteStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
@@ -248,6 +249,9 @@ onUnmounted(() => {
             />
           </span>
         </button>
+
+        <!-- Botón / Notificación de Auto-Actualización -->
+        <UpdateNotificationBtn />
 
         <div class="neu-groove-v h-4 my-auto"></div>
 

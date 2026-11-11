@@ -15,7 +15,8 @@ import type {
   SaveScratchpadNoteInput,
   WorldRule,
   SaveWorldRuleInput,
-  WindowAction
+  WindowAction,
+  UpdaterStatusPayload
 } from '@shared/types'
 
 const api: FolioApi = {
@@ -90,6 +91,20 @@ const api: FolioApi = {
       ipcRenderer.invoke('spellcheck:addCustomWord', word),
     removeCustomWord: (word: string): Promise<string[]> =>
       ipcRenderer.invoke('spellcheck:removeCustomWord', word)
+  },
+  updater: {
+    getState: (): Promise<UpdaterStatusPayload> => ipcRenderer.invoke('updater:get-state'),
+    checkForUpdates: (): Promise<boolean> => ipcRenderer.invoke('updater:check'),
+    applyUpdate: (): Promise<boolean> => ipcRenderer.invoke('updater:apply'),
+    onStatusChange: (callback: (payload: UpdaterStatusPayload) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: UpdaterStatusPayload): void => {
+        callback(payload)
+      }
+      ipcRenderer.on('updater:status', listener)
+      return (): void => {
+        ipcRenderer.removeListener('updater:status', listener)
+      }
+    }
   }
 }
 

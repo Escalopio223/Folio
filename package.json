@@ -39,6 +39,7 @@
     "dictionary-en": "^4.0.0",
     "dictionary-es": "^4.0.0",
     "drizzle-orm": "^0.45.4",
+    "electron-updater": "^6.8.11",
     "lucide-vue-next": "^1.0.0",
     "nspell": "^2.1.5",
     "pinia": "^4.1.0",

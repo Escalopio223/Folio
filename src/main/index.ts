@@ -6,6 +6,8 @@ import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
 import { setupContextMenu } from './contextMenu'
 import { syncCustomDictionaryWithSession } from './ipc/spellcheckHandler'
+import { setupAutoUpdater } from './updater'
+import { closeDatabase } from './db'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -46,6 +48,9 @@ function createWindow(): BrowserWindow {
 
   // Activar menú contextual nativo (Copiar, Pegar, Cortar, Seleccionar todo)
   setupContextMenu(mainWindow)
+
+  // Configurar actualizador automático híbrido (Windows NSIS auto / macOS direct dmg)
+  setupAutoUpdater(mainWindow)
 
   return mainWindow
 }
@@ -100,4 +105,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  closeDatabase()
 })

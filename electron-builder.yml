@@ -1,5 +1,9 @@
 appId: com.folio.desktop
 productName: Folio
+publish:
+  provider: github
+  owner: Escalopio223
+  repo: Folio
 directories:
   buildResources: build
 files:
@@ -14,6 +18,7 @@ asarUnpack:
   - '**/*.node'
 win:
   executableName: Folio
+  verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch:
@@ -24,7 +29,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
 mac:
   category: public.app-category.productivity
   icon: build/icon.icns

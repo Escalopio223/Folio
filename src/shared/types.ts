@@ -313,4 +313,31 @@ export interface FolioApi {
     addCustomWord: (word: string) => Promise<string[]>
     removeCustomWord: (word: string) => Promise<string[]>
   }
+  updater: {
+    getState: () => Promise<UpdaterStatusPayload>
+    checkForUpdates: () => Promise<boolean>
+    applyUpdate: () => Promise<boolean>
+    onStatusChange: (callback: (payload: UpdaterStatusPayload) => void) => () => void
+  }
+}
+
+export type UpdaterStatusType =
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'progress'
+  | 'ready'
+  | 'available-mac'
+  | 'up-to-date'
+  | 'error'
+
+export interface UpdaterStatusPayload {
+  status: UpdaterStatusType
+  version?: string
+  releaseUrl?: string
+  percent?: number
+  bytesPerSecond?: number
+  transferred?: number
+  total?: number
+  message?: string
 }

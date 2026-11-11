@@ -1874,3 +1874,17 @@ export function removeCustomDictionaryWord(rawWord: string): boolean {
     return false
   }
 }
+
+export function closeDatabase(): void {
+  if (sqliteInstance) {
+    try {
+      sqliteInstance.close()
+      console.log('[DB] SQLite Database cleanly closed.')
+    } catch (err) {
+      console.warn('[DB] Error closing SQLite database:', err)
+    } finally {
+      sqliteInstance = null
+      drizzleInstance = null
+    }
+  }
+}
