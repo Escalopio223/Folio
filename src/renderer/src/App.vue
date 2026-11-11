@@ -101,7 +101,7 @@ onBeforeUnmount(() => {
           </span>
         </button>
       </div>
-      <span>Folio v1.2.1</span>
+      <span>Folio v1.2.2</span>
     </footer>
 
     <!-- Omnibox / Paleta de Comandos Modal Global (Ctrl+K / Cmd+K) -->
