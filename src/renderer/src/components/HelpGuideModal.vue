@@ -620,7 +620,7 @@ const featureModules = computed<FeatureModule[]>(() => [
             class="px-6 py-3 border-t border-[var(--neu-border)] bg-[var(--bg-surface)] flex items-center justify-between text-xs text-[var(--text-muted)] shrink-0"
           >
             <div class="flex items-center gap-3">
-              <span class="font-mono text-[11px]">Folio v1.1.0</span>
+              <span class="font-mono text-[11px]">Folio v1.2.0</span>
               <span>·</span>
               <span>
                 Pulsa
