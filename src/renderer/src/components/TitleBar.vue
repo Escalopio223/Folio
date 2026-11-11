@@ -22,7 +22,7 @@ import UpdateNotificationBtn from './UpdateNotificationBtn.vue'
 import { useUiStore } from '../stores/uiStore'
 import { usePaletteStore } from '../stores/paletteStore'
 import { useScratchpadStore } from '../stores/scratchpadStore'
-import { modKey } from '../utils/platform'
+import { modKey, isMac } from '../utils/platform'
 import type { WindowAction } from '@shared/types'
 
 const uiStore = useUiStore()
@@ -90,8 +90,8 @@ onUnmounted(() => {
 <template>
   <div class="w-full flex flex-col shrink-0 select-none bg-[var(--bg-base)]">
     <header class="drag-region h-11 w-full flex items-center justify-between px-3.5 text-xs">
-      <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle -->
-      <div class="flex items-center gap-2.5">
+      <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle (con padding en macOS para los semáforos) -->
+      <div class="flex items-center gap-2.5 transition-all" :class="{ 'pl-[72px]': isMac }">
         <!-- Tree Toggle Button con texto referente al apartado -->
         <button
           type="button"
@@ -253,10 +253,10 @@ onUnmounted(() => {
         <!-- Botón / Notificación de Auto-Actualización -->
         <UpdateNotificationBtn />
 
-        <div class="neu-groove-v h-4 my-auto"></div>
+        <div v-if="!isMac" class="neu-groove-v h-4 my-auto"></div>
 
-        <!-- Window Action Buttons -->
-        <div class="flex items-center gap-1">
+        <!-- Window Action Buttons (Solo en Windows y Linux) -->
+        <div v-if="!isMac" class="flex items-center gap-1">
           <button
             type="button"
             class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"

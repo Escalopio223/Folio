@@ -10,6 +10,7 @@ import { setupAutoUpdater } from './updater'
 import { closeDatabase } from './db'
 
 function createWindow(): BrowserWindow {
+  const isDarwin = process.platform === 'darwin'
   const mainWindow = new BrowserWindow({
     width: 1120,
     height: 760,
@@ -17,7 +18,8 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     frame: false,
-    titleBarStyle: 'hidden',
+    titleBarStyle: isDarwin ? 'hiddenInset' : 'hidden',
+    trafficLightPosition: isDarwin ? { x: 12, y: 13 } : undefined,
     backgroundColor: '#EFEAE1',
     autoHideMenuBar: true,
     icon: icon,
