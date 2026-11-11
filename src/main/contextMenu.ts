@@ -1,4 +1,5 @@
 import { Menu, BrowserWindow, MenuItemConstructorOptions } from 'electron'
+import { addCustomDictionaryWord } from './db'
 
 /**
  * Configura el menú contextual nativo (clic derecho) para Windows y macOS,
@@ -18,7 +19,7 @@ export function setupContextMenu(window: BrowserWindow): void {
     // 1. Sugerencias del corrector ortográfico si hay palabra marcada
     if (params.misspelledWord) {
       if (params.dictionarySuggestions.length > 0) {
-        for (const suggestion of params.dictionarySuggestions) {
+        for (const suggestion of params.dictionarySuggestions.slice(0, 3)) {
           template.push({
             label: suggestion,
             click: () => window.webContents.replaceMisspelling(suggestion)
@@ -30,6 +31,16 @@ export function setupContextMenu(window: BrowserWindow): void {
           enabled: false
         })
       }
+      template.push({
+        label: `Dejar de marcar "${params.misspelledWord}" como falta`,
+        click: () => {
+          addCustomDictionaryWord(params.misspelledWord)
+          try {
+            window.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+          } catch {}
+          window.webContents.send('spellcheck:customWordAdded', params.misspelledWord)
+        }
+      })
       template.push({ type: 'separator' })
     }
 

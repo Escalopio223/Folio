@@ -305,5 +305,12 @@ export interface FolioApi {
     setLanguages: (languages: string[]) => Promise<boolean>
     getLanguages: () => Promise<string[]>
     getAvailableLanguages: () => Promise<string[]>
+    checkAndSuggest: (
+      word: string,
+      lang?: 'es' | 'en' | 'auto'
+    ) => Promise<{ word: string; isMisspelled: boolean; suggestions: string[] }>
+    getCustomWords: () => Promise<string[]>
+    addCustomWord: (word: string) => Promise<string[]>
+    removeCustomWord: (word: string) => Promise<string[]>
   }
 }

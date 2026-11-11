@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { initDatabase } from './db'
 import { registerAllIpcHandlers } from './ipc'
 import { setupContextMenu } from './contextMenu'
+import { syncCustomDictionaryWithSession } from './ipc/spellcheckHandler'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -75,6 +76,7 @@ app.whenReady().then(() => {
   try {
     const dbInfo = initDatabase()
     console.log(`[Folio Main] SQLite Database initialized at: ${dbInfo.path}`)
+    syncCustomDictionaryWithSession()
   } catch (err) {
     console.error('[Folio Main] Failed to initialize SQLite database:', err)
   }

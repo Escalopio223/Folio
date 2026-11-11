@@ -36,8 +36,11 @@
     "@tiptap/vue-3": "^3.32.0",
     "@vueuse/core": "^15.0.0",
     "better-sqlite3": "^13.0.3",
+    "dictionary-en": "^4.0.0",
+    "dictionary-es": "^4.0.0",
     "drizzle-orm": "^0.45.4",
     "lucide-vue-next": "^1.0.0",
+    "nspell": "^2.1.5",
     "pinia": "^4.1.0",
     "vue-router": "^5.4.0"
   },

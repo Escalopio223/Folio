@@ -374,6 +374,12 @@ export function initDatabase(): {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, achievement_key)
     );
+
+    CREATE TABLE IF NOT EXISTS custom_dictionary (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL
+    );
   `)
 
   // =========================================================================
@@ -1826,5 +1832,45 @@ export function getGoalsSummary(projectId: string): GoalsSummary {
     unlockedAchievements,
     totalManuscriptWords,
     currentStreak
+  }
+}
+
+export function getCustomDictionaryWords(): string[] {
+  if (!sqliteInstance) return []
+  try {
+    const rows = sqliteInstance
+      .prepare('SELECT word FROM custom_dictionary ORDER BY word ASC')
+      .all() as { word: string }[]
+    return rows.map((r) => r.word)
+  } catch (err) {
+    console.error('[DB] Failed to get custom dictionary words:', err)
+    return []
+  }
+}
+
+export function addCustomDictionaryWord(rawWord: string): boolean {
+  if (!sqliteInstance || !rawWord) return false
+  const word = rawWord.trim()
+  if (!word) return false
+  try {
+    sqliteInstance
+      .prepare('INSERT OR IGNORE INTO custom_dictionary (word, created_at) VALUES (?, ?)')
+      .run(word, Date.now())
+    return true
+  } catch (err) {
+    console.error('[DB] Failed to add custom dictionary word:', err)
+    return false
+  }
+}
+
+export function removeCustomDictionaryWord(rawWord: string): boolean {
+  if (!sqliteInstance || !rawWord) return false
+  const word = rawWord.trim()
+  try {
+    sqliteInstance.prepare('DELETE FROM custom_dictionary WHERE word = ?').run(word)
+    return true
+  } catch (err) {
+    console.error('[DB] Failed to remove custom dictionary word:', err)
+    return false
   }
 }

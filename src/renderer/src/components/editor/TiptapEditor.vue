@@ -22,6 +22,7 @@ import { AutoCapitalizeExtension } from './extensions/AutoCapitalizeExtension'
 import { detectLanguage } from '../../nlp/languageDetector'
 import { useSpellcheck } from '../../composables/useSpellcheck'
 import EditorBubbleMenu from './EditorBubbleMenu.vue'
+import SpellingSuggestionsPopover from './SpellingSuggestionsPopover.vue'
 import { normalizeHtml } from './utils/blockFormatting'
 import { useUiStore } from '../../stores/uiStore'
 import { useTypewriterAudio } from '../../composables/useTypewriterAudio'
@@ -363,7 +364,70 @@ function handleEditorMouseOut(event: MouseEvent): void {
   }
 }
 
+function handleReplaceMisspellingEvent(e: Event): void {
+  const detail = (e as CustomEvent).detail
+  if (!editor.value || !detail?.replacement) return
+
+  const word = (detail.word || '').trim()
+  const replacement = detail.replacement
+  const state = editor.value.state
+  const { from, to } = state.selection
+
+  let replaced = false
+
+  // 1. Si hay texto seleccionado y coincide con la palabra
+  if (!state.selection.empty) {
+    const selectedText = state.doc.textBetween(from, to).trim()
+    if (selectedText.toLowerCase() === word.toLowerCase()) {
+      editor.value.chain().focus().insertContentAt({ from, to }, replacement).run()
+      replaced = true
+    }
+  }
+
+  // 2. Si el cursor está posicionado en la palabra
+  if (!replaced) {
+    const $from = state.selection.$from
+    const parentText = $from.parent.textContent
+    const offset = $from.parentOffset
+    const textBefore = parentText.slice(0, offset)
+    const textAfter = parentText.slice(offset)
+    const matchBefore = textBefore.match(/[\p{L}'’\-]+$/u)
+    const matchAfter = textAfter.match(/^[\p{L}'’\-]+/u)
+    const currentWord = (matchBefore ? matchBefore[0] : '') + (matchAfter ? matchAfter[0] : '')
+    if (currentWord.toLowerCase() === word.toLowerCase()) {
+      const startDocPos = $from.pos - (matchBefore ? matchBefore[0].length : 0)
+      const endDocPos = $from.pos + (matchAfter ? matchAfter[0].length : 0)
+      editor.value.chain().focus().insertContentAt({ from: startDocPos, to: endDocPos }, replacement).run()
+      replaced = true
+    }
+  }
+
+  // 3. Búsqueda de la coincidencia más próxima si se hizo clic derecho sin enfocar previamente
+  if (!replaced && word) {
+    state.doc.descendants((node, pos) => {
+      if (replaced || !node.isText || !node.text) return true
+      const idx = node.text.toLowerCase().indexOf(word.toLowerCase())
+      if (idx !== -1) {
+        editor.value
+          ?.chain()
+          .focus()
+          .insertContentAt({ from: pos + idx, to: pos + idx + word.length }, replacement)
+          .run()
+        replaced = true
+        return false
+      }
+      return true
+    })
+  }
+}
+
+function handleDictionaryUpdatedEvent(): void {
+  applySpellcheckDOM(editor.value, currentLanguageCode.value)
+}
+
 onMounted(() => {
+  window.addEventListener('folio:replace-misspelling', handleReplaceMisspellingEvent)
+  window.addEventListener('folio:dictionary-updated', handleDictionaryUpdatedEvent)
   if (editor.value) {
     emit('ready', editor.value)
     emit('scene-breaks', scanSceneBreaks(editor.value))
@@ -373,6 +437,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('folio:replace-misspelling', handleReplaceMisspellingEvent)
+  window.removeEventListener('folio:dictionary-updated', handleDictionaryUpdatedEvent)
   if (editor.value) {
     editor.value.view.dom.removeEventListener('mouseover', handleEditorMouseOver)
     editor.value.view.dom.removeEventListener('mouseout', handleEditorMouseOut)
@@ -487,6 +553,9 @@ defineExpose({
   >
     <!-- Menú flotante contextual neumórfico -->
     <EditorBubbleMenu :editor="editor" />
+
+    <!-- Popover con 3 sugerencias ortográficas cuando el cursor está en una palabra errónea -->
+    <SpellingSuggestionsPopover :editor="editor" />
 
     <!-- Contenedor del Editor TipTap / ProseMirror -->
     <EditorContent :editor="editor" class="tiptap-editor-content w-full flex-1" />

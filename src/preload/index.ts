@@ -79,7 +79,17 @@ const api: FolioApi = {
       ipcRenderer.invoke('spellcheck:setLanguages', languages),
     getLanguages: (): Promise<string[]> => ipcRenderer.invoke('spellcheck:getLanguages'),
     getAvailableLanguages: (): Promise<string[]> =>
-      ipcRenderer.invoke('spellcheck:getAvailableLanguages')
+      ipcRenderer.invoke('spellcheck:getAvailableLanguages'),
+    checkAndSuggest: (
+      word: string,
+      lang?: 'es' | 'en' | 'auto'
+    ): Promise<{ word: string; isMisspelled: boolean; suggestions: string[] }> =>
+      ipcRenderer.invoke('spellcheck:checkAndSuggest', word, lang),
+    getCustomWords: (): Promise<string[]> => ipcRenderer.invoke('spellcheck:getCustomWords'),
+    addCustomWord: (word: string): Promise<string[]> =>
+      ipcRenderer.invoke('spellcheck:addCustomWord', word),
+    removeCustomWord: (word: string): Promise<string[]> =>
+      ipcRenderer.invoke('spellcheck:removeCustomWord', word)
   }
 }
 

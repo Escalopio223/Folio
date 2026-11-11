@@ -174,6 +174,18 @@ export const unlockedAchievements = sqliteTable(
   ]
 )
 
+export const customDictionary = sqliteTable(
+  'custom_dictionary',
+  {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    word: text('word').notNull().unique(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('idx_custom_dictionary_word').on(table.word)
+  ]
+)
+
 export type ProjectGoalsSelect = typeof projectGoals.$inferSelect
 export type ProjectGoalsInsert = typeof projectGoals.$inferInsert
 
@@ -182,3 +194,6 @@ export type DailyWritingLogInsert = typeof dailyWritingLogs.$inferInsert
 
 export type UnlockedAchievementSelect = typeof unlockedAchievements.$inferSelect
 export type UnlockedAchievementInsert = typeof unlockedAchievements.$inferInsert
+
+export type CustomDictionarySelect = typeof customDictionary.$inferSelect
+export type CustomDictionaryInsert = typeof customDictionary.$inferInsert
