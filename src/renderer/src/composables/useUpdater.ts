@@ -47,6 +47,11 @@ export function useUpdater() {
       })
       isSubscribed = true
     }
+
+    // 3. Comprobación de seguridad lanzada desde la UI al montar
+    setTimeout(() => {
+      checkForUpdates().catch(() => {})
+    }, 2500)
   }
 
   function destroy(): void {

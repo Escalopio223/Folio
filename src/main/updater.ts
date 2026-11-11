@@ -1,11 +1,20 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { autoUpdater, ProgressInfo, UpdateInfo } from 'electron-updater'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { UpdaterStatusPayload } from '../shared/types'
 import { closeDatabase } from './db'
 
 const GITHUB_OWNER = 'Escalopio223'
 const GITHUB_REPO = 'Folio'
 const LATEST_RELEASE_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`
+
+function logToFile(msg: string): void {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'updater.log')
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`)
+  } catch {}
+}
 
 let mainWindowRef: BrowserWindow | null = null
 let isQuittingForUpdate = false
@@ -16,6 +25,7 @@ let currentState: UpdaterStatusPayload = {
 
 function sendStatusToRenderer(payload: UpdaterStatusPayload): void {
   currentState = { ...payload }
+  logToFile(`[State] Status changed: ${payload.status} ${payload.version ? `(v${payload.version})` : ''} ${payload.message ? `- ${payload.message}` : ''}`)
   if (mainWindowRef && !mainWindowRef.isDestroyed()) {
     mainWindowRef.webContents.send('updater:status', currentState)
   }
@@ -24,8 +34,21 @@ function sendStatusToRenderer(payload: UpdaterStatusPayload): void {
 export function setupAutoUpdater(window: BrowserWindow): void {
   mainWindowRef = window
 
-  // Configuración de logger integrado
-  autoUpdater.logger = console
+  // Configuración de logger integrado (Consola + Archivo en userData/updater.log)
+  autoUpdater.logger = {
+    info: (m: unknown) => {
+      console.log(m)
+      logToFile(`[INFO] ${typeof m === 'object' ? JSON.stringify(m) : m}`)
+    },
+    warn: (m: unknown) => {
+      console.warn(m)
+      logToFile(`[WARN] ${typeof m === 'object' ? JSON.stringify(m) : m}`)
+    },
+    error: (m: unknown) => {
+      console.error(m)
+      logToFile(`[ERROR] ${typeof m === 'object' ? JSON.stringify(m) : m}`)
+    }
+  }
 
   // Si estamos en desarrollo, permitir usar dev-app-update.yml si existe
   if (!app.isPackaged) {
@@ -111,21 +134,31 @@ export function setupAutoUpdater(window: BrowserWindow): void {
   })
 
   // =========================================================================
-  // 3. COMPROBACIÓN AUTOMÁTICA TRAS 3 SEGUNDOS DE CARGA
+  // 3. COMPROBACIÓN AUTOMÁTICA RESILIENTE (SIN CONDICIONES DE CARRERA)
   // =========================================================================
-  window.webContents.once('did-finish-load', () => {
-    if (app.isPackaged) {
+  const triggerAutoCheck = (): void => {
+    if (app.isPackaged || autoUpdater.forceDevUpdateConfig) {
+      logToFile('[Updater] Iniciando temporizador de comprobación automática (3s)...')
       setTimeout(() => {
         try {
+          logToFile('[Updater] Ejecutando autoUpdater.checkForUpdates()...')
           autoUpdater.checkForUpdates().catch((err) => {
+            logToFile(`[Updater] Fallo en comprobación automática inicial: ${err?.message || err}`)
             console.warn('[Updater] Fallo en comprobación automática inicial:', err?.message)
           })
         } catch (err) {
+          logToFile(`[Updater] Error al lanzar checkForUpdates: ${err}`)
           console.warn('[Updater] Error al lanzar checkForUpdates:', err)
         }
       }, 3000)
     }
-  })
+  }
+
+  if (window.webContents.isLoading()) {
+    window.webContents.once('did-finish-load', triggerAutoCheck)
+  } else {
+    triggerAutoCheck()
+  }
 }
 
 // =========================================================================
