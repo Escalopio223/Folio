@@ -1,6 +1,6 @@
 {
   "name": "folio",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Folio - Desktop Local-First Application with SQLite and Vue 3",
   "main": "./out/main/index.js",
   "author": "Folio Team",

@@ -28,7 +28,7 @@ onMounted(() => {
     leave-from-class="opacity-100 scale-100 translate-y-0"
     leave-to-class="opacity-0 scale-90 translate-y-[-2px]"
   >
-    <div v-if="isVisible" class="flex items-center">
+    <div v-if="isVisible" class="no-drag flex items-center shrink-0">
       <!-- 1. Estado Descargando en segundo plano (Windows / Linux) -->
       <div
         v-if="isDownloading"

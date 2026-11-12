@@ -89,9 +89,15 @@ onUnmounted(() => {
 
 <template>
   <div class="w-full flex flex-col shrink-0 select-none bg-[var(--bg-base)]">
-    <header class="drag-region h-11 w-full flex items-center justify-between px-3.5 text-xs">
-      <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle (con padding en macOS para los semáforos) -->
-      <div class="flex items-center gap-2.5 transition-all" :class="{ 'pl-[72px]': isMac }">
+    <header
+      class="drag-region relative w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3.5 py-1.5 min-h-[44px] text-xs transition-all"
+      :class="{
+        'pl-[76px]': isMac,
+        'pr-[108px]': !isMac
+      }"
+    >
+      <!-- Left: Brand / Title / Logo / Manuscript Tree Toggle / Export / Manual / Sound -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 transition-all">
         <!-- Tree Toggle Button con texto referente al apartado -->
         <button
           type="button"
@@ -109,24 +115,24 @@ onUnmounted(() => {
           <span class="text-[11px] font-medium hidden sm:inline">Manuscrito</span>
         </button>
 
-        <div class="neu-groove-v h-4 my-auto"></div>
+        <div class="neu-groove-v h-4 my-auto shrink-0"></div>
 
         <div class="w-7 h-7 shrink-0 flex items-center justify-center drop-shadow-sm">
           <FolioLogo />
         </div>
 
-        <span class="font-editorial text-lg font-bold tracking-tight text-[var(--text-primary)]">
+        <span class="font-editorial text-lg font-bold tracking-tight text-[var(--text-primary)] shrink-0">
           Folio
         </span>
 
         <div
-          class="neu-well-sm px-2 py-0.5 flex items-center gap-1.5 text-[10px] font-mono text-[var(--text-secondary)]"
+          class="neu-well-sm px-2 py-0.5 flex items-center gap-1.5 text-[10px] font-mono text-[var(--text-secondary)] shrink-0"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
           <span>LOCAL</span>
         </div>
 
-        <div class="neu-groove-v h-4 my-auto"></div>
+        <div class="neu-groove-v h-4 my-auto shrink-0"></div>
 
         <!-- Botón y Menú Desplegable de Exportación de Manuscrito (EPUB, PDF, DOCX) -->
         <ExportManuscriptMenu />
@@ -165,8 +171,8 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- Right: Omnibox, Lore Toggle, Custom 3-Color Theme & Window Controls -->
-      <div class="no-drag flex items-center gap-2">
+      <!-- Right: Omnibox, Lore Toggle, Custom 3-Color Theme & Auto-Update -->
+      <div class="no-drag flex flex-wrap items-center gap-2">
         <!-- Quick Command Palette / Omnibox Button (Ctrl+K / Cmd+K) -->
         <button
           type="button"
@@ -181,7 +187,7 @@ onUnmounted(() => {
           >
         </button>
 
-        <div class="neu-groove-v h-4 my-auto"></div>
+        <div class="neu-groove-v h-4 my-auto shrink-0"></div>
 
         <!-- Wiki / Lore Inspector Toggle Button -->
         <button
@@ -222,12 +228,12 @@ onUnmounted(() => {
           </span>
         </button>
 
-        <div class="neu-groove-v h-4 my-auto"></div>
+        <div class="neu-groove-v h-4 my-auto shrink-0"></div>
 
         <!-- Custom 3-Color Theme Button -->
         <button
           type="button"
-          class="neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
+          class="no-drag neu-btn px-2.5 py-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:!text-[var(--accent)] transition-all cursor-pointer"
           :class="{ 'neu-well !text-[var(--accent)] font-semibold': uiStore.isThemeModalOpen }"
           title="Personalizar Colores (Botones, Texto y Background con filtros)"
           @click="uiStore.openThemeModal()"
@@ -252,39 +258,40 @@ onUnmounted(() => {
 
         <!-- Botón / Notificación de Auto-Actualización -->
         <UpdateNotificationBtn />
+      </div>
 
-        <div v-if="!isMac" class="neu-groove-v h-4 my-auto"></div>
+      <!-- Window Action Buttons (Solo en Windows y Linux, siempre fijos en la esquina superior derecha) -->
+      <div
+        v-if="!isMac"
+        class="no-drag absolute top-2 right-3.5 flex items-center gap-1 z-30"
+      >
+        <button
+          type="button"
+          class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
+          title="Minimizar"
+          @click="handleAction('minimize')"
+        >
+          <Minus :size="12" />
+        </button>
 
-        <!-- Window Action Buttons (Solo en Windows y Linux) -->
-        <div v-if="!isMac" class="flex items-center gap-1">
-          <button
-            type="button"
-            class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
-            title="Minimizar"
-            @click="handleAction('minimize')"
-          >
-            <Minus :size="12" />
-          </button>
+        <button
+          type="button"
+          class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
+          :title="isMaximized ? 'Restaurar' : 'Maximizar'"
+          @click="handleAction('maximize')"
+        >
+          <Copy v-if="isMaximized" :size="11" />
+          <Square v-else :size="11" />
+        </button>
 
-          <button
-            type="button"
-            class="neu-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
-            :title="isMaximized ? 'Restaurar' : 'Maximizar'"
-            @click="handleAction('maximize')"
-          >
-            <Copy v-if="isMaximized" :size="11" />
-            <Square v-else :size="11" />
-          </button>
-
-          <button
-            type="button"
-            class="neu-btn neu-close-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
-            title="Cerrar aplicación"
-            @click="handleAction('close')"
-          >
-            <X :size="13" />
-          </button>
-        </div>
+        <button
+          type="button"
+          class="neu-btn neu-close-btn w-7 h-7 flex items-center justify-center text-[var(--text-secondary)]"
+          title="Cerrar aplicación"
+          @click="handleAction('close')"
+        >
+          <X :size="13" />
+        </button>
       </div>
     </header>
 
